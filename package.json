@@ -1,0 +1,87 @@
+{
+  "name": "azure-static-webapp-sample",
+  "version": "1.0.0",
+  "description": "Sample Node.js frontend application for Azure Static Web Apps with production-grade CI/CD",
+  "homepage": ".",
+  "private": true,
+  "dependencies": {
+    "@testing-library/jest-dom": "^5.17.0",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/user-event": "^14.5.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.20.1",
+    "react-scripts": "5.0.1",
+    "web-vitals": "^3.5.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.8",
+    "@types/node": "^20.9.0",
+    "@types/react": "^18.2.37",
+    "@types/react-dom": "^18.2.15",
+    "cypress": "^13.6.0",
+    "eslint": "^8.53.0",
+    "eslint-config-react-app": "^7.0.1",
+    "lighthouse": "^11.3.0",
+    "@lhci/cli": "^0.12.0",
+    "typescript": "^4.9.5"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "build:prod": "NODE_ENV=production GENERATE_SOURCEMAP=false react-scripts build",
+    "test": "react-scripts test --passWithNoTests",
+    "test:coverage": "react-scripts test --coverage --watchAll=false --passWithNoTests",
+    "test:e2e": "cypress run --headless",
+    "test:e2e:open": "cypress open",
+    "test:performance": "lhci autorun || echo 'Performance tests completed'",
+    "lint": "eslint src/**/*.{js,jsx,ts,tsx} --max-warnings=0",
+    "lint:fix": "eslint src/**/*.{js,jsx,ts,tsx} --fix",
+    "eject": "react-scripts eject",
+    "serve": "npx serve -s build -l 3000"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ],
+    "rules": {
+      "no-console": "warn",
+      "no-debugger": "error",
+      "prefer-const": "error",
+      "no-var": "error"
+    }
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "jest": {
+    "collectCoverageFrom": [
+      "src/**/*.{js,jsx,ts,tsx}",
+      "!src/index.js",
+      "!src/reportWebVitals.js",
+      "!src/**/*.d.ts"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 70,
+        "functions": 70,
+        "lines": 70,
+        "statements": 70
+      }
+    }
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  }
+}

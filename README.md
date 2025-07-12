@@ -83,6 +83,7 @@ TEAMS_WEBHOOK_URL            # Microsoft Teams webhook
 |-------------|---------|---------|----------------|-----|
 | Development | `develop` | Push to develop | Short SHA | `https://dev-app.azurestaticapps.net` |
 | Staging | `main` | Push to main | Short SHA | `https://staging-app.azurestaticapps.net` |
+| Pre-Production | `release/**` | Push to release branch | Release version | `https://preprod-app.azurestaticapps.net` |
 | Production | `main` | Semantic release tag | Semantic version | `https://prod-app.azurestaticapps.net` |
 
 ## 🔄 CI/CD Pipeline
@@ -110,6 +111,15 @@ On push to `main` branch:
 4. **Deploy**: Deploy to staging environment
 5. **Verify**: Health check and integration tests
 
+### Pre-Production Deployment
+On push to `release/**` branch:
+1. **Build**: Compile application for pre-production
+2. **Testing**: Complete test suite including performance
+3. **Security**: Full security scan
+4. **Secrets**: Retrieve from Azure Key Vault
+5. **Deploy**: Deploy to pre-production environment
+6. **Verify**: Health check and integration tests
+
 ### Production Deployment
 On semantic release tag:
 1. **Build**: Compile application for production
@@ -127,6 +137,7 @@ Each environment has its own configuration file in the `environments/` directory
 
 - `environments/development.json`
 - `environments/staging.json`
+- `environments/pre-production.json`
 - `environments/production.json`
 
 ### Application Configuration
@@ -196,10 +207,12 @@ Ensure your `package.json` includes the following scripts:
 5. Merge after approval
 
 ### Release Process
-1. Merge `develop` into `main`
-2. Semantic release creates version tag
-3. Automatic production deployment
-4. Post-deployment verification
+1. Create `release/vX.Y.Z` branch from `develop`
+2. Deploy to pre-production for testing
+3. Merge release branch into `main`
+4. Semantic release creates version tag
+5. Automatic production deployment
+6. Post-deployment verification
 
 ### Hotfix Process
 1. Create hotfix branch from `main`

@@ -2,10 +2,10 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, 'release/**' ]
     tags: [ 'v*' ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main, develop, 'release/**' ]
     types: [ opened, synchronize, reopened ]
 
 env:
@@ -123,7 +123,59 @@ jobs:
           environment: staging
           version: ${{ github.sha }}
 
-  # Production Deployment
+  # Release Branch Deployment (Pre-production)
+  deploy-release:
+    name: Deploy Release Branch
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/heads/release/') && github.event_name == 'push'
+    environment: pre-production
+    needs: []
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Extract release version
+        id: extract-version
+        run: |
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          RELEASE_VERSION=${BRANCH_NAME#release/}
+          echo "release-version=$RELEASE_VERSION" >> $GITHUB_OUTPUT
+          echo "Release version: $RELEASE_VERSION"
+
+      - name: Run full test suite
+        run: |
+          npm run test:coverage
+          npm run test:e2e
+          npm run test:performance
+
+      - name: Security Scan
+        uses: ./.github/actions/security-scan
+        with:
+          sonar-token: ${{ secrets.SONAR_TOKEN }}
+          checkmarx-username: ${{ secrets.CHECKMARX_USERNAME }}
+          checkmarx-password: ${{ secrets.CHECKMARX_PASSWORD }}
+          checkmarx-server: ${{ secrets.CHECKMARX_SERVER }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get Azure Key Vault secrets
+        uses: ./.github/actions/azure-keyvault
+        with:
+          keyvault-name: ${{ secrets.AZURE_KEYVAULT_NAME_PROD }}
+          azure-credentials: ${{ secrets.AZURE_CREDENTIALS_PROD }}
+
+      - name: Deploy to Azure Static Web Apps (Release)
+        uses: ./.github/actions/deploy-static-app
+        with:
+          azure-static-web-apps-api-token: ${{ env.AZURE_STATIC_WEB_APPS_API_TOKEN_PROD }}
+          environment: pre-production
+          version: ${{ steps.extract-version.outputs.release-version }}
+
+  # Production Deployment (Semantic Tags)
   deploy-prod:
     name: Deploy to Production
     runs-on: ubuntu-latest
@@ -172,7 +224,7 @@ jobs:
     name: Cleanup on Failure
     runs-on: ubuntu-latest
     if: failure()
-    needs: [deploy-dev, deploy-staging, deploy-prod]
+    needs: [deploy-dev, deploy-staging, deploy-release, deploy-prod]
     steps:
       - name: Cleanup resources
         run: |

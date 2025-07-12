@@ -58,6 +58,10 @@ jobs:
               {
                 "name": "develop",
                 "prerelease": "dev"
+              },
+              {
+                "name": "release/*",
+                "prerelease": "rc"
               }
             ],
             "plugins": [

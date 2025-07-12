@@ -28,6 +28,7 @@ This guide provides a comprehensive overview of all the files created for the pr
 #### Environment Configuration
 - `environments/development.json` - Development environment configuration
 - `environments/staging.json` - Staging environment configuration
+- `environments/pre-production.json` - Pre-production environment configuration
 - `environments/production.json` - Production environment configuration
 - `.env.example` - Environment variables template
 
@@ -135,6 +136,11 @@ The branch protection workflow will automatically configure protection rules, bu
 - **Version**: Short SHA (e.g., `a1b2c3d`)
 - **Environment**: Staging
 
+### Pre-Production Deployment
+- **Trigger**: Push to `release/**` branch
+- **Version**: Release version (e.g., `1.2.3`)
+- **Environment**: Pre-Production
+
 ### Production Deployment
 - **Trigger**: Semantic release tag
 - **Version**: Semantic version (e.g., `v1.2.3`)
@@ -177,6 +183,7 @@ The branch protection workflow will automatically configure protection rules, bu
 Update the environment configuration files:
 - `environments/development.json`
 - `environments/staging.json`
+- `environments/pre-production.json`
 - `environments/production.json`
 
 ### Security Scanning
@@ -231,6 +238,9 @@ Once all prerequisites are met:
 3. Create PR from `develop` to `main`
 4. Verify all checks pass
 5. Merge PR to trigger staging deployment
-6. Create semantic release tag for production deployment
+6. Create `release/v1.0.0` branch for pre-production testing
+7. Verify pre-production deployment
+8. Merge release branch to `main` to trigger semantic release
+9. Verify production deployment
 
 Your production-grade CI/CD pipeline is now ready! 🎉

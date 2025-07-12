@@ -2,7 +2,7 @@ name: Branch Protection
 
 on:
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main, develop, 'release/**' ]
     types: [ opened, synchronize, reopened ]
   schedule:
     # Run daily to ensure protection rules are in place
@@ -76,6 +76,33 @@ jobs:
               required_conversation_resolution: true
             };
             
+            // Protection rules for release branches
+            const releaseProtection = {
+              required_status_checks: {
+                strict: true,
+                contexts: [
+                  'validate-pr',
+                  'Security Scan',
+                  'Regression Tests',
+                  'SonarCloud Quality Gate',
+                  'Checkmarx Scan'
+                ]
+              },
+              enforce_admins: true,
+              required_pull_request_reviews: {
+                required_approving_review_count: 2,
+                dismiss_stale_reviews: true,
+                require_code_owner_reviews: true,
+                require_last_push_approval: true
+              },
+              restrictions: null,
+              required_linear_history: true,
+              allow_force_pushes: false,
+              allow_deletions: false,
+              block_creations: false,
+              required_conversation_resolution: true
+            };
+            
             try {
               // Update main branch protection
               await github.rest.repos.updateBranchProtection({
@@ -94,6 +121,30 @@ jobs:
                 ...developProtection
               });
               console.log('✅ Develop branch protection updated');
+              
+              // Get all release branches and update their protection
+              const { data: branches } = await github.rest.repos.listBranches({
+                owner,
+                repo
+              });
+              
+              const releaseBranches = branches.filter(branch => 
+                branch.name.startsWith('release/')
+              );
+              
+              for (const branch of releaseBranches) {
+                try {
+                  await github.rest.repos.updateBranchProtection({
+                    owner,
+                    repo,
+                    branch: branch.name,
+                    ...releaseProtection
+                  });
+                  console.log(`✅ Release branch protection updated: ${branch.name}`);
+                } catch (branchError) {
+                  console.error(`❌ Failed to update protection for ${branch.name}:`, branchError.message);
+                }
+              }
               
             } catch (error) {
               console.error('❌ Failed to update branch protection:', error.message);
