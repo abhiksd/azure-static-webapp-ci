@@ -1,0 +1,300 @@
+name: Semantic Release
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run in dry-run mode'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  semantic-release:
+    name: Semantic Release
+    runs-on: ubuntu-latest
+    if: github.repository != 'github/docs-internal'
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      packages: write
+    outputs:
+      new-release-published: ${{ steps.release.outputs.new-release-published }}
+      new-release-version: ${{ steps.release.outputs.new-release-version }}
+      new-release-git-tag: ${{ steps.release.outputs.new-release-git-tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install semantic-release
+        run: |
+          npm install -g semantic-release
+          npm install -g @semantic-release/changelog
+          npm install -g @semantic-release/git
+          npm install -g @semantic-release/github
+          npm install -g @semantic-release/npm
+          npm install -g @semantic-release/exec
+
+      - name: Create semantic-release config
+        run: |
+          cat > .releaserc.json << 'EOF'
+          {
+            "branches": [
+              "main",
+              {
+                "name": "develop",
+                "prerelease": "dev"
+              }
+            ],
+            "plugins": [
+              "@semantic-release/commit-analyzer",
+              "@semantic-release/release-notes-generator",
+              [
+                "@semantic-release/changelog",
+                {
+                  "changelogFile": "CHANGELOG.md",
+                  "changelogTitle": "# Changelog\n\nAll notable changes to this project will be documented in this file."
+                }
+              ],
+              [
+                "@semantic-release/npm",
+                {
+                  "npmPublish": false
+                }
+              ],
+              [
+                "@semantic-release/exec",
+                {
+                  "prepareCmd": "echo 'Preparing release ${nextRelease.version}' && npm run build:prod || echo 'No build script found'",
+                  "publishCmd": "echo 'Publishing release ${nextRelease.version}'"
+                }
+              ],
+              [
+                "@semantic-release/github",
+                {
+                  "assets": [
+                    {
+                      "path": "build/**/*",
+                      "label": "Build artifacts"
+                    },
+                    {
+                      "path": "dist/**/*",
+                      "label": "Distribution files"
+                    }
+                  ]
+                }
+              ],
+              [
+                "@semantic-release/git",
+                {
+                  "assets": [
+                    "package.json",
+                    "package-lock.json",
+                    "CHANGELOG.md"
+                  ],
+                  "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+                }
+              ]
+            ]
+          }
+          EOF
+
+      - name: Run semantic release
+        id: release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          GIT_AUTHOR_NAME: semantic-release-bot
+          GIT_AUTHOR_EMAIL: semantic-release-bot@martynus.net
+          GIT_COMMITTER_NAME: semantic-release-bot
+          GIT_COMMITTER_EMAIL: semantic-release-bot@martynus.net
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "Running semantic-release in dry-run mode..."
+            npx semantic-release --dry-run
+          else
+            echo "Running semantic-release..."
+            npx semantic-release
+          fi
+
+      - name: Get release info
+        if: steps.release.outputs.new-release-published == 'true'
+        run: |
+          echo "✅ New release published!"
+          echo "Version: ${{ steps.release.outputs.new-release-version }}"
+          echo "Git Tag: ${{ steps.release.outputs.new-release-git-tag }}"
+
+  trigger-production-deployment:
+    name: Trigger Production Deployment
+    runs-on: ubuntu-latest
+    needs: semantic-release
+    if: needs.semantic-release.outputs.new-release-published == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.semantic-release.outputs.new-release-git-tag }}
+
+      - name: Trigger production deployment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const tagName = '${{ needs.semantic-release.outputs.new-release-git-tag }}';
+            
+            // Create a workflow dispatch event to trigger production deployment
+            try {
+              await github.rest.actions.createWorkflowDispatch({
+                owner,
+                repo,
+                workflow_id: 'ci-cd.yml',
+                ref: tagName
+              });
+              
+              console.log(`✅ Production deployment triggered for ${tagName}`);
+            } catch (error) {
+              console.error('❌ Failed to trigger production deployment:', error.message);
+            }
+
+      - name: Create deployment issue
+        if: needs.semantic-release.outputs.new-release-published == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const version = '${{ needs.semantic-release.outputs.new-release-version }}';
+            const tag = '${{ needs.semantic-release.outputs.new-release-git-tag }}';
+            
+            const issueBody = `## 🚀 Production Deployment - ${version}
+            
+            A new release has been automatically created and is being deployed to production.
+            
+            **Release Information:**
+            - Version: ${version}
+            - Tag: ${tag}
+            - Release Date: ${new Date().toISOString().split('T')[0]}
+            
+            **Deployment Status:**
+            - [x] Semantic release completed
+            - [ ] Production deployment in progress
+            - [ ] Health checks passed
+            - [ ] Deployment verified
+            
+            **Monitoring:**
+            - [ ] Application metrics normal
+            - [ ] Error rates within acceptable limits
+            - [ ] Performance metrics stable
+            
+            **Post-Deployment Tasks:**
+            - [ ] Verify core functionality
+            - [ ] Check user-facing features
+            - [ ] Monitor for any issues
+            - [ ] Update documentation if needed
+            
+            This issue will be automatically closed once the deployment is verified.
+            
+            ---
+            *Automated by semantic-release workflow*`;
+            
+            await github.rest.issues.create({
+              owner,
+              repo,
+              title: `🚀 Production Deployment - ${version}`,
+              body: issueBody,
+              labels: ['deployment', 'production', 'automated']
+            });
+
+  notify-teams:
+    name: Notify Teams
+    runs-on: ubuntu-latest
+    needs: [semantic-release, trigger-production-deployment]
+    if: always() && needs.semantic-release.outputs.new-release-published == 'true'
+    steps:
+      - name: Notify Slack
+        if: env.SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          VERSION="${{ needs.semantic-release.outputs.new-release-version }}"
+          TAG="${{ needs.semantic-release.outputs.new-release-git-tag }}"
+          
+          curl -X POST -H 'Content-type: application/json' \
+            --data "{
+              \"text\": \"🚀 New release deployed!\",
+              \"attachments\": [{
+                \"color\": \"good\",
+                \"fields\": [{
+                  \"title\": \"Version\",
+                  \"value\": \"$VERSION\",
+                  \"short\": true
+                }, {
+                  \"title\": \"Tag\",
+                  \"value\": \"$TAG\",
+                  \"short\": true
+                }, {
+                  \"title\": \"Repository\",
+                  \"value\": \"$GITHUB_REPOSITORY\",
+                  \"short\": true
+                }, {
+                  \"title\": \"Workflow\",
+                  \"value\": \"<https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID|View Workflow>\",
+                  \"short\": true
+                }]
+              }]
+            }" \
+            $SLACK_WEBHOOK_URL
+
+      - name: Notify Microsoft Teams
+        if: env.TEAMS_WEBHOOK_URL != ''
+        env:
+          TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
+        run: |
+          VERSION="${{ needs.semantic-release.outputs.new-release-version }}"
+          TAG="${{ needs.semantic-release.outputs.new-release-git-tag }}"
+          
+          curl -X POST -H 'Content-type: application/json' \
+            --data "{
+              \"@type\": \"MessageCard\",
+              \"@context\": \"https://schema.org/extensions\",
+              \"summary\": \"New Release Deployed\",
+              \"themeColor\": \"0078D4\",
+              \"title\": \"🚀 New Release Deployed - $VERSION\",
+              \"sections\": [{
+                \"activityTitle\": \"Release Information\",
+                \"facts\": [{
+                  \"name\": \"Version\",
+                  \"value\": \"$VERSION\"
+                }, {
+                  \"name\": \"Tag\",
+                  \"value\": \"$TAG\"
+                }, {
+                  \"name\": \"Repository\",
+                  \"value\": \"$GITHUB_REPOSITORY\"
+                }]
+              }],
+              \"potentialAction\": [{
+                \"@type\": \"OpenUri\",
+                \"name\": \"View Workflow\",
+                \"targets\": [{
+                  \"os\": \"default\",
+                  \"uri\": \"https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID\"
+                }]
+              }]
+            }" \
+            $TEAMS_WEBHOOK_URL

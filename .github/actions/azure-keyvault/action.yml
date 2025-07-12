@@ -1,0 +1,180 @@
+name: 'Azure Key Vault'
+description: 'Retrieve secrets from Azure Key Vault'
+
+inputs:
+  keyvault-name:
+    description: 'Name of the Azure Key Vault'
+    required: true
+  azure-credentials:
+    description: 'Azure service principal credentials (JSON)'
+    required: true
+  secrets-list:
+    description: 'Comma-separated list of secrets to retrieve'
+    required: false
+    default: ''
+  set-env-vars:
+    description: 'Set retrieved secrets as environment variables'
+    required: false
+    default: 'true'
+
+outputs:
+  secrets-retrieved:
+    description: 'Number of secrets successfully retrieved'
+    value: ${{ steps.get-secrets.outputs.secrets-count }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ inputs.azure-credentials }}
+
+    - name: Get Key Vault Secrets
+      id: get-secrets
+      shell: bash
+      run: |
+        KEYVAULT_NAME="${{ inputs.keyvault-name }}"
+        SECRETS_LIST="${{ inputs.secrets-list }}"
+        SET_ENV_VARS="${{ inputs.set-env-vars }}"
+        
+        echo "🔑 Retrieving secrets from Key Vault: $KEYVAULT_NAME"
+        
+        # If no specific secrets list provided, get common application secrets
+        if [ -z "$SECRETS_LIST" ]; then
+          SECRETS_LIST="app-config,database-connection,api-keys,jwt-secret,storage-connection"
+        fi
+        
+        # Convert comma-separated list to array
+        IFS=',' read -ra SECRETS_ARRAY <<< "$SECRETS_LIST"
+        
+        SECRETS_COUNT=0
+        RETRIEVED_SECRETS=""
+        
+        for secret in "${SECRETS_ARRAY[@]}"; do
+          # Remove leading/trailing whitespace
+          secret=$(echo "$secret" | xargs)
+          
+          echo "Retrieving secret: $secret"
+          
+          # Try to get the secret
+          SECRET_VALUE=$(az keyvault secret show --vault-name "$KEYVAULT_NAME" --name "$secret" --query value -o tsv 2>/dev/null || echo "")
+          
+          if [ -n "$SECRET_VALUE" ]; then
+            echo "✅ Successfully retrieved: $secret"
+            SECRETS_COUNT=$((SECRETS_COUNT + 1))
+            RETRIEVED_SECRETS="$RETRIEVED_SECRETS,$secret"
+            
+            # Set as environment variable if requested
+            if [ "$SET_ENV_VARS" = "true" ]; then
+              # Convert secret name to environment variable format
+              ENV_VAR_NAME=$(echo "$secret" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
+              echo "Setting environment variable: $ENV_VAR_NAME"
+              echo "$ENV_VAR_NAME=$SECRET_VALUE" >> $GITHUB_ENV
+              
+              # Also set as output for use in subsequent steps
+              echo "::add-mask::$SECRET_VALUE"
+              echo "$ENV_VAR_NAME=$SECRET_VALUE" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "⚠️  Failed to retrieve or secret not found: $secret"
+          fi
+        done
+        
+        echo "secrets-count=$SECRETS_COUNT" >> $GITHUB_OUTPUT
+        echo "retrieved-secrets=${RETRIEVED_SECRETS#,}" >> $GITHUB_OUTPUT
+        
+        echo "🎉 Successfully retrieved $SECRETS_COUNT secrets"
+
+    - name: Set Common Application Secrets
+      shell: bash
+      run: |
+        # Set common application configuration from Key Vault
+        echo "🔧 Setting up application configuration..."
+        
+        # Database configuration
+        if [ -n "$DATABASE_CONNECTION" ]; then
+          echo "DATABASE_URL=$DATABASE_CONNECTION" >> $GITHUB_ENV
+        fi
+        
+        # API configuration
+        if [ -n "$API_KEYS" ]; then
+          echo "API_KEYS=$API_KEYS" >> $GITHUB_ENV
+        fi
+        
+        # JWT configuration
+        if [ -n "$JWT_SECRET" ]; then
+          echo "JWT_SECRET=$JWT_SECRET" >> $GITHUB_ENV
+        fi
+        
+        # Storage configuration
+        if [ -n "$STORAGE_CONNECTION" ]; then
+          echo "AZURE_STORAGE_CONNECTION_STRING=$STORAGE_CONNECTION" >> $GITHUB_ENV
+        fi
+        
+        # Application configuration
+        if [ -n "$APP_CONFIG" ]; then
+          echo "APP_CONFIG=$APP_CONFIG" >> $GITHUB_ENV
+        fi
+
+    - name: Validate Retrieved Secrets
+      shell: bash
+      run: |
+        echo "🔍 Validating retrieved secrets..."
+        
+        SECRETS_COUNT="${{ steps.get-secrets.outputs.secrets-count }}"
+        RETRIEVED_SECRETS="${{ steps.get-secrets.outputs.retrieved-secrets }}"
+        
+        echo "Total secrets retrieved: $SECRETS_COUNT"
+        echo "Secrets list: $RETRIEVED_SECRETS"
+        
+        # Check if critical secrets are available
+        CRITICAL_SECRETS="database-connection,api-keys"
+        IFS=',' read -ra CRITICAL_ARRAY <<< "$CRITICAL_SECRETS"
+        
+        MISSING_CRITICAL=0
+        for critical in "${CRITICAL_ARRAY[@]}"; do
+          if [[ "$RETRIEVED_SECRETS" != *"$critical"* ]]; then
+            echo "⚠️  Critical secret missing: $critical"
+            MISSING_CRITICAL=$((MISSING_CRITICAL + 1))
+          fi
+        done
+        
+        if [ $MISSING_CRITICAL -gt 0 ]; then
+          echo "❌ Some critical secrets are missing"
+          echo "This may cause deployment issues"
+        else
+          echo "✅ All critical secrets are available"
+        fi
+
+    - name: Create Environment Configuration
+      shell: bash
+      run: |
+        # Create a .env file for local development reference
+        cat > .env.example << EOF
+        # Environment Variables Retrieved from Azure Key Vault
+        # Copy this file to .env and fill in the values for local development
+        
+        # Database Configuration
+        DATABASE_URL=your-database-connection-string
+        
+        # API Configuration
+        API_KEYS=your-api-keys
+        
+        # JWT Configuration
+        JWT_SECRET=your-jwt-secret
+        
+        # Storage Configuration
+        AZURE_STORAGE_CONNECTION_STRING=your-storage-connection
+        
+        # Application Configuration
+        APP_CONFIG=your-app-config
+        
+        # Note: Actual values are retrieved from Azure Key Vault during deployment
+        EOF
+        
+        echo "📝 Created .env.example file for reference"
+
+    - name: Azure Logout
+      if: always()
+      uses: azure/logout@v1
