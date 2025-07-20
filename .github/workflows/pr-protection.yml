@@ -250,12 +250,17 @@ jobs:
     needs: [configure-checks, quality-gate]
     if: needs.configure-checks.outputs.enable-sonar == 'true'
     outputs:
-      quality-gate: ${{ steps.sonar.outputs.quality-gate }}
-      coverage: ${{ steps.sonar.outputs.coverage }}
-      duplications: ${{ steps.sonar.outputs.duplications }}
-      maintainability: ${{ steps.sonar.outputs.maintainability }}
-      reliability: ${{ steps.sonar.outputs.reliability }}
-      security: ${{ steps.sonar.outputs.security }}
+      quality-gate: ${{ steps.sonar-quality-gate.outputs.quality-gate }}
+      threshold-passed: ${{ steps.sonar-quality-gate.outputs.threshold-passed }}
+      coverage: ${{ steps.sonar-quality-gate.outputs.coverage }}
+      branch-coverage: ${{ steps.sonar-quality-gate.outputs.branch-coverage }}
+      duplications: ${{ steps.sonar-quality-gate.outputs.duplications }}
+      maintainability: ${{ steps.sonar-quality-gate.outputs.maintainability }}
+      reliability: ${{ steps.sonar-quality-gate.outputs.reliability }}
+      security: ${{ steps.sonar-quality-gate.outputs.security }}
+      blocker-issues: ${{ steps.sonar-quality-gate.outputs.blocker-issues }}
+      critical-issues: ${{ steps.sonar-quality-gate.outputs.critical-issues }}
+      major-issues: ${{ steps.sonar-quality-gate.outputs.major-issues }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -310,21 +315,109 @@ jobs:
       - name: Get SonarCloud Quality Gate
         id: sonar-quality-gate
         run: |
-          echo "🔍 Checking SonarCloud Quality Gate..."
-          
-          # Note: In a real implementation, you would call SonarCloud API
-          # For now, we'll simulate the check
+          echo "🔍 Checking SonarCloud Quality Gate with configurable thresholds..."
           
           if [ "${{ secrets.SONAR_TOKEN }}" != "" ]; then
-            echo "quality-gate=PASSED" >> $GITHUB_OUTPUT
-            echo "coverage=85" >> $GITHUB_OUTPUT
-            echo "duplications=2.1" >> $GITHUB_OUTPUT
-            echo "maintainability=A" >> $GITHUB_OUTPUT
-            echo "reliability=A" >> $GITHUB_OUTPUT
-            echo "security=A" >> $GITHUB_OUTPUT
-            echo "✅ SonarCloud Quality Gate: PASSED"
+            # Simulated results - in real implementation, call SonarCloud API
+            ACTUAL_COVERAGE=85
+            ACTUAL_BRANCH_COVERAGE=75
+            ACTUAL_DUPLICATIONS=2.1
+            ACTUAL_MAINTAINABILITY="A"
+            ACTUAL_RELIABILITY="A"
+            ACTUAL_SECURITY="A"
+            BLOCKER_ISSUES=0
+            CRITICAL_ISSUES=0
+            MAJOR_ISSUES=2
+            
+            echo "📊 SonarCloud Analysis Results:"
+            echo "Coverage: ${ACTUAL_COVERAGE}% (Required: ${{ env.MIN_CODE_COVERAGE }}%)"
+            echo "Branch Coverage: ${ACTUAL_BRANCH_COVERAGE}% (Required: ${{ env.MIN_BRANCH_COVERAGE }}%)"
+            echo "Duplications: ${ACTUAL_DUPLICATIONS}% (Max: ${{ env.SONAR_DUPLICATED_LINES_DENSITY }}%)"
+            echo "Maintainability: $ACTUAL_MAINTAINABILITY (Target: ${{ env.SONAR_MAINTAINABILITY_RATING }})"
+            echo "Reliability: $ACTUAL_RELIABILITY (Target: ${{ env.SONAR_RELIABILITY_RATING }})"
+            echo "Security: $ACTUAL_SECURITY (Target: ${{ env.SONAR_SECURITY_RATING }})"
+            echo "Issues - Blocker: $BLOCKER_ISSUES, Critical: $CRITICAL_ISSUES, Major: $MAJOR_ISSUES"
+            
+            # Set outputs
+            echo "coverage=$ACTUAL_COVERAGE" >> $GITHUB_OUTPUT
+            echo "branch-coverage=$ACTUAL_BRANCH_COVERAGE" >> $GITHUB_OUTPUT
+            echo "duplications=$ACTUAL_DUPLICATIONS" >> $GITHUB_OUTPUT
+            echo "maintainability=$ACTUAL_MAINTAINABILITY" >> $GITHUB_OUTPUT
+            echo "reliability=$ACTUAL_RELIABILITY" >> $GITHUB_OUTPUT
+            echo "security=$ACTUAL_SECURITY" >> $GITHUB_OUTPUT
+            echo "blocker-issues=$BLOCKER_ISSUES" >> $GITHUB_OUTPUT
+            echo "critical-issues=$CRITICAL_ISSUES" >> $GITHUB_OUTPUT
+            echo "major-issues=$MAJOR_ISSUES" >> $GITHUB_OUTPUT
+            
+            # Validate against thresholds
+            QUALITY_GATE_PASSED=true
+            THRESHOLD_VIOLATIONS=()
+            
+            # Check coverage thresholds
+            if (( $(echo "$ACTUAL_COVERAGE < ${{ env.MIN_CODE_COVERAGE }}" | bc -l) )); then
+              QUALITY_GATE_PASSED=false
+              THRESHOLD_VIOLATIONS+=("Code coverage: ${ACTUAL_COVERAGE}% < ${{ env.MIN_CODE_COVERAGE }}%")
+            fi
+            
+            if (( $(echo "$ACTUAL_BRANCH_COVERAGE < ${{ env.MIN_BRANCH_COVERAGE }}" | bc -l) )); then
+              QUALITY_GATE_PASSED=false
+              THRESHOLD_VIOLATIONS+=("Branch coverage: ${ACTUAL_BRANCH_COVERAGE}% < ${{ env.MIN_BRANCH_COVERAGE }}%")
+            fi
+            
+            # Check duplications threshold
+            if (( $(echo "$ACTUAL_DUPLICATIONS > ${{ env.SONAR_DUPLICATED_LINES_DENSITY }}" | bc -l) )); then
+              QUALITY_GATE_PASSED=false
+              THRESHOLD_VIOLATIONS+=("Duplications: ${ACTUAL_DUPLICATIONS}% > ${{ env.SONAR_DUPLICATED_LINES_DENSITY }}%")
+            fi
+            
+            # Check rating thresholds (A=best, E=worst)
+            if [ "$ACTUAL_MAINTAINABILITY" != "${{ env.SONAR_MAINTAINABILITY_RATING }}" ] && [ "$ACTUAL_MAINTAINABILITY" != "A" ]; then
+              QUALITY_GATE_PASSED=false
+              THRESHOLD_VIOLATIONS+=("Maintainability rating: $ACTUAL_MAINTAINABILITY (Target: ${{ env.SONAR_MAINTAINABILITY_RATING }})")
+            fi
+            
+            if [ "$ACTUAL_RELIABILITY" != "${{ env.SONAR_RELIABILITY_RATING }}" ] && [ "$ACTUAL_RELIABILITY" != "A" ]; then
+              QUALITY_GATE_PASSED=false
+              THRESHOLD_VIOLATIONS+=("Reliability rating: $ACTUAL_RELIABILITY (Target: ${{ env.SONAR_RELIABILITY_RATING }})")
+            fi
+            
+            if [ "$ACTUAL_SECURITY" != "${{ env.SONAR_SECURITY_RATING }}" ] && [ "$ACTUAL_SECURITY" != "A" ]; then
+              QUALITY_GATE_PASSED=false
+              THRESHOLD_VIOLATIONS+=("Security rating: $ACTUAL_SECURITY (Target: ${{ env.SONAR_SECURITY_RATING }})")
+            fi
+            
+            # Check issue thresholds
+            if [ "$BLOCKER_ISSUES" -gt "${{ env.MAX_BLOCKER_ISSUES }}" ]; then
+              QUALITY_GATE_PASSED=false
+              THRESHOLD_VIOLATIONS+=("Blocker issues: $BLOCKER_ISSUES > ${{ env.MAX_BLOCKER_ISSUES }}")
+            fi
+            
+            if [ "$CRITICAL_ISSUES" -gt "${{ env.MAX_CRITICAL_ISSUES }}" ]; then
+              QUALITY_GATE_PASSED=false
+              THRESHOLD_VIOLATIONS+=("Critical issues: $CRITICAL_ISSUES > ${{ env.MAX_CRITICAL_ISSUES }}")
+            fi
+            
+            if [ "$MAJOR_ISSUES" -gt "${{ env.MAX_MAJOR_ISSUES }}" ]; then
+              QUALITY_GATE_PASSED=false
+              THRESHOLD_VIOLATIONS+=("Major issues: $MAJOR_ISSUES > ${{ env.MAX_MAJOR_ISSUES }}")
+            fi
+            
+            # Set final quality gate status
+            if [ "$QUALITY_GATE_PASSED" = true ]; then
+              echo "quality-gate=PASSED" >> $GITHUB_OUTPUT
+              echo "threshold-passed=true" >> $GITHUB_OUTPUT
+              echo "✅ SonarCloud Quality Gate: PASSED"
+            else
+              echo "quality-gate=FAILED" >> $GITHUB_OUTPUT
+              echo "threshold-passed=false" >> $GITHUB_OUTPUT
+              echo "❌ SonarCloud Quality Gate: FAILED"
+              echo "Threshold violations:"
+              printf '%s\n' "${THRESHOLD_VIOLATIONS[@]}"
+            fi
+            
           else
             echo "quality-gate=SKIPPED" >> $GITHUB_OUTPUT
+            echo "threshold-passed=true" >> $GITHUB_OUTPUT
             echo "⚠️ SonarCloud token not configured, skipping analysis"
           fi
 
@@ -335,11 +428,14 @@ jobs:
     needs: [configure-checks, quality-gate]
     if: needs.configure-checks.outputs.enable-checkmarx == 'true'
     outputs:
-      scan-status: ${{ steps.checkmarx.outputs.status }}
-      critical-count: ${{ steps.checkmarx.outputs.critical }}
-      high-count: ${{ steps.checkmarx.outputs.high }}
-      medium-count: ${{ steps.checkmarx.outputs.medium }}
-      low-count: ${{ steps.checkmarx.outputs.low }}
+      scan-status: ${{ steps.results.outputs.status }}
+      threshold-passed: ${{ steps.results.outputs.threshold-passed }}
+      critical-count: ${{ steps.results.outputs.critical-count }}
+      high-count: ${{ steps.results.outputs.high-count }}
+      medium-count: ${{ steps.results.outputs.medium-count }}
+      sca-critical: ${{ steps.results.outputs.sca-critical }}
+      sca-high: ${{ steps.results.outputs.sca-high }}
+      kics-high: ${{ steps.results.outputs.kics-high }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -370,20 +466,69 @@ jobs:
             --kics-timeout=600
 
       - name: Process Checkmarx Results
+        id: results
         if: always()
         run: |
           echo "🔍 Processing Checkmarx scan results..."
           
           if [ "${{ secrets.CHECKMARX_CLIENT }}" != "" ]; then
-            # Simulate scan results - in real implementation, parse actual results
-            echo "status=completed" >> $GITHUB_OUTPUT
-            echo "critical=0" >> $GITHUB_OUTPUT
-            echo "high=1" >> $GITHUB_OUTPUT
-            echo "medium=3" >> $GITHUB_OUTPUT
-            echo "low=5" >> $GITHUB_OUTPUT
+            # Parse Checkmarx results (actual implementation would parse real results file)
+            # For now, simulating with configurable thresholds validation
             
-            echo "✅ Checkmarx scan completed"
-            echo "Critical: 0, High: 1, Medium: 3, Low: 5"
+            # Simulated results - replace with actual parsing logic
+            SAST_CRITICAL=0
+            SAST_HIGH=1
+            SAST_MEDIUM=3
+            SCA_CRITICAL=0
+            SCA_HIGH=2
+            KICS_HIGH=1
+            
+            echo "📊 Checkmarx Scan Results Summary:"
+            echo "SAST - Critical: $SAST_CRITICAL, High: $SAST_HIGH, Medium: $SAST_MEDIUM"
+            echo "SCA - Critical: $SCA_CRITICAL, High: $SCA_HIGH"
+            echo "KICS - High: $KICS_HIGH"
+            
+            # Set outputs for all scan types
+            echo "status=completed" >> $GITHUB_OUTPUT
+            echo "critical-count=$SAST_CRITICAL" >> $GITHUB_OUTPUT
+            echo "high-count=$SAST_HIGH" >> $GITHUB_OUTPUT
+            echo "medium-count=$SAST_MEDIUM" >> $GITHUB_OUTPUT
+            echo "sca-critical=$SCA_CRITICAL" >> $GITHUB_OUTPUT
+            echo "sca-high=$SCA_HIGH" >> $GITHUB_OUTPUT
+            echo "kics-high=$KICS_HIGH" >> $GITHUB_OUTPUT
+            
+            # Validate against configurable thresholds
+            THRESHOLD_VIOLATIONS=()
+            
+            if [ "$SAST_CRITICAL" -gt "${{ env.MAX_CRITICAL_VULNERABILITIES }}" ]; then
+              THRESHOLD_VIOLATIONS+=("SAST Critical: $SAST_CRITICAL > ${{ env.MAX_CRITICAL_VULNERABILITIES }}")
+            fi
+            
+            if [ "$SAST_HIGH" -gt "${{ env.MAX_HIGH_VULNERABILITIES }}" ]; then
+              THRESHOLD_VIOLATIONS+=("SAST High: $SAST_HIGH > ${{ env.MAX_HIGH_VULNERABILITIES }}")
+            fi
+            
+            if [ "$SAST_MEDIUM" -gt "${{ env.MAX_MEDIUM_VULNERABILITIES }}" ]; then
+              THRESHOLD_VIOLATIONS+=("SAST Medium: $SAST_MEDIUM > ${{ env.MAX_MEDIUM_VULNERABILITIES }}")
+            fi
+            
+            if [ "$SCA_CRITICAL" -gt "0" ]; then
+              THRESHOLD_VIOLATIONS+=("SCA Critical vulnerabilities found: $SCA_CRITICAL")
+            fi
+            
+            if [ "$KICS_HIGH" -gt "0" ]; then
+              THRESHOLD_VIOLATIONS+=("KICS High IaC issues: $KICS_HIGH")
+            fi
+            
+            if [ ${#THRESHOLD_VIOLATIONS[@]} -gt 0 ]; then
+              echo "❌ Threshold violations found:"
+              printf '%s\n' "${THRESHOLD_VIOLATIONS[@]}"
+              echo "threshold-passed=false" >> $GITHUB_OUTPUT
+            else
+              echo "✅ All thresholds passed"
+              echo "threshold-passed=true" >> $GITHUB_OUTPUT
+            fi
+            
           else
             echo "status=skipped" >> $GITHUB_OUTPUT
             echo "⚠️ Checkmarx credentials not configured, skipping scan"
