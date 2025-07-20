@@ -39,12 +39,12 @@ Comprehensive SonarCloud analysis with configurable quality gates and coverage t
 Comprehensive Checkmarx security scanning with configurable vulnerability thresholds.
 
 **Features:**
-- ✅ **Real Checkmarx CxFlow integration** with SARIF result parsing
+- ✅ **Real Checkmarx AST CLI integration** with official GitHub action
+- ✅ **SCA Resolver support** for Java projects (auto-detected)
 - ✅ **Multiple scan types** (SAST, SCA, KICS)
-- ✅ **Essential vulnerability metrics** (critical, high, medium)
-- ✅ **Easy enable/disable** functionality
-- ✅ **Simplified threshold validation**
-- ✅ **Clean reporting** without information overload
+- ✅ **Real SARIF result parsing** from AST output files
+- ✅ **Essential vulnerability metrics** with threshold validation
+- ✅ **Production-grade** scanning with intermediate complexity
 
 **Usage:**
 ```yaml
@@ -122,9 +122,10 @@ CHECKMARX_EXCLUDE_FILES="*.min.js,*.bundle.js"
 
 **Secrets:**
 ```bash
-CHECKMARX_CLIENT                        # Checkmarx client ID
-CHECKMARX_SECRET                        # Checkmarx client secret
-CHECKMARX_SERVER                        # Checkmarx server URL (optional)
+CHECKMARX_CLIENT_ID                     # Checkmarx AST client ID
+CHECKMARX_SECRET                        # Checkmarx AST client secret
+CHECKMARX_TENANT                        # Checkmarx AST tenant name
+CHECKMARX_BASE_URI                      # Checkmarx AST base URI (optional)
 ```
 
 ## 🔧 Action Configuration Details

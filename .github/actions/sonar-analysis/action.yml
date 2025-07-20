@@ -146,16 +146,42 @@ runs:
         GITHUB_TOKEN: ${{ inputs.github-token }}
         SONAR_TOKEN: ${{ inputs.sonar-token }}
 
-    - name: Wait for SonarCloud Quality Gate
+    - name: Wait for SonarCloud Analysis Completion
       if: env.SONAR_ENABLED == 'true'
       shell: bash
       run: |
         echo "⏳ Waiting for SonarCloud analysis to complete..."
         
-        # Wait for the analysis to complete
-        sleep 30
+        PROJECT_KEY="${{ inputs.project-key || github.repository }}"
+        PROJECT_KEY_ENCODED=$(echo "$PROJECT_KEY" | sed 's/\//%2F/g')
         
-        echo "✅ SonarCloud analysis completed, checking quality gate..."
+        # Wait and check for analysis completion
+        for i in {1..10}; do
+          echo "  Checking analysis status (attempt $i/10)..."
+          
+          TASK_RESPONSE=$(curl -s -u "${{ inputs.sonar-token }}:" \
+            "https://sonarcloud.io/api/ce/component?component=$PROJECT_KEY_ENCODED" || echo "")
+          
+          if [[ -n "$TASK_RESPONSE" ]] && echo "$TASK_RESPONSE" | jq -e '.current' > /dev/null 2>&1; then
+            TASK_STATUS=$(echo "$TASK_RESPONSE" | jq -r '.current.status // "PENDING"')
+            echo "  Analysis status: $TASK_STATUS"
+            
+            if [[ "$TASK_STATUS" == "SUCCESS" ]]; then
+              echo "✅ SonarCloud analysis completed successfully"
+              break
+            elif [[ "$TASK_STATUS" == "FAILED" ]] || [[ "$TASK_STATUS" == "CANCELLED" ]]; then
+              echo "❌ SonarCloud analysis failed with status: $TASK_STATUS"
+              break
+            fi
+          fi
+          
+          if [[ $i -lt 10 ]]; then
+            echo "  Waiting 15 seconds before next check..."
+            sleep 15
+          fi
+        done
+        
+        echo "📊 Ready to fetch quality gate results..."
 
     - name: Get SonarCloud Results
       id: quality-gate

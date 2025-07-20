@@ -13,9 +13,13 @@ inputs:
     description: 'Checkmarx client secret'
     required: true
   checkmarx-server:
-    description: 'Checkmarx server URL'
+    description: 'Checkmarx tenant (for AST)'
     required: false
-    default: 'https://checkmarx.company.com'
+    default: 'your-tenant'
+  base-uri:
+    description: 'Checkmarx AST base URI'
+    required: false
+    default: 'https://ast.checkmarx.net'
   scan-types:
     description: 'Scan types (comma-separated: sca,sast,kics)'
     required: false
@@ -144,49 +148,116 @@ runs:
         echo "  📂 Folders: ${{ inputs.exclude-folders }}"
         echo "  📄 Files: ${{ inputs.exclude-files }}"
 
-    - name: Run Checkmarx CxFlow Security Scan
-      if: env.CHECKMARX_ENABLED == 'true'
-      uses: checkmarx-ts/checkmarx-cxflow-github-action@v1.6
-      with:
-        project: ${{ inputs.project-name || github.repository }}
-        team: ${{ inputs.team }}
-        checkmarx_url: ${{ inputs.checkmarx-server }}
-        checkmarx_client: ${{ inputs.checkmarx-client }}
-        checkmarx_secret: ${{ inputs.checkmarx-secret }}
-        scanners: ${{ inputs.scan-types }}
-        incremental: ${{ inputs.incremental }}
-        preset: ${{ inputs.preset }}
-        exclude_folders: ${{ inputs.exclude-folders }}
-        exclude_files: ${{ inputs.exclude-files }}
-        github_token: ${{ github.token }}
-        bug_tracker: Sarif
-        params: |
-          --bug-tracker-impl=SARIF
-          --cx-flow.bug-tracker-impl=SARIF
-          --logging.level.com.checkmarx=DEBUG
-          --checkmarx.version=9.0
-          --checkmarx.scan-preset="${{ inputs.preset }}"
-          --checkmarx.incremental=${{ inputs.incremental }}
-          --checkmarx.exclude-folders="${{ inputs.exclude-folders }}"
-          --checkmarx.exclude-files="${{ inputs.exclude-files }}"
-
-    - name: Process Checkmarx Results
+    - name: Setup Checkmarx Scan Configuration
       if: env.CHECKMARX_ENABLED == 'true'
       shell: bash
       run: |
-        echo "📊 Processing Checkmarx scan results..."
+        echo "🔧 Setting up Checkmarx AST scan configuration..."
         
-        # Look for SARIF files from CxFlow
-        SARIF_FILES=$(find . -name "*.sarif" -o -name "*checkmarx*.json" 2>/dev/null | head -3)
+        # Parse scan types to build additional parameters
+        SCAN_TYPES="${{ inputs.scan-types }}"
+        ADDITIONAL_PARAMS=""
+        
+        # Handle SAST configuration
+        if [[ "$SCAN_TYPES" == *"sast"* ]]; then
+          ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --scan-types sast"
+          ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --sast-preset-name '${{ inputs.preset }}'"
+          ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --sast-incremental ${{ inputs.incremental }}"
+          if [[ -n "${{ inputs.exclude-folders }}" ]]; then
+            ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --sast-filter '${{ inputs.exclude-folders }}'"
+          fi
+        fi
+        
+        # Handle SCA configuration  
+        if [[ "$SCAN_TYPES" == *"sca"* ]]; then
+          ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --scan-types sca"
+        fi
+        
+        # Handle KICS configuration
+        if [[ "$SCAN_TYPES" == *"kics"* ]]; then
+          ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --scan-types kics"
+        fi
+        
+        # Add output format
+        ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --report-format sarif,json"
+        ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --output-path ."
+        
+        echo "CHECKMARX_ADDITIONAL_PARAMS=$ADDITIONAL_PARAMS" >> $GITHUB_ENV
+        echo "✅ Checkmarx scan parameters configured"
+
+    - name: Download SCA Resolver (for Java projects)
+      if: env.CHECKMARX_ENABLED == 'true' && contains(inputs.scan-types, 'sca') && (contains(github.workspace, 'pom.xml') || contains(github.workspace, 'build.gradle'))
+      shell: bash
+      run: |
+        echo "📦 Downloading SCA Resolver for Java project..."
+        wget https://sca-downloads.s3.amazonaws.com/cli/2.7.2/ScaResolver-linux64.tar.gz
+        tar -xzvf ScaResolver-linux64.tar.gz
+        rm -rf ScaResolver-linux64.tar.gz
+        echo "✅ SCA Resolver downloaded"
+
+    - name: Run SCA Resolver Scan (for Java projects)
+      if: env.CHECKMARX_ENABLED == 'true' && contains(inputs.scan-types, 'sca') && (contains(github.workspace, 'pom.xml') || contains(github.workspace, 'build.gradle'))
+      shell: bash
+      run: |
+        echo "🔍 Running SCA resolver scan for Java dependencies..."
+        ./ScaResolver offline -r ".cxsca-results.json" -s . -n "${{ inputs.project-name || github.repository }}" --log-level Debug
+        echo "✅ SCA resolver scan completed"
+
+    - name: Run Checkmarx AST Scan
+      if: env.CHECKMARX_ENABLED == 'true'
+      uses: checkmarx/ast-github-action@86e9ae570a811f9a1fb85903647a307aa3bf6253 # v2.0.44
+      with:
+        project_name: ${{ inputs.project-name || github.repository }}
+        cx_tenant: ${{ inputs.checkmarx-server }}
+        base_uri: ${{ inputs.base-uri }}
+        cx_client_id: ${{ inputs.checkmarx-client }}
+        cx_client_secret: ${{ inputs.checkmarx-secret }}
+        additional_params: ${{ env.CHECKMARX_ADDITIONAL_PARAMS }}
+
+    - name: Process Checkmarx AST Results
+      if: env.CHECKMARX_ENABLED == 'true'
+      shell: bash
+      run: |
+        echo "📊 Processing Checkmarx AST scan results..."
+        
+        # Look for AST result files (SARIF and JSON)
+        echo "🔍 Searching for Checkmarx AST result files..."
+        
+        # AST typically generates results with patterns like:
+        # - cx_result.sarif, cx_result.json
+        # - checkmarx-*.sarif, checkmarx-*.json  
+        # - sast-results.sarif, sca-results.json, kics-results.sarif
+        SARIF_FILES=$(find . -maxdepth 2 \( -name "*.sarif" -o -name "*cx_result*" -o -name "*checkmarx*" -o -name "*sast-results*" -o -name "*sca-results*" -o -name "*kics-results*" \) -type f 2>/dev/null | head -5)
         
         if [[ -n "$SARIF_FILES" ]]; then
-          echo "📄 Found SARIF results:"
+          echo "📄 Found Checkmarx AST result files:"
           for file in $SARIF_FILES; do
-            echo "  - $file"
+            echo "  - $file ($(stat --format=%s "$file" 2>/dev/null || echo "0") bytes)"
           done
           echo "SARIF_AVAILABLE=true" >> $GITHUB_ENV
+          
+          # Also check for specific AST result patterns
+          if ls cx_result.* >/dev/null 2>&1; then
+            echo "✅ Found cx_result files from AST scan"
+          fi
+          
+          if ls *sast-results* >/dev/null 2>&1; then
+            echo "✅ Found SAST result files"
+          fi
+          
+          if ls *sca-results* >/dev/null 2>&1; then
+            echo "✅ Found SCA result files"
+          fi
+          
+          if ls *kics-results* >/dev/null 2>&1; then
+            echo "✅ Found KICS result files"
+          fi
         else
-          echo "⚠️ No SARIF files found, using API fallback"
+          echo "⚠️ No Checkmarx AST result files found"
+          echo "📋 This might be normal for:"
+          echo "  - First scan of a new project"
+          echo "  - Scans with no findings"
+          echo "  - Configuration issues"
           echo "SARIF_AVAILABLE=false" >> $GITHUB_ENV
         fi
 

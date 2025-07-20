@@ -372,9 +372,10 @@ jobs:
         uses: ./.github/actions/checkmarx-scan
         with:
           enabled: ${{ env.ENABLE_CHECKMARX }}
-          checkmarx-client: ${{ secrets.CHECKMARX_CLIENT }}
+          checkmarx-client: ${{ secrets.CHECKMARX_CLIENT_ID }}
           checkmarx-secret: ${{ secrets.CHECKMARX_SECRET }}
-          checkmarx-server: ${{ secrets.CHECKMARX_SERVER || 'https://checkmarx.company.com' }}
+          checkmarx-server: ${{ secrets.CHECKMARX_TENANT || 'your-tenant' }}
+          base-uri: ${{ secrets.CHECKMARX_BASE_URI || 'https://ast.checkmarx.net' }}
           scan-types: ${{ vars.CHECKMARX_SCAN_TYPES || 'sca,sast,kics' }}
           max-critical-vulnerabilities: ${{ env.MAX_CRITICAL_VULNERABILITIES }}
           max-high-vulnerabilities: ${{ env.MAX_HIGH_VULNERABILITIES }}
