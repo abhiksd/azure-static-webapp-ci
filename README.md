@@ -92,6 +92,19 @@ SLACK_WEBHOOK_URL            # Slack webhook for notifications
 TEAMS_WEBHOOK_URL            # Microsoft Teams webhook
 ```
 
+## 🏷️ Versioning Strategy
+
+Our deployment pipeline uses environment-specific versioning for optimal traceability:
+
+| Environment | Version Format | Example | Benefits |
+|-------------|----------------|---------|----------|
+| **Development** | `dev-{sha}-{timestamp}` | `dev-a1b2c3d-20241225-1430` | Fast iteration, commit traceability |
+| **Staging** | `staging-{sha}-{timestamp}` | `staging-a1b2c3d-20241225-1445` | Pre-production validation |
+| **Pre-Production** | `v{major}.{minor}.{patch}-pre.{sha}` | `v1.2.3-pre.a1b2c3d` | Release candidates |
+| **Production** | `v{major}.{minor}.{patch}` | `v1.2.3` | Semantic versioning |
+
+> 📖 **Complete Guide**: See [Versioning Strategy](docs/13-VERSIONING-STRATEGY.md) for detailed implementation and best practices.
+
 ## 🏗️ Architecture
 
 ### Workflow Structure
