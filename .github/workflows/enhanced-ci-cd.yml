@@ -1,0 +1,580 @@
+name: Enhanced CI/CD Pipeline with Production-Grade Features
+
+on:
+  push:
+    branches: [ main, develop, 'release/**' ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, develop, 'release/**' ]
+    types: [ opened, synchronize, reopened ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - development
+          - staging
+          - pre-production
+          - production
+      enable-rollback:
+        description: 'Enable automatic rollback on failure'
+        required: false
+        default: true
+        type: boolean
+      monitoring-duration:
+        description: 'Post-deployment monitoring duration (minutes)'
+        required: false
+        default: '15'
+        type: string
+
+env:
+  NODE_VERSION: '18'
+  AZURE_STATIC_WEB_APPS_API_TOKEN_DEV: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_DEV }}
+  AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING }}
+  AZURE_STATIC_WEB_APPS_API_TOKEN_PROD: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PROD }}
+
+jobs:
+  # Enhanced PR Validation
+  validate-pr:
+    name: 🔍 Validate Pull Request
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    outputs:
+      should-deploy: ${{ steps.changes.outputs.should-deploy }}
+      security-score: ${{ steps.security.outputs.score }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Analyze Changes
+        id: changes
+        run: |
+          echo "📊 Analyzing changes..."
+          
+          # Check for significant changes
+          CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }})
+          echo "Changed files: $CHANGED_FILES"
+          
+          # Check for code changes that require deployment
+          if echo "$CHANGED_FILES" | grep -E '\.(js|ts|tsx|jsx|css|scss|html|json|md)$' > /dev/null; then
+            echo "should-deploy=true" >> $GITHUB_OUTPUT
+            echo "✅ Code changes detected - deployment required"
+          else
+            echo "should-deploy=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ No significant code changes - skipping deployment"
+          fi
+          
+          # Check for security-sensitive changes
+          if echo "$CHANGED_FILES" | grep -E '(package\.json|yarn\.lock|.*\.env.*|.*config.*|.*secret.*)' > /dev/null; then
+            echo "security-review=true" >> $GITHUB_OUTPUT
+            echo "🔒 Security-sensitive files changed - additional review required"
+          fi
+
+      - name: Run Enhanced Linting
+        run: |
+          echo "🔍 Running enhanced linting..."
+          npm run lint
+          
+          # Additional linting for security
+          if command -v eslint-security >/dev/null 2>&1; then
+            npx eslint --ext .js,.jsx,.ts,.tsx --plugin security src/
+          fi
+
+      - name: Run Tests with Coverage
+        run: |
+          echo "🧪 Running tests with coverage..."
+          npm run test:coverage
+          
+          # Check coverage thresholds
+          COVERAGE_THRESHOLD=80
+          COVERAGE=$(npm run test:coverage 2>&1 | grep -o 'Lines.*%' | grep -o '[0-9.]*' | head -1)
+          
+          if (( $(echo "$COVERAGE >= $COVERAGE_THRESHOLD" | bc -l) )); then
+            echo "✅ Coverage threshold met: $COVERAGE%"
+          else
+            echo "❌ Coverage below threshold: $COVERAGE% < $COVERAGE_THRESHOLD%"
+            exit 1
+          fi
+
+      - name: Security Analysis
+        id: security
+        uses: ./.github/actions/security-scan
+        with:
+          sonar-token: ${{ secrets.SONAR_TOKEN }}
+          checkmarx-username: ${{ secrets.CHECKMARX_USERNAME }}
+          checkmarx-password: ${{ secrets.CHECKMARX_PASSWORD }}
+          checkmarx-server: ${{ secrets.CHECKMARX_SERVER }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Performance Testing
+        if: steps.changes.outputs.should-deploy == 'true'
+        run: |
+          echo "⚡ Running performance tests..."
+          npm run test:performance || echo "⚠️ Performance tests failed - consider optimization"
+
+      - name: E2E Testing
+        if: steps.changes.outputs.should-deploy == 'true'
+        run: |
+          echo "🎭 Running E2E tests..."
+          npm run test:e2e
+
+  # Development Deployment with Enhanced Features
+  deploy-dev:
+    name: 🚀 Deploy to Development
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    environment: 
+      name: development
+      url: ${{ steps.deploy.outputs.static-web-app-url }}
+    needs: []
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Get Azure Key Vault secrets
+        uses: ./.github/actions/azure-keyvault
+        with:
+          keyvault-name: ${{ secrets.AZURE_KEYVAULT_NAME_DEV }}
+          azure-credentials: ${{ secrets.AZURE_CREDENTIALS_DEV }}
+
+      - name: Enhanced Deployment
+        id: deploy
+        uses: ./.github/actions/enhanced-deploy
+        with:
+          azure-static-web-apps-api-token: ${{ env.AZURE_STATIC_WEB_APPS_API_TOKEN_DEV }}
+          environment: development
+          version: ${{ github.sha }}
+          enable-health-checks: 'true'
+          enable-monitoring: 'true'
+          enable-rollback: 'true'
+          monitoring-duration: '5'
+          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          teams-webhook-url: ${{ secrets.TEAMS_WEBHOOK_URL }}
+
+      - name: Update Environment Status
+        if: always()
+        run: |
+          STATUS="${{ steps.deploy.outputs.health-check-status }}"
+          echo "Development deployment status: $STATUS"
+          
+          # Update GitHub deployment status
+          if [ "$STATUS" = "healthy" ]; then
+            echo "🎯 Development environment is healthy"
+          else
+            echo "⚠️ Development environment needs attention"
+          fi
+
+  # Staging Deployment with Comprehensive Validation
+  deploy-staging:
+    name: 🚀 Deploy to Staging
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: 
+      name: staging
+      url: ${{ steps.deploy.outputs.static-web-app-url }}
+    needs: []
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Pre-deployment Validation
+        run: |
+          echo "🔍 Running pre-deployment validation for staging..."
+          
+          # Run full test suite
+          npm run test:coverage
+          npm run test:e2e
+          
+          # Check for any critical security vulnerabilities
+          npm audit --audit-level high
+          
+          echo "✅ Pre-deployment validation completed"
+
+      - name: Get Azure Key Vault secrets
+        uses: ./.github/actions/azure-keyvault
+        with:
+          keyvault-name: ${{ secrets.AZURE_KEYVAULT_NAME_STAGING }}
+          azure-credentials: ${{ secrets.AZURE_CREDENTIALS_STAGING }}
+
+      - name: Enhanced Deployment
+        id: deploy
+        uses: ./.github/actions/enhanced-deploy
+        with:
+          azure-static-web-apps-api-token: ${{ env.AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING }}
+          environment: staging
+          version: ${{ github.sha }}
+          enable-health-checks: 'true'
+          enable-monitoring: 'true'
+          enable-rollback: 'true'
+          monitoring-duration: '10'
+          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          teams-webhook-url: ${{ secrets.TEAMS_WEBHOOK_URL }}
+
+      - name: Post-deployment Validation
+        if: steps.deploy.outputs.health-check-status == 'healthy'
+        run: |
+          echo "🧪 Running post-deployment validation..."
+          
+          DEPLOYMENT_URL="${{ steps.deploy.outputs.static-web-app-url }}"
+          
+          # Smoke tests
+          curl -f "$DEPLOYMENT_URL" > /dev/null || exit 1
+          curl -f "$DEPLOYMENT_URL/health" > /dev/null || exit 1
+          
+          # Performance validation
+          RESPONSE_TIME=$(curl -o /dev/null -s -w '%{time_total}' "$DEPLOYMENT_URL")
+          if (( $(echo "$RESPONSE_TIME > 3.0" | bc -l) )); then
+            echo "⚠️ Response time is slow: ${RESPONSE_TIME}s"
+          else
+            echo "✅ Response time acceptable: ${RESPONSE_TIME}s"
+          fi
+
+  # Pre-production Deployment (Release Branches)
+  deploy-preprod:
+    name: 🚀 Deploy to Pre-production
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/heads/release/') && github.event_name == 'push'
+    environment: 
+      name: pre-production
+      url: ${{ steps.deploy.outputs.static-web-app-url }}
+    needs: []
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract Release Version
+        id: version
+        run: |
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          RELEASE_VERSION=${BRANCH_NAME#release/}
+          echo "release-version=$RELEASE_VERSION" >> $GITHUB_OUTPUT
+          echo "Release version: $RELEASE_VERSION"
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Comprehensive Pre-release Testing
+        run: |
+          echo "🧪 Running comprehensive pre-release testing..."
+          
+          # Full test suite
+          npm run test:coverage
+          npm run test:e2e
+          npm run test:performance
+          
+          # Security audit
+          npm audit --audit-level moderate
+          
+          # License compliance check
+          if command -v license-checker >/dev/null 2>&1; then
+            npx license-checker --summary
+          fi
+          
+          echo "✅ Pre-release testing completed"
+
+      - name: Security Scan
+        uses: ./.github/actions/security-scan
+        with:
+          sonar-token: ${{ secrets.SONAR_TOKEN }}
+          checkmarx-username: ${{ secrets.CHECKMARX_USERNAME }}
+          checkmarx-password: ${{ secrets.CHECKMARX_PASSWORD }}
+          checkmarx-server: ${{ secrets.CHECKMARX_SERVER }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get Azure Key Vault secrets
+        uses: ./.github/actions/azure-keyvault
+        with:
+          keyvault-name: ${{ secrets.AZURE_KEYVAULT_NAME_PROD }}
+          azure-credentials: ${{ secrets.AZURE_CREDENTIALS_PROD }}
+
+      - name: Enhanced Deployment
+        id: deploy
+        uses: ./.github/actions/enhanced-deploy
+        with:
+          azure-static-web-apps-api-token: ${{ env.AZURE_STATIC_WEB_APPS_API_TOKEN_PROD }}
+          environment: pre-production
+          version: ${{ steps.version.outputs.release-version }}
+          enable-health-checks: 'true'
+          enable-monitoring: 'true'
+          enable-rollback: 'true'
+          monitoring-duration: '15'
+          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          teams-webhook-url: ${{ secrets.TEAMS_WEBHOOK_URL }}
+
+      - name: Release Validation
+        if: steps.deploy.outputs.health-check-status == 'healthy'
+        run: |
+          echo "🔍 Running release validation..."
+          
+          DEPLOYMENT_URL="${{ steps.deploy.outputs.static-web-app-url }}"
+          
+          # Comprehensive validation for pre-production
+          node scripts/health-check.js "$DEPLOYMENT_URL" "pre-production" || exit 1
+          
+          echo "✅ Release validation completed successfully"
+
+  # Production Deployment (Tags)
+  deploy-prod:
+    name: 🚀 Deploy to Production
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment: 
+      name: production
+      url: ${{ steps.deploy.outputs.static-web-app-url }}
+    needs: []
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract Production Version
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "production-version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Production version: $VERSION"
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Production-Ready Validation
+        run: |
+          echo "🏭 Running production-ready validation..."
+          
+          # Ensure all tests pass
+          npm run test:coverage
+          npm run test:e2e
+          npm run test:performance
+          
+          # Security validation
+          npm audit --audit-level high
+          
+          # Build size check
+          npm run build
+          BUILD_SIZE=$(du -sh build | cut -f1)
+          echo "Build size: $BUILD_SIZE"
+          
+          echo "✅ Production validation completed"
+
+      - name: Final Security Scan
+        uses: ./.github/actions/security-scan
+        with:
+          sonar-token: ${{ secrets.SONAR_TOKEN }}
+          checkmarx-username: ${{ secrets.CHECKMARX_USERNAME }}
+          checkmarx-password: ${{ secrets.CHECKMARX_PASSWORD }}
+          checkmarx-server: ${{ secrets.CHECKMARX_SERVER }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get Azure Key Vault secrets
+        uses: ./.github/actions/azure-keyvault
+        with:
+          keyvault-name: ${{ secrets.AZURE_KEYVAULT_NAME_PROD }}
+          azure-credentials: ${{ secrets.AZURE_CREDENTIALS_PROD }}
+
+      - name: Production Deployment
+        id: deploy
+        uses: ./.github/actions/enhanced-deploy
+        with:
+          azure-static-web-apps-api-token: ${{ env.AZURE_STATIC_WEB_APPS_API_TOKEN_PROD }}
+          environment: production
+          version: ${{ steps.version.outputs.production-version }}
+          enable-health-checks: 'true'
+          enable-monitoring: 'true'
+          enable-rollback: 'true'
+          rollback-threshold: '10'  # More sensitive for production
+          monitoring-duration: '30'  # Longer monitoring for production
+          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          teams-webhook-url: ${{ secrets.TEAMS_WEBHOOK_URL }}
+
+      - name: Production Health Verification
+        if: steps.deploy.outputs.health-check-status == 'healthy'
+        run: |
+          echo "🏥 Running production health verification..."
+          
+          DEPLOYMENT_URL="${{ steps.deploy.outputs.static-web-app-url }}"
+          
+          # Comprehensive health check for production
+          node scripts/health-check.js "$DEPLOYMENT_URL" "production"
+          
+          # Record successful production deployment
+          node scripts/rollback.js record production "${{ steps.version.outputs.production-version }}" "$DEPLOYMENT_URL"
+          
+          echo "✅ Production deployment verified and recorded"
+
+      - name: Start Extended Monitoring
+        if: steps.deploy.outputs.health-check-status == 'healthy'
+        run: |
+          echo "📊 Starting extended production monitoring..."
+          
+          # Set up extended monitoring for production
+          PROD_URL="${{ steps.deploy.outputs.static-web-app-url }}"
+          
+          # Start monitoring in background
+          nohup node scripts/monitoring.js > monitoring.log 2>&1 &
+          
+          echo "Production monitoring started"
+
+  # Manual Deployment Workflow
+  manual-deploy:
+    name: 🎯 Manual Deployment
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    environment: 
+      name: ${{ github.event.inputs.environment }}
+      url: ${{ steps.deploy.outputs.static-web-app-url }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Determine API Token
+        id: token
+        run: |
+          case "${{ github.event.inputs.environment }}" in
+            development)
+              echo "api-token=${{ env.AZURE_STATIC_WEB_APPS_API_TOKEN_DEV }}" >> $GITHUB_OUTPUT
+              echo "keyvault=${{ secrets.AZURE_KEYVAULT_NAME_DEV }}" >> $GITHUB_OUTPUT
+              echo "credentials=${{ secrets.AZURE_CREDENTIALS_DEV }}" >> $GITHUB_OUTPUT
+              ;;
+            staging)
+              echo "api-token=${{ env.AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING }}" >> $GITHUB_OUTPUT
+              echo "keyvault=${{ secrets.AZURE_KEYVAULT_NAME_STAGING }}" >> $GITHUB_OUTPUT
+              echo "credentials=${{ secrets.AZURE_CREDENTIALS_STAGING }}" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "api-token=${{ env.AZURE_STATIC_WEB_APPS_API_TOKEN_PROD }}" >> $GITHUB_OUTPUT
+              echo "keyvault=${{ secrets.AZURE_KEYVAULT_NAME_PROD }}" >> $GITHUB_OUTPUT
+              echo "credentials=${{ secrets.AZURE_CREDENTIALS_PROD }}" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Get Azure Key Vault secrets
+        uses: ./.github/actions/azure-keyvault
+        with:
+          keyvault-name: ${{ steps.token.outputs.keyvault }}
+          azure-credentials: ${{ steps.token.outputs.credentials }}
+
+      - name: Manual Enhanced Deployment
+        id: deploy
+        uses: ./.github/actions/enhanced-deploy
+        with:
+          azure-static-web-apps-api-token: ${{ steps.token.outputs.api-token }}
+          environment: ${{ github.event.inputs.environment }}
+          version: ${{ github.sha }}
+          enable-health-checks: 'true'
+          enable-monitoring: 'true'
+          enable-rollback: ${{ github.event.inputs.enable-rollback }}
+          monitoring-duration: ${{ github.event.inputs.monitoring-duration }}
+          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          teams-webhook-url: ${{ secrets.TEAMS_WEBHOOK_URL }}
+
+  # Rollback Workflow (Can be triggered manually)
+  rollback:
+    name: 🔄 Emergency Rollback
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && contains(github.event.inputs.environment, 'rollback')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Execute Rollback
+        run: |
+          echo "🚨 Executing emergency rollback..."
+          
+          ENVIRONMENT="${{ github.event.inputs.environment }}"
+          ENVIRONMENT=${ENVIRONMENT//-rollback/}  # Remove -rollback suffix
+          
+          # Execute rollback
+          node scripts/rollback.js rollback "$ENVIRONMENT"
+          
+          echo "✅ Rollback completed"
+
+  # Monitoring Dashboard Update
+  update-monitoring:
+    name: 📊 Update Monitoring Dashboard
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [deploy-dev, deploy-staging, deploy-preprod, deploy-prod, manual-deploy]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Generate Monitoring Dashboard
+        run: |
+          echo "📊 Generating updated monitoring dashboard..."
+          
+          # Generate dashboard with current deployment status
+          if [ -f "scripts/monitoring.js" ]; then
+            node -e "
+              const MonitoringSystem = require('./scripts/monitoring.js');
+              const monitor = new MonitoringSystem({});
+              monitor.generateDashboard().then(() => console.log('Dashboard updated'));
+            "
+          fi
+
+      - name: Upload Dashboard
+        uses: actions/upload-artifact@v4
+        with:
+          name: monitoring-dashboard-${{ github.run_id }}
+          path: |
+            monitoring-dashboard.html
+            monitoring-dashboard.json
+          retention-days: 7
+
+  # Cleanup Job
+  cleanup:
+    name: 🧹 Cleanup
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [deploy-dev, deploy-staging, deploy-preprod, deploy-prod, manual-deploy]
+    steps:
+      - name: Cleanup Resources
+        run: |
+          echo "🧹 Cleaning up deployment resources..."
+          
+          # Clean up any temporary files or resources
+          # Stop any running monitoring processes
+          if [ -f "monitoring.pid" ]; then
+            MONITOR_PID=$(cat monitoring.pid)
+            kill $MONITOR_PID 2>/dev/null || echo "Monitoring process already stopped"
+            rm -f monitoring.pid
+          fi
+          
+          echo "✅ Cleanup completed"
