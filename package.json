@@ -5,6 +5,7 @@
   "homepage": ".",
   "private": true,
   "dependencies": {
+    "@octokit/rest": "^20.0.2",
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^14.5.2",
