@@ -25,6 +25,14 @@ on:
         description: 'Enable enhanced monitoring'
         type: boolean
         default: true
+      enable_sonar:
+        description: 'Enable SonarCloud analysis'
+        type: boolean
+        default: true
+      enable_checkmarx:
+        description: 'Enable Checkmarx security scanning'
+        type: boolean
+        default: false
 
 # Grant GITHUB_TOKEN the permissions required to interact with OIDC
 permissions:
@@ -37,6 +45,10 @@ permissions:
 
 env:
   NODE_VERSION: '18'
+  
+  # Security scanning configuration - use workflow inputs if available, otherwise use repository variables
+  ENABLE_SONAR: ${{ github.event.inputs.enable_sonar || vars.ENABLE_SONAR_SCAN || 'true' }}
+  ENABLE_CHECKMARX: ${{ github.event.inputs.enable_checkmarx || vars.ENABLE_CHECKMARX_SCAN || 'false' }}
 
   # Static Web Apps tokens (these remain as secrets)
   AZURE_STATIC_WEB_APPS_API_TOKEN_DEV: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_DEV }}
@@ -129,10 +141,31 @@ jobs:
           
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        if: env.ENABLE_SONAR == 'true' && secrets.SONAR_TOKEN != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Checkmarx Security Scan
+        if: env.ENABLE_CHECKMARX == 'true' && secrets.CHECKMARX_CLIENT != ''
+        uses: checkmarx-ts/checkmarx-cxflow-github-action@v1.6
+        with:
+          project: ${{ github.repository }}
+          team: /CxServer/SP/Company
+          checkmarx_url: ${{ secrets.CHECKMARX_SERVER || 'https://checkmarx.company.com' }}
+          checkmarx_client: ${{ secrets.CHECKMARX_CLIENT }}
+          checkmarx_secret: ${{ secrets.CHECKMARX_SECRET }}
+          scanners: ${{ vars.CHECKMARX_SCAN_TYPES || 'sca,sast,kics' }}
+          params: |
+            --bug-tracker=GITHUBPULL
+            --preset="${{ vars.CHECKMARX_PRESET || 'Checkmarx Default' }}"
+            --incremental=${{ vars.CHECKMARX_INCREMENTAL || 'true' }}
+            --exclude-folders="${{ vars.CHECKMARX_EXCLUDE_FOLDERS || 'node_modules,dist,build,coverage' }}"
+            --exclude-files="${{ vars.CHECKMARX_EXCLUDE_FILES || '*.min.js,*.bundle.js' }}"
+            --cx-flow.filter-severity=High,Medium,Low
+            --severity-threshold=High
+            --sca-resolver=npm,gradle,maven
+            --kics-timeout=600
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3

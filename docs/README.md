@@ -32,6 +32,7 @@ Welcome to the complete documentation for the Azure Static Web Apps deployment s
 - **[Operations Runbook](./09-OPERATIONS-RUNBOOK.md)** - Day-to-day operations and maintenance
 - **[API Reference](./10-API-REFERENCE.md)** - Complete API documentation
 - **[Migration to Managed Identity](./11-MIGRATION-TO-MANAGED-IDENTITY.md)** - Guide for migrating from service principal to managed identity
+- **[Configurable Thresholds](./12-CONFIGURABLE-THRESHOLDS.md)** - Complete guide to security and quality threshold configuration
 
 ## 🚀 System Architecture
 

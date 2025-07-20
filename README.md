@@ -34,6 +34,43 @@ Configure the following secrets in your GitHub repository:
 # These can be found in Repository Settings > Secrets and variables > Actions > Variables
 ```
 
+#### 🎛️ Configurable Security & Quality Parameters
+
+The following repository variables control security scanning and quality gates:
+
+**Scan Control:**
+```
+ENABLE_SONAR_SCAN=true          # Enable/disable SonarCloud analysis
+ENABLE_CHECKMARX_SCAN=true      # Enable/disable Checkmarx security scanning
+ENABLE_DEPENDENCY_SCAN=true     # Enable/disable dependency vulnerability scanning
+ENABLE_LICENSE_SCAN=false       # Enable/disable license compliance checking
+SECURITY_GATE_ENABLED=true      # Enable/disable overall security gate
+```
+
+**Checkmarx Configuration:**
+```
+CHECKMARX_SCAN_TYPES=sca,sast,kics    # Scan types (comma-separated)
+CHECKMARX_PRESET=Checkmarx Default    # Security scan preset
+CHECKMARX_INCREMENTAL=true            # Use incremental scanning
+MAX_CRITICAL_VULNERABILITIES=0        # Maximum critical vulnerabilities
+MAX_HIGH_VULNERABILITIES=2            # Maximum high vulnerabilities  
+MAX_MEDIUM_VULNERABILITIES=10         # Maximum medium vulnerabilities
+```
+
+**SonarCloud Configuration:**
+```
+MIN_CODE_COVERAGE=80                  # Minimum code coverage (%)
+MIN_BRANCH_COVERAGE=70                # Minimum branch coverage (%)
+SONAR_MAINTAINABILITY_RATING=A        # Target maintainability rating
+SONAR_RELIABILITY_RATING=A            # Target reliability rating
+SONAR_SECURITY_RATING=A               # Target security rating
+MAX_BLOCKER_ISSUES=0                  # Maximum blocker issues
+MAX_CRITICAL_ISSUES=0                 # Maximum critical issues
+MAX_MAJOR_ISSUES=5                    # Maximum major issues
+```
+
+> 📖 **Complete Configuration Guide**: See [Configurable Thresholds](docs/12-CONFIGURABLE-THRESHOLDS.md) for detailed configuration options and examples.
+
 #### Azure Static Web Apps
 ```
 AZURE_STATIC_WEB_APPS_API_TOKEN_DEV      # Development deployment token

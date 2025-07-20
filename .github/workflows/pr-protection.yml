@@ -442,7 +442,7 @@ jobs:
 
       - name: Checkmarx CxFlow Action
         id: checkmarx
-        if: env.ENABLE_CHECKMARX == 'true' && secrets.CHECKMARX_CLIENT != ''
+        if: secrets.CHECKMARX_CLIENT != ''
         uses: checkmarx-ts/checkmarx-cxflow-github-action@v1.6
         with:
           project: ${{ github.repository }}
@@ -680,6 +680,7 @@ jobs:
           
           # SonarCloud Checks with configurable thresholds
           if [ "${{ needs.configure-checks.outputs.enable-sonar }}" = "true" ]; then
+            echo "🔬 Evaluating SonarCloud results..."
             SONAR_COVERAGE="${{ needs.sonar-analysis.outputs.coverage || '0' }}"
             SONAR_MAINTAINABILITY="${{ needs.sonar-analysis.outputs.maintainability || 'A' }}"
             SONAR_RELIABILITY="${{ needs.sonar-analysis.outputs.reliability || 'A' }}"
@@ -719,8 +720,13 @@ jobs:
             fi
           fi
           
-          # Checkmarx Checks with enhanced thresholds
+          else
+            echo "🔬 SonarCloud analysis disabled - skipping quality checks"
+          fi
+          
+          # Checkmarx Checks with enhanced thresholds  
           if [ "${{ needs.configure-checks.outputs.enable-checkmarx }}" = "true" ]; then
+            echo "🔒 Evaluating Checkmarx security scan results..."
             CRITICAL_COUNT="${{ needs.checkmarx-scan.outputs.critical-count || '0' }}"
             HIGH_COUNT="${{ needs.checkmarx-scan.outputs.high-count || '0' }}"
             MEDIUM_COUNT="${{ needs.checkmarx-scan.outputs.medium-count || '0' }}"
@@ -768,6 +774,8 @@ jobs:
                 GATE_PASSED=false
               fi
             fi
+          else
+            echo "🔒 Checkmarx security scanning disabled - skipping vulnerability checks"
           fi
           
           # Dependency Checks
