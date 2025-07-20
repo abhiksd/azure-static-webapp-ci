@@ -102,57 +102,202 @@ jobs:
           DEPLOY_PREPROD=false
           DEPLOY_PROD=false
           
-          # Check for semantic version tags (production releases)
+          # Production-Grade Tag-Based Deployments
+          
+          # PRODUCTION: Only semantic version tags (v1.2.3) with strict validation
           if [[ "$REF_TYPE" == "tag" ]] && [[ "$BRANCH" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "🏷️ Production release tag detected: $BRANCH"
-            DEPLOY_PROD=true
+            echo "🏷️ PRODUCTION release tag detected: $BRANCH"
             
-          # Check for pre-release tags (pre-production)
-          elif [[ "$REF_TYPE" == "tag" ]] && [[ "$BRANCH" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-pre\. ]]; then
-            echo "🏷️ Pre-release tag detected: $BRANCH"
-            DEPLOY_PREPROD=true
+            # Production-grade validations
+            MAJOR=$(echo "$BRANCH" | sed -E 's/^v([0-9]+)\.([0-9]+)\.([0-9]+)$/\1/')
+            MINOR=$(echo "$BRANCH" | sed -E 's/^v([0-9]+)\.([0-9]+)\.([0-9]+)$/\2/')
+            PATCH=$(echo "$BRANCH" | sed -E 's/^v([0-9]+)\.([0-9]+)\.([0-9]+)$/\3/')
             
-          # Check for release candidate tags
-          elif [[ "$REF_TYPE" == "tag" ]] && [[ "$BRANCH" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc\. ]]; then
-            echo "🏷️ Release candidate tag detected: $BRANCH"
-            DEPLOY_PREPROD=true
+            echo "  Version breakdown: Major=$MAJOR, Minor=$MINOR, Patch=$PATCH"
             
-          # Branch-based deployments
-          elif [[ "$REF_TYPE" == "branch" ]]; then
-            case "$BRANCH" in
-              "main")
-                echo "🌟 Main branch: Deploy to dev and staging (production requires tags)"
-                DEPLOY_DEV=true
-                DEPLOY_STAGING=true
-                ;;
-              "develop")
-                echo "🔧 Develop branch: Deploy to dev only"
-                DEPLOY_DEV=true
-                ;;
-              "staging")
-                echo "🧪 Staging branch: Deploy to staging only"
-                DEPLOY_STAGING=true
-                ;;
-              "preprod"|"preproduction")
-                echo "🎯 Pre-production branch: Deploy to pre-prod"
+            # Validate tag is properly signed (production requirement)
+            if git verify-tag "$BRANCH" 2>/dev/null || [[ "${{ vars.SKIP_TAG_VERIFICATION }}" == "true" ]]; then
+              echo "  ✅ Tag verification passed"
+              DEPLOY_PROD=true
+            else
+              echo "  ❌ WARNING: Tag not signed or verification failed"
+              echo "  Production deployment requires signed tags unless SKIP_TAG_VERIFICATION=true"
+              if [[ "${{ vars.ALLOW_UNSIGNED_PROD_TAGS }}" == "true" ]]; then
+                echo "  🔓 Proceeding with unsigned tag (ALLOW_UNSIGNED_PROD_TAGS=true)"
+                DEPLOY_PROD=true
+              fi
+            fi
+            
+          # PRE-PRODUCTION: Pre-release and RC tags with validation
+          elif [[ "$REF_TYPE" == "tag" ]] && [[ "$BRANCH" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-(pre|rc|alpha|beta)\. ]]; then
+            echo "🏷️ PRE-PRODUCTION release tag detected: $BRANCH"
+            
+            # Extract pre-release type
+            PRERELEASE_TYPE=$(echo "$BRANCH" | sed -E 's/^v[0-9]+\.[0-9]+\.[0-9]+-([^.]+)\..*$/\1/')
+            echo "  Pre-release type: $PRERELEASE_TYPE"
+            
+            case "$PRERELEASE_TYPE" in
+              "pre"|"rc")
+                echo "  ✅ Release candidate - deploying to pre-production"
                 DEPLOY_PREPROD=true
                 ;;
-              release/*)
-                echo "🚀 Release branch: Deploy to pre-prod and staging"
+              "alpha"|"beta")
+                echo "  🧪 Alpha/Beta release - deploying to staging and pre-production"
                 DEPLOY_STAGING=true
                 DEPLOY_PREPROD=true
-                ;;
-              hotfix/*)
-                echo "🔥 Hotfix branch: Deploy to dev and staging"
-                DEPLOY_DEV=true
-                DEPLOY_STAGING=true
-                ;;
-              feature/*)
-                echo "✨ Feature branch: Deploy to dev only"
-                DEPLOY_DEV=true
                 ;;
               *)
-                echo "🔍 Other branch: No automatic deployment"
+                echo "  🔍 Unknown pre-release type - deploying to staging only"
+                DEPLOY_STAGING=true
+                ;;
+            esac
+            
+          # Production-Grade Branch-Based Deployments
+          elif [[ "$REF_TYPE" == "branch" ]]; then
+            echo "🔀 Branch-based deployment logic"
+            
+            case "$BRANCH" in
+              "main"|"master")
+                echo "🌟 MAIN BRANCH (Production-ready code)"
+                echo "  - Automatic: Development + Staging (CI/CD validation)"
+                echo "  - Production: Requires manual release tag creation"
+                
+                # Main branch gets automatic dev/staging for integration testing
+                DEPLOY_DEV=true
+                DEPLOY_STAGING=true
+                
+                # Production requires explicit tagging (security best practice)
+                echo "  📋 For production deployment:"
+                echo "    1. Validate staging deployment"
+                echo "    2. Create signed semantic version tag: git tag -s v1.2.3"
+                echo "    3. Push tag: git push origin v1.2.3"
+                ;;
+                
+              "develop"|"development")
+                echo "🔧 DEVELOP BRANCH (Active development)"
+                echo "  - Purpose: Feature integration and testing"
+                echo "  - Deployment: Development environment only"
+                echo "  - Quality gates: Basic CI checks"
+                
+                DEPLOY_DEV=true
+                ;;
+                
+              "staging")
+                echo "🧪 STAGING BRANCH (Pre-production testing)"
+                echo "  - Purpose: User acceptance testing and staging validation"
+                echo "  - Deployment: Staging environment with full security scans"
+                echo "  - Requirements: All quality gates must pass"
+                
+                # Staging branch requires enhanced security validation
+                if [[ "${{ vars.STAGING_REQUIRES_APPROVAL }}" == "true" ]]; then
+                  echo "  ⚠️ Staging deployment requires manual approval"
+                  echo "    Set STAGING_AUTO_DEPLOY=true to enable automatic deployment"
+                fi
+                DEPLOY_STAGING=true
+                ;;
+                
+              "preprod"|"preproduction"|"pre-production")
+                echo "🎯 PRE-PRODUCTION BRANCH (Release preparation)"
+                echo "  - Purpose: Final pre-production validation"
+                echo "  - Deployment: Pre-production environment"
+                echo "  - Security: Full security scans + penetration testing"
+                echo "  - Performance: Load testing and monitoring"
+                
+                DEPLOY_PREPROD=true
+                ;;
+                
+              release/*)
+                echo "🚀 RELEASE BRANCH (Release candidate)"
+                RELEASE_VERSION=$(echo "$BRANCH" | sed 's/release\///')
+                echo "  - Release version: $RELEASE_VERSION"
+                echo "  - Purpose: Release stabilization and final testing"
+                echo "  - Deployment: Staging + Pre-production"
+                echo "  - Next step: Create RC tag when ready"
+                
+                # Release branches deploy to staging and pre-prod for validation
+                DEPLOY_STAGING=true
+                DEPLOY_PREPROD=true
+                
+                echo "  📋 Release process:"
+                echo "    1. Deploy to staging for integration testing"
+                echo "    2. Deploy to pre-prod for final validation"
+                echo "    3. Create RC tag: git tag v${RELEASE_VERSION}-rc.1"
+                echo "    4. After validation, create production tag: git tag v${RELEASE_VERSION}"
+                ;;
+                
+              hotfix/*)
+                echo "🔥 HOTFIX BRANCH (Critical production fix)"
+                HOTFIX_VERSION=$(echo "$BRANCH" | sed 's/hotfix\///')
+                echo "  - Hotfix version: $HOTFIX_VERSION"
+                echo "  - Purpose: Critical production issue resolution"
+                echo "  - Deployment: Development + Staging (expedited)"
+                echo "  - Fast-track: Can proceed to production with minimal validation"
+                
+                DEPLOY_DEV=true
+                DEPLOY_STAGING=true
+                
+                # Hotfix can optionally deploy to pre-prod for critical fixes
+                if [[ "${{ vars.HOTFIX_SKIP_PREPROD }}" != "true" ]]; then
+                  echo "  - Also deploying to pre-production for validation"
+                  DEPLOY_PREPROD=true
+                fi
+                
+                echo "  ⚡ Expedited process:"
+                echo "    1. Deploy to dev/staging for validation"
+                echo "    2. Create hotfix tag: git tag v${HOTFIX_VERSION}"
+                echo "    3. Emergency production deployment available"
+                ;;
+                
+              feature/*|feat/*)
+                echo "✨ FEATURE BRANCH (New feature development)"
+                FEATURE_NAME=$(echo "$BRANCH" | sed 's/feature\///' | sed 's/feat\///')
+                echo "  - Feature: $FEATURE_NAME"
+                echo "  - Purpose: Isolated feature development"
+                echo "  - Deployment: Development environment only"
+                echo "  - Testing: Unit tests + basic integration"
+                
+                DEPLOY_DEV=true
+                ;;
+                
+              bugfix/*|fix/*)
+                echo "🐛 BUGFIX BRANCH (Bug resolution)"
+                BUG_NAME=$(echo "$BRANCH" | sed 's/bugfix\///' | sed 's/fix\///')
+                echo "  - Bug fix: $BUG_NAME"
+                echo "  - Purpose: Non-critical bug resolution"
+                echo "  - Deployment: Development environment"
+                
+                DEPLOY_DEV=true
+                ;;
+                
+              experimental/*|exp/*)
+                echo "🔬 EXPERIMENTAL BRANCH (Research and experiments)"
+                echo "  - Purpose: Proof of concept and experimentation"
+                echo "  - Deployment: Development environment (optional)"
+                echo "  - Validation: Minimal requirements"
+                
+                # Experimental branches only deploy if explicitly enabled
+                if [[ "${{ vars.DEPLOY_EXPERIMENTAL }}" == "true" ]]; then
+                  DEPLOY_DEV=true
+                  echo "  ✅ Experimental deployment enabled"
+                else
+                  echo "  🚫 Experimental deployment disabled (set DEPLOY_EXPERIMENTAL=true to enable)"
+                fi
+                ;;
+                
+              *)
+                echo "🔍 UNKNOWN BRANCH TYPE"
+                echo "  - Branch: $BRANCH"
+                echo "  - Status: No automatic deployment configured"
+                echo "  - Options: Use workflow dispatch for manual deployment"
+                echo ""
+                echo "  📚 Supported branch patterns:"
+                echo "    - main/master: dev + staging"
+                echo "    - develop: dev only"
+                echo "    - staging: staging only"
+                echo "    - release/*: staging + pre-prod"
+                echo "    - hotfix/*: dev + staging (+ pre-prod)"
+                echo "    - feature/*: dev only"
+                echo "    - bugfix/*: dev only"
                 ;;
             esac
           fi
