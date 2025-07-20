@@ -307,14 +307,14 @@ jobs:
 
       - name: Checkmarx CxFlow Action
         id: checkmarx
-        if: env.ENABLE_CHECKMARX == 'true' && secrets.CHECKMARX_USERNAME != ''
+        if: env.ENABLE_CHECKMARX == 'true' && secrets.CHECKMARX_CLIENT != ''
         uses: checkmarx-ts/checkmarx-cxflow-github-action@v1.6
         with:
           project: ${{ github.repository }}
           team: /CxServer/SP/Company
           checkmarx_url: ${{ secrets.CHECKMARX_SERVER || 'https://checkmarx.company.com' }}
-          checkmarx_username: ${{ secrets.CHECKMARX_USERNAME }}
-          checkmarx_password: ${{ secrets.CHECKMARX_PASSWORD }}
+          checkmarx_client: ${{ secrets.CHECKMARX_CLIENT }}
+          checkmarx_secret: ${{ secrets.CHECKMARX_SECRET }}
           checkmarx_client_secret: ${{ secrets.CHECKMARX_CLIENT_SECRET }}
           scanners: sast
           params: --bug-tracker=GITHUBPULL --cx-flow.filter-severity --cx-flow.filter-category --cx-flow.filter-cwe --cx-flow.filter-state
@@ -324,7 +324,7 @@ jobs:
         run: |
           echo "🔍 Processing Checkmarx scan results..."
           
-          if [ "${{ secrets.CHECKMARX_USERNAME }}" != "" ]; then
+          if [ "${{ secrets.CHECKMARX_CLIENT }}" != "" ]; then
             # Simulate scan results - in real implementation, parse actual results
             echo "status=completed" >> $GITHUB_OUTPUT
             echo "critical=0" >> $GITHUB_OUTPUT

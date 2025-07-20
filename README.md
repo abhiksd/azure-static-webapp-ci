@@ -44,8 +44,8 @@ AZURE_STATIC_WEB_APPS_API_TOKEN_PROD     # Production deployment token
 #### Security Scanning
 ```
 SONAR_TOKEN                   # SonarCloud authentication token
-CHECKMARX_USERNAME           # Checkmarx username
-CHECKMARX_PASSWORD           # Checkmarx password
+CHECKMARX_CLIENT             # Checkmarx client ID
+CHECKMARX_SECRET             # Checkmarx client secret
 CHECKMARX_SERVER             # Checkmarx server URL
 ```
 

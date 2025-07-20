@@ -13,11 +13,11 @@ inputs:
     description: 'SonarCloud project key'
     required: false
     default: ''
-  checkmarx-username:
-    description: 'Checkmarx username'
+  checkmarx-client:
+    description: 'Checkmarx client ID'
     required: true
-  checkmarx-password:
-    description: 'Checkmarx password'
+  checkmarx-secret:
+    description: 'Checkmarx client secret'
     required: true
   checkmarx-server:
     description: 'Checkmarx server URL'
@@ -132,8 +132,8 @@ runs:
     - name: Run Checkmarx Scan
       shell: bash
       env:
-        CX_USERNAME: ${{ inputs.checkmarx-username }}
-        CX_PASSWORD: ${{ inputs.checkmarx-password }}
+        CX_CLIENT_ID: ${{ inputs.checkmarx-client }}
+        CX_CLIENT_SECRET: ${{ inputs.checkmarx-secret }}
         CX_SERVER: ${{ inputs.checkmarx-server }}
       run: |
         # Set project name
@@ -142,8 +142,8 @@ runs:
           PROJECT_NAME=$(echo $GITHUB_REPOSITORY | tr '/' '_')
         fi
         
-        # Authenticate with Checkmarx
-        cx auth --username $CX_USERNAME --password $CX_PASSWORD --server $CX_SERVER
+        # Authenticate with Checkmarx using client credentials
+        cx auth --client-id $CX_CLIENT_ID --client-secret $CX_CLIENT_SECRET --server $CX_SERVER
         
         # Run scan
         cx scan create --project-name "$PROJECT_NAME" --source-dir . --format json --output-path checkmarx-results.json
