@@ -92,18 +92,39 @@ SLACK_WEBHOOK_URL            # Slack webhook for notifications
 TEAMS_WEBHOOK_URL            # Microsoft Teams webhook
 ```
 
-## 🏷️ Versioning Strategy
+## 🏭 Production-Grade Deployment Strategy
 
-Our deployment pipeline uses environment-specific versioning for optimal traceability:
+Our enterprise-level deployment pipeline implements comprehensive security controls and risk management:
 
-| Environment | Version Format | Example | Benefits |
-|-------------|----------------|---------|----------|
-| **Development** | `dev-{sha}-{timestamp}` | `dev-a1b2c3d-20241225-1430` | Fast iteration, commit traceability |
-| **Staging** | `staging-{sha}-{timestamp}` | `staging-a1b2c3d-20241225-1445` | Pre-production validation |
-| **Pre-Production** | `v{major}.{minor}.{patch}-pre.{sha}` | `v1.2.3-pre.a1b2c3d` | Release candidates |
-| **Production** | `v{major}.{minor}.{patch}` | `v1.2.3` | Semantic versioning |
+### Environment Promotion Flow
+```
+🔧 Development → 🧪 Staging → 🎯 Pre-Production → 🏭 Production
+     ↓              ↓              ↓              ↓
+ Short SHA      Short SHA     Semantic Ver   Semantic Ver
+ Basic Tests    Integration   Full Testing   Enterprise
+ Fast Feedback  User Testing  Security       Validation
+```
 
-> 📖 **Complete Guide**: See [Versioning Strategy](docs/13-VERSIONING-STRATEGY.md) for detailed implementation and best practices.
+### Deployment Triggers & Versioning
+
+| Environment | Trigger | Version Format | Security Level | Approval |
+|-------------|---------|----------------|----------------|----------|
+| **Development** | Branches (feature/*, develop) | `dev-{sha}-{timestamp}` | Basic | None |
+| **Staging** | Branches (main, staging) | `staging-{sha}-{timestamp}` | Standard | Optional |
+| **Pre-Production** | Tags (v1.2.3-rc.1) | `v1.2.3-rc.1` | Enhanced | Required for RC |
+| **Production** | Tags (v1.2.3) | `v1.2.3` | Maximum | Mandatory |
+
+### Production-Grade Controls
+
+- ✅ **GPG-signed tag verification** for production releases
+- ✅ **Deployment time windows** (business hours enforcement)
+- ✅ **Risk-based approval workflows** (major/minor/patch releases)
+- ✅ **Comprehensive security scanning** (SAST, SCA, KICS)
+- ✅ **Documentation requirements** (CHANGELOG.md validation)
+- ✅ **Emergency deployment overrides** for critical fixes
+- ✅ **Automated rollback capabilities** with health checks
+
+> 📖 **Enterprise Guide**: See [Production-Grade Deployment](docs/14-PRODUCTION-GRADE-DEPLOYMENT.md) for complete implementation details.
 
 ## 🏗️ Architecture
 

@@ -34,6 +34,7 @@ Welcome to the complete documentation for the Azure Static Web Apps deployment s
 - **[Migration to Managed Identity](./11-MIGRATION-TO-MANAGED-IDENTITY.md)** - Guide for migrating from service principal to managed identity
 - **[Configurable Thresholds](./12-CONFIGURABLE-THRESHOLDS.md)** - Complete guide to security and quality threshold configuration
 - **[Versioning Strategy](./13-VERSIONING-STRATEGY.md)** - Environment-specific versioning and release management
+- **[Production-Grade Deployment](./14-PRODUCTION-GRADE-DEPLOYMENT.md)** - Enterprise deployment strategies and security controls
 
 ## 🚀 System Architecture
 
