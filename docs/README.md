@@ -4,6 +4,10 @@ Welcome to the complete documentation for the Azure Static Web Apps deployment s
 
 ## 🎯 Quick Start
 
+**For Most Teams (Recommended):**
+1. **[Simple Deployment Guide](./SIMPLE-DEPLOYMENT-GUIDE.md)** - Easy-to-maintain CI/CD pipeline
+
+**For Enterprise Teams:**
 1. **[Infrastructure Setup](./01-INFRASTRUCTURE-SETUP.md)** - Create Azure resources for all environments
 2. **[Deployment Guide](./02-DEPLOYMENT-GUIDE.md)** - Deploy applications across environments
 3. **[Environment Configuration](./03-ENVIRONMENT-CONFIGURATION.md)** - Configure environment-specific settings
@@ -19,7 +23,8 @@ Welcome to the complete documentation for the Azure Static Web Apps deployment s
 - **[Environment Configuration](./03-ENVIRONMENT-CONFIGURATION.md)** - Frontend configuration management and deployment variables
 
 ### 🚀 Deployment & Operations
-- **[Deployment Guide](./02-DEPLOYMENT-GUIDE.md)** - Deployment processes with scenario-based examples
+- **[Simple Deployment Guide](./SIMPLE-DEPLOYMENT-GUIDE.md)** - Easy-to-maintain CI/CD pipeline (recommended)
+- **[Deployment Guide](./02-DEPLOYMENT-GUIDE.md)** - Enterprise deployment processes with scenario-based examples
 - **[Azure Key Vault Integration](./04-AZURE-KEYVAULT-INTEGRATION.md)** - Secret management across environments
 - **[Monitoring Guide](./05-MONITORING-GUIDE.md)** - Health checks, metrics, and alerting setup
 

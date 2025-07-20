@@ -92,7 +92,31 @@ SLACK_WEBHOOK_URL            # Slack webhook for notifications
 TEAMS_WEBHOOK_URL            # Microsoft Teams webhook
 ```
 
-## 🏭 Production-Grade Deployment Strategy
+## 🚀 Deployment Strategies
+
+Choose the deployment approach that fits your team's needs:
+
+### 🏭 Enterprise-Grade (Full-Featured)
+For large teams requiring comprehensive security and compliance controls.
+
+### 🚀 Simplified (Easy to Maintain)  
+For smaller teams wanting essential features without complexity.
+
+**Simple Deployment Features:**
+- ✅ **Easy to understand** deployment logic (3 environments, simple rules)
+- ✅ **Minimal configuration** required (just Azure Static Web Apps tokens)
+- ✅ **Essential features only** (build, test, deploy, version tracking)
+- ✅ **Optional security scanning** (SonarCloud, Checkmarx - easily disabled)
+- ✅ **Standard workflows** (branch → dev/staging, tags → production)
+- ✅ **Quick setup** (works with any React/Node.js/static site project)
+
+**Perfect for:** Small teams, personal projects, startups, or teams that want CI/CD without complexity.
+
+> 📖 **Simple Guide**: See [Simple Deployment Guide](docs/SIMPLE-DEPLOYMENT-GUIDE.md) for easy setup instructions.
+
+---
+
+## 🏭 Enterprise-Grade Deployment Strategy
 
 Our enterprise-level deployment pipeline implements comprehensive security controls and risk management:
 
