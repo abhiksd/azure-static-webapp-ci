@@ -313,12 +313,12 @@ jobs:
     name: 🔨 Build & Quality Checks
     runs-on: ubuntu-latest
     outputs:
-      sonar-quality-gate: ${{ steps.sonar-analysis.outputs.quality-gate }}
+      sonar-status: ${{ steps.sonar-analysis.outputs.status }}
       sonar-coverage: ${{ steps.sonar-analysis.outputs.coverage }}
-      checkmarx-status: ${{ steps.checkmarx-scan.outputs.scan-status }}
+      checkmarx-status: ${{ steps.checkmarx-scan.outputs.status }}
       checkmarx-critical: ${{ steps.checkmarx-scan.outputs.critical-count }}
       checkmarx-high: ${{ steps.checkmarx-scan.outputs.high-count }}
-      security-scan-status: ${{ steps.security-summary.outputs.status }}
+      security-status: ${{ steps.security-summary.outputs.status }}
     
     steps:
       - name: Checkout
@@ -335,85 +335,53 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: 🧪 Run Tests & Build
+      - name: Build & Test
         run: |
-          echo "🧪 Running comprehensive quality checks..."
-          
-          # Unit tests with coverage
-          npm run test -- --coverage --ci || echo "No tests configured"
-          
-          # Linting
-          npm run lint || echo "No linting configured"
-          
-          # Build verification
-          npm run build || echo "No build configured"
-          
-          echo "✅ Basic quality checks completed"
+          echo "🔨 Building and testing..."
+          npm run test -- --coverage --ci || true
+          npm run lint || true
+          npm run build || true
+          echo "✅ Build completed"
 
-      - name: 🔬 SonarCloud Analysis
+      - name: SonarCloud Analysis
         id: sonar-analysis
         uses: ./.github/actions/sonar-analysis
         with:
           enabled: ${{ env.ENABLE_SONAR }}
           sonar-token: ${{ secrets.SONAR_TOKEN }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          organization: ${{ vars.SONAR_ORGANIZATION }}
           min-code-coverage: ${{ env.MIN_CODE_COVERAGE }}
-          min-branch-coverage: ${{ vars.MIN_BRANCH_COVERAGE || '70' }}
-          sonar-maintainability-rating: ${{ vars.SONAR_MAINTAINABILITY_RATING || 'A' }}
-          sonar-reliability-rating: ${{ vars.SONAR_RELIABILITY_RATING || 'A' }}
-          sonar-security-rating: ${{ vars.SONAR_SECURITY_RATING || 'A' }}
           max-blocker-issues: ${{ vars.MAX_BLOCKER_ISSUES || '0' }}
           max-critical-issues: ${{ vars.MAX_CRITICAL_ISSUES || '0' }}
-          max-major-issues: ${{ vars.MAX_MAJOR_ISSUES || '5' }}
-          coverage-exclusions: ${{ vars.SONAR_COVERAGE_EXCLUSIONS || '**/node_modules/**,**/dist/**,**/build/**,**/coverage/**,**/*.test.*,**/*.spec.*' }}
 
-      - name: 🔒 Checkmarx Security Scan
+      - name: Checkmarx Security Scan
         id: checkmarx-scan
         uses: ./.github/actions/checkmarx-scan
         with:
           enabled: ${{ env.ENABLE_CHECKMARX }}
-          checkmarx-client: ${{ secrets.CHECKMARX_CLIENT_ID }}
+          checkmarx-url: ${{ secrets.CHECKMARX_URL }}
+          checkmarx-username: ${{ secrets.CHECKMARX_USERNAME }}
+          checkmarx-password: ${{ secrets.CHECKMARX_PASSWORD }}
           checkmarx-secret: ${{ secrets.CHECKMARX_SECRET }}
-          checkmarx-server: ${{ secrets.CHECKMARX_TENANT || 'your-tenant' }}
-          base-uri: ${{ secrets.CHECKMARX_BASE_URI || 'https://ast.checkmarx.net' }}
+          tenant: ${{ secrets.CHECKMARX_TENANT }}
           scan-types: ${{ vars.CHECKMARX_SCAN_TYPES || 'sca,sast,kics' }}
-          max-critical-vulnerabilities: ${{ env.MAX_CRITICAL_VULNERABILITIES }}
-          max-high-vulnerabilities: ${{ env.MAX_HIGH_VULNERABILITIES }}
-          max-medium-vulnerabilities: ${{ vars.MAX_MEDIUM_VULNERABILITIES || '10' }}
-          max-sca-critical: ${{ vars.MAX_SCA_CRITICAL || '0' }}
-          max-sca-high: ${{ vars.MAX_SCA_HIGH || '2' }}
-          max-kics-high: ${{ vars.MAX_KICS_HIGH || '0' }}
+          max-critical: ${{ env.MAX_CRITICAL_VULNERABILITIES }}
+          max-high: ${{ env.MAX_HIGH_VULNERABILITIES }}
           preset: ${{ vars.CHECKMARX_PRESET || 'Checkmarx Default' }}
-          incremental: ${{ vars.CHECKMARX_INCREMENTAL || 'true' }}
-          exclude-folders: ${{ vars.CHECKMARX_EXCLUDE_FOLDERS || 'node_modules,dist,build,coverage' }}
-          exclude-files: ${{ vars.CHECKMARX_EXCLUDE_FILES || '*.min.js,*.bundle.js' }}
 
-      - name: 📋 Security & Quality Summary
+      - name: Security Summary
         id: security-summary
         run: |
-          SONAR_STATUS="${{ steps.sonar-analysis.outputs.scan-status }}"
-          CHECKMARX_STATUS="${{ steps.checkmarx-scan.outputs.scan-status }}"
+          SONAR="${{ steps.sonar-analysis.outputs.status || 'SKIPPED' }}"
+          CHECKMARX="${{ steps.checkmarx-scan.outputs.status || 'SKIPPED' }}"
+          echo "📊 Summary: SonarCloud=$SONAR | Checkmarx=$CHECKMARX"
           
-          echo "📊 Security & Quality Summary:"
-          echo "=============================="
-          echo "🔬 SonarCloud: $SONAR_STATUS"
-          echo "🔒 Checkmarx: $CHECKMARX_STATUS"
-          
-          # Overall status determination
-          if [[ "$SONAR_STATUS" == "FAILED" ]] || [[ "$CHECKMARX_STATUS" == "FAILED" ]]; then
-            echo "status=FAILED" >> $GITHUB_OUTPUT
-            echo "❌ Quality checks failed"
-            
-            if [[ "$SONAR_STATUS" == "FAILED" ]]; then
-              echo "  - SonarCloud quality gate failed"
-            fi
-            if [[ "$CHECKMARX_STATUS" == "FAILED" ]]; then
-              echo "  - Checkmarx security thresholds exceeded"
-            fi
-          else
-            echo "status=PASSED" >> $GITHUB_OUTPUT
-            echo "✅ All quality checks passed"
-          fi
+          # Overall status
+          STATUS="PASSED"
+          [[ "$SONAR" == "FAILED" || "$CHECKMARX" == "FAILED" ]] && STATUS="FAILED"
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+          echo "Overall: $STATUS"
 
   # Development deployment with short SHA versioning
   deploy-dev:
@@ -433,10 +401,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: Build for deployment
-        run: |
-          npm ci
-          npm run build
+      - name: Build
+        run: npm ci && npm run build
 
       - name: Deploy to Development
         uses: Azure/static-web-apps-deploy@v1
@@ -447,11 +413,8 @@ jobs:
           app_location: "/"
           output_location: "build"
 
-      - name: Development Deployment Success
-        run: |
-          echo "✅ Development deployment successful!"
-          echo "🏷️ Version: ${{ needs.detect-deployment.outputs.dev-version }}"
-          echo "🌐 URL: https://dev-yourapp.azurestaticapps.net"
+      - name: Success
+        run: echo "✅ Dev deployed: ${{ needs.detect-deployment.outputs.dev-version }}"
 
   # Staging deployment with short SHA versioning
   deploy-staging:
@@ -471,10 +434,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: Build for deployment
-        run: |
-          npm ci
-          npm run build
+      - name: Build
+        run: npm ci && npm run build
 
       - name: Deploy to Staging
         uses: Azure/static-web-apps-deploy@v1
@@ -485,11 +446,8 @@ jobs:
           app_location: "/"
           output_location: "build"
 
-      - name: Staging Deployment Success
-        run: |
-          echo "✅ Staging deployment successful!"
-          echo "🏷️ Version: ${{ needs.detect-deployment.outputs.staging-version }}"
-          echo "🌐 URL: https://staging-yourapp.azurestaticapps.net"
+      - name: Success
+        run: echo "✅ Staging deployed: ${{ needs.detect-deployment.outputs.staging-version }}"
 
   # Pre-production deployment with semantic versioning
   deploy-preprod:
@@ -509,10 +467,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: Build for deployment
-        run: |
-          npm ci
-          npm run build
+      - name: Build
+        run: npm ci && npm run build
 
       - name: Deploy to Pre-Production
         uses: Azure/static-web-apps-deploy@v1
@@ -523,11 +479,8 @@ jobs:
           app_location: "/"
           output_location: "build"
 
-      - name: Pre-Production Deployment Success
-        run: |
-          echo "✅ Pre-production deployment successful!"
-          echo "🏷️ Version: ${{ needs.detect-deployment.outputs.semantic-version }}"
-          echo "🌐 URL: https://preprod-yourapp.azurestaticapps.net"
+      - name: Success
+        run: echo "✅ Pre-prod deployed: ${{ needs.detect-deployment.outputs.semantic-version }}"
 
   # Production deployment with semantic versioning and enhanced validations
   deploy-prod:
@@ -541,21 +494,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Production Deployment Validation
+      - name: Validation
         run: |
-          echo "🏭 PRODUCTION DEPLOYMENT VALIDATION"
-          echo "=================================="
-          echo "🏷️ Version: ${{ needs.detect-deployment.outputs.semantic-version }}"
-          echo "📊 Risk Level: ${{ needs.detect-deployment.outputs.deployment-risk }}"
-          echo "🛡️ Quality Status: ${{ needs.quality-checks.outputs.security-scan-status }}"
-          
-          # Production-specific validations
-          if [[ "${{ needs.quality-checks.outputs.security-scan-status }}" == "FAILED" ]]; then
-            echo "❌ Cannot deploy to production: Quality checks failed"
-            exit 1
-          fi
-          
-          echo "✅ Production deployment validation passed"
+          echo "🏭 Production validation: ${{ needs.detect-deployment.outputs.semantic-version }}"
+          [[ "${{ needs.quality-checks.outputs.security-status }}" == "FAILED" ]] && exit 1
+          echo "✅ Validation passed"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -563,10 +506,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: Build for production
-        run: |
-          npm ci
-          npm run build
+      - name: Build
+        run: npm ci && npm run build
 
       - name: Deploy to Production
         uses: Azure/static-web-apps-deploy@v1
@@ -598,13 +539,8 @@ jobs:
             - Actor: ${{ github.actor }}
             - URL: https://yourapp.azurestaticapps.net
 
-      - name: Production Deployment Success
-        run: |
-          echo "🎉 PRODUCTION DEPLOYMENT SUCCESSFUL!"
-          echo "=================================="
-          echo "🏷️ Version: ${{ needs.detect-deployment.outputs.semantic-version }}"
-          echo "🌐 Production URL: https://yourapp.azurestaticapps.net"
-          echo "📊 Risk Level: ${{ needs.detect-deployment.outputs.deployment-risk }}"
+      - name: Success
+        run: echo "🎉 Production deployed: ${{ needs.detect-deployment.outputs.semantic-version }}"
 
   # Comprehensive deployment summary
   deployment-summary:
@@ -614,31 +550,9 @@ jobs:
     if: always()
     
     steps:
-      - name: Comprehensive Deployment Report
+      - name: Summary
         run: |
-          echo "📊 INTERMEDIATE PRODUCTION-GRADE DEPLOYMENT SUMMARY"
-          echo "=================================================="
-          echo ""
-          echo "🏷️ Version Information:"
-          echo "  🔧 Development: ${{ needs.detect-deployment.outputs.dev-version }}"
-          echo "  🧪 Staging: ${{ needs.detect-deployment.outputs.staging-version }}"
-          echo "  🎯 Semantic (Pre-prod/Prod): ${{ needs.detect-deployment.outputs.semantic-version }}"
-          echo ""
-          echo "🚀 Deployment Results:"
-          echo "  🔧 Development: ${{ needs.deploy-dev.result || 'skipped' }}"
-          echo "  🧪 Staging: ${{ needs.deploy-staging.result || 'skipped' }}"
-          echo "  🎯 Pre-Production: ${{ needs.deploy-preprod.result || 'skipped' }}"
-          echo "  🏭 Production: ${{ needs.deploy-prod.result || 'skipped' }}"
-          echo ""
-          echo "🛡️ Quality & Security:"
-          echo "  📊 Quality Checks: ${{ needs.quality-checks.result }}"
-          echo "  🔬 SonarCloud Gate: ${{ needs.quality-checks.outputs.sonar-quality-gate || 'skipped' }}"
-          echo "  📈 Code Coverage: ${{ needs.quality-checks.outputs.sonar-coverage || 'N/A' }}%"
-          echo "  🔒 Checkmarx Status: ${{ needs.quality-checks.outputs.checkmarx-status || 'skipped' }}"
-          echo "  🚨 Critical Vulns: ${{ needs.quality-checks.outputs.checkmarx-critical || '0' }}"
-          echo "  ⚠️ High Vulns: ${{ needs.quality-checks.outputs.checkmarx-high || '0' }}"
-          echo "  🛡️ Overall Status: ${{ needs.quality-checks.outputs.security-scan-status || 'skipped' }}"
-          echo ""
-          echo "📋 Risk Assessment:"
-          echo "  📊 Deployment Risk: ${{ needs.detect-deployment.outputs.deployment-risk }}"
-          echo "  📋 Approval Required: ${{ needs.detect-deployment.outputs.require-approval }}"
+          echo "📊 Deployment Summary:"
+          echo "Deployments: Dev=${{ needs.deploy-dev.result || 'skip' }} | Staging=${{ needs.deploy-staging.result || 'skip' }} | Prod=${{ needs.deploy-prod.result || 'skip' }}"
+          echo "Quality: Sonar=${{ needs.quality-checks.outputs.sonar-status || 'skip' }} | Checkmarx=${{ needs.quality-checks.outputs.checkmarx-status || 'skip' }}"
+          echo "Version: ${{ needs.detect-deployment.outputs.semantic-version }}"

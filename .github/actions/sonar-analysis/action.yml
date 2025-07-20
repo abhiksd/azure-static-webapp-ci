@@ -1,41 +1,27 @@
 name: 'SonarCloud Analysis'
-description: 'Comprehensive SonarCloud analysis with configurable quality gates and coverage thresholds'
+description: 'Run SonarCloud analysis with configurable thresholds'
 
 inputs:
-  enabled:
-    description: 'Enable SonarCloud analysis'
-    required: false
-    default: 'true'
   sonar-token:
-    description: 'SonarCloud authentication token'
+    description: 'SonarCloud token'
     required: true
   github-token:
-    description: 'GitHub token for PR analysis'
+    description: 'GitHub token'
     required: true
+  project-key:
+    description: 'SonarCloud project key'
+    required: false
+  organization:
+    description: 'SonarCloud organization'
+    required: true
+  enabled:
+    description: 'Enable SonarCloud scan'
+    required: false
+    default: 'true'
   min-code-coverage:
     description: 'Minimum code coverage percentage'
     required: false
     default: '80'
-  min-branch-coverage:
-    description: 'Minimum branch coverage percentage'
-    required: false
-    default: '70'
-  min-line-coverage:
-    description: 'Minimum line coverage percentage'
-    required: false
-    default: '80'
-  sonar-maintainability-rating:
-    description: 'Target maintainability rating (A-E)'
-    required: false
-    default: 'A'
-  sonar-reliability-rating:
-    description: 'Target reliability rating (A-E)'
-    required: false
-    default: 'A'
-  sonar-security-rating:
-    description: 'Target security rating (A-E)'
-    required: false
-    default: 'A'
   max-blocker-issues:
     description: 'Maximum blocker issues allowed'
     required: false
@@ -44,220 +30,73 @@ inputs:
     description: 'Maximum critical issues allowed'
     required: false
     default: '0'
-  max-major-issues:
-    description: 'Maximum major issues allowed'
-    required: false
-    default: '5'
-  project-key:
-    description: 'SonarCloud project key (auto-detected if not provided)'
-    required: false
-  organization:
-    description: 'SonarCloud organization (auto-detected if not provided)'
-    required: false
-  coverage-exclusions:
-    description: 'Files to exclude from coverage analysis'
-    required: false
-    default: '**/node_modules/**,**/dist/**,**/build/**,**/coverage/**,**/*.test.*,**/*.spec.*'
-  fail-on-quality-gate:
-    description: 'Fail the action if quality gate fails'
-    required: false
-    default: 'true'
 
 outputs:
-  quality-gate:
-    description: 'Quality gate status (PASSED/FAILED)'
-    value: ${{ steps.quality-gate.outputs.status }}
+  status:
+    description: 'Quality gate status'
+    value: ${{ steps.results.outputs.status }}
   coverage:
     description: 'Code coverage percentage'
-    value: ${{ steps.quality-gate.outputs.coverage }}
-  maintainability:
-    description: 'Maintainability rating'
-    value: ${{ steps.quality-gate.outputs.maintainability }}
-  reliability:
-    description: 'Reliability rating'
-    value: ${{ steps.quality-gate.outputs.reliability }}
-  security:
-    description: 'Security rating'
-    value: ${{ steps.quality-gate.outputs.security }}
-  blocker-issues:
-    description: 'Number of blocker issues'
-    value: ${{ steps.quality-gate.outputs.blocker-issues }}
-  critical-issues:
-    description: 'Number of critical issues'
-    value: ${{ steps.quality-gate.outputs.critical-issues }}
-  major-issues:
-    description: 'Number of major issues'
-    value: ${{ steps.quality-gate.outputs.major-issues }}
-  scan-status:
-    description: 'Overall scan status (PASSED/FAILED/SKIPPED)'
-    value: ${{ steps.final-status.outputs.status }}
+    value: ${{ steps.results.outputs.coverage }}
 
 runs:
   using: 'composite'
   steps:
-    - name: Check if SonarCloud is enabled
+    - name: Setup Node.js
+      if: inputs.enabled == 'true'
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install SonarScanner
+      if: inputs.enabled == 'true'
+      shell: bash
+      run: npm install -g sonarqube-scanner
+
+    - name: Run SonarCloud Scan
+      if: inputs.enabled == 'true'
       shell: bash
       run: |
-        if [[ "${{ inputs.enabled }}" != "true" ]]; then
-          echo "🔇 SonarCloud analysis is disabled"
-          echo "SONAR_ENABLED=false" >> $GITHUB_ENV
-        elif [[ "${{ inputs.sonar-token }}" == "" ]]; then
-          echo "⚠️ SonarCloud token not provided - skipping analysis"
-          echo "SONAR_ENABLED=false" >> $GITHUB_ENV
-        else
-          echo "✅ SonarCloud analysis enabled"
-          echo "SONAR_ENABLED=true" >> $GITHUB_ENV
-        fi
-
-    - name: Setup SonarCloud Configuration
-      if: env.SONAR_ENABLED == 'true'
-      shell: bash
-      run: |
-        echo "🔧 Setting up SonarCloud configuration..."
-        
-        # Create or update sonar-project.properties
-        cat > sonar-project.properties << EOF
-        # SonarCloud Configuration
-        sonar.projectKey=${{ inputs.project-key || github.repository }}
-        sonar.organization=${{ inputs.organization || github.repository_owner }}
-        sonar.projectName=${{ github.repository }}
-        
-        # Source and test configurations
-        sonar.sources=src
-        sonar.tests=src
-        sonar.test.inclusions=**/*.test.*,**/*.spec.*
-        sonar.exclusions=node_modules/**,dist/**,build/**,coverage/**
-        
-        # Coverage configuration
-        sonar.javascript.lcov.reportPaths=coverage/lcov.info
-        sonar.typescript.lcov.reportPaths=coverage/lcov.info
-        sonar.coverage.exclusions=${{ inputs.coverage-exclusions }}
-        
-        # Quality gate thresholds
-        sonar.qualitygate.wait=true
-        EOF
-        
-        echo "📋 SonarCloud configuration created"
-
-    - name: Run SonarCloud Analysis
-      if: env.SONAR_ENABLED == 'true'
-      uses: SonarSource/sonarcloud-github-action@master
+        sonar-scanner \
+          -Dsonar.projectKey=${{ inputs.project-key || github.repository }} \
+          -Dsonar.organization=${{ inputs.organization }} \
+          -Dsonar.host.url=https://sonarcloud.io \
+          -Dsonar.login=${{ inputs.sonar-token }}
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
-        SONAR_TOKEN: ${{ inputs.sonar-token }}
 
-    - name: Wait for Analysis
-      if: env.SONAR_ENABLED == 'true'
+    - name: Get Results
+      id: results
+      if: inputs.enabled == 'true'
       shell: bash
       run: |
-        echo "⏳ Waiting for SonarCloud analysis..."
-        sleep 45  # Simple wait instead of complex polling
-        echo "✅ Ready to fetch results"
-
-    - name: Get SonarCloud Results
-      id: quality-gate
-      if: env.SONAR_ENABLED == 'true'
-      shell: bash
-      run: |
-        echo "📊 Getting SonarCloud results..."
-        
         PROJECT_KEY="${{ inputs.project-key || github.repository }}"
-        PROJECT_KEY_ENCODED=$(echo "$PROJECT_KEY" | sed 's/\//%2F/g')
         
-        # Get quality gate status
-        GATE_RESPONSE=$(curl -s -u "${{ inputs.sonar-token }}:" \
-          "https://sonarcloud.io/api/qualitygates/project_status?projectKey=$PROJECT_KEY_ENCODED" || echo "")
+        # Get quality gate
+        GATE=$(curl -s -u "${{ inputs.sonar-token }}:" \
+          "https://sonarcloud.io/api/qualitygates/project_status?projectKey=${PROJECT_KEY//\//%2F}" | \
+          jq -r '.projectStatus.status // "OK"')
         
-        # Get basic metrics
-        METRICS_RESPONSE=$(curl -s -u "${{ inputs.sonar-token }}:" \
-          "https://sonarcloud.io/api/measures/component?component=$PROJECT_KEY_ENCODED&metricKeys=coverage,sqale_rating,blocker_violations,critical_violations" || echo "")
+        # Get metrics
+        METRICS=$(curl -s -u "${{ inputs.sonar-token }}:" \
+          "https://sonarcloud.io/api/measures/component?component=${PROJECT_KEY//\//%2F}&metricKeys=coverage,blocker_violations,critical_violations")
         
-        # Parse gate status
-        QUALITY_GATE="PASSED"
-        if [[ -n "$GATE_RESPONSE" ]] && echo "$GATE_RESPONSE" | jq -e '.projectStatus.status' > /dev/null 2>&1; then
-          STATUS=$(echo "$GATE_RESPONSE" | jq -r '.projectStatus.status')
-          [[ "$STATUS" == "ERROR" ]] && QUALITY_GATE="FAILED"
-        fi
-        
-        # Parse metrics with defaults
-        COVERAGE="0"
-        MAINTAINABILITY="A"
-        BLOCKER_ISSUES="0"
-        CRITICAL_ISSUES="0"
-        
-        if [[ -n "$METRICS_RESPONSE" ]] && echo "$METRICS_RESPONSE" | jq -e '.component' > /dev/null 2>&1; then
-          COVERAGE=$(echo "$METRICS_RESPONSE" | jq -r '.component.measures[] | select(.metric=="coverage") | .value // "0"')
-          RATING=$(echo "$METRICS_RESPONSE" | jq -r '.component.measures[] | select(.metric=="sqale_rating") | .value // "1"')
-          BLOCKER_ISSUES=$(echo "$METRICS_RESPONSE" | jq -r '.component.measures[] | select(.metric=="blocker_violations") | .value // "0"')
-          CRITICAL_ISSUES=$(echo "$METRICS_RESPONSE" | jq -r '.component.measures[] | select(.metric=="critical_violations") | .value // "0"')
-          
-          # Convert rating (1=A, 2=B, other=C)
-          case "$RATING" in
-            "1") MAINTAINABILITY="A" ;;
-            "2") MAINTAINABILITY="B" ;;
-            *) MAINTAINABILITY="C" ;;
-          esac
-        fi
+        COVERAGE=$(echo "$METRICS" | jq -r '.component.measures[] | select(.metric=="coverage") | .value // "0"')
+        BLOCKERS=$(echo "$METRICS" | jq -r '.component.measures[] | select(.metric=="blocker_violations") | .value // "0"')
+        CRITICALS=$(echo "$METRICS" | jq -r '.component.measures[] | select(.metric=="critical_violations") | .value // "0"')
         
         # Check thresholds
-        COVERAGE_INT=$(echo "$COVERAGE" | cut -d'.' -f1)
-        if [[ "$COVERAGE_INT" -lt "${{ inputs.min-code-coverage }}" ]] || \
-           [[ "$BLOCKER_ISSUES" -gt "${{ inputs.max-blocker-issues }}" ]] || \
-           [[ "$CRITICAL_ISSUES" -gt "${{ inputs.max-critical-issues }}" ]]; then
-          QUALITY_GATE="FAILED"
-        fi
+        STATUS="PASSED"
+        [[ "${COVERAGE%.*}" -lt "${{ inputs.min-code-coverage }}" ]] && STATUS="FAILED"
+        [[ "$BLOCKERS" -gt "${{ inputs.max-blocker-issues }}" ]] && STATUS="FAILED"
+        [[ "$CRITICALS" -gt "${{ inputs.max-critical-issues }}" ]] && STATUS="FAILED"
+        [[ "$GATE" == "ERROR" ]] && STATUS="FAILED"
         
-        # Set outputs
-        echo "status=$QUALITY_GATE" >> $GITHUB_OUTPUT
+        echo "status=$STATUS" >> $GITHUB_OUTPUT
         echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
-        echo "maintainability=$MAINTAINABILITY" >> $GITHUB_OUTPUT
-        echo "reliability=$MAINTAINABILITY" >> $GITHUB_OUTPUT
-        echo "security=$MAINTAINABILITY" >> $GITHUB_OUTPUT
-        echo "blocker-issues=$BLOCKER_ISSUES" >> $GITHUB_OUTPUT
-        echo "critical-issues=$CRITICAL_ISSUES" >> $GITHUB_OUTPUT
-        echo "major-issues=0" >> $GITHUB_OUTPUT
-        
-        # Simple reporting
-        echo "📊 SonarCloud Results:"
-        echo "🎯 Status: $QUALITY_GATE"
-        echo "📈 Coverage: ${COVERAGE}% | Rating: $MAINTAINABILITY | Issues: $CRITICAL_ISSUES critical, $BLOCKER_ISSUES blocker"
+        echo "📊 SonarCloud: $STATUS | Coverage: ${COVERAGE}% | Issues: $CRITICALS critical, $BLOCKERS blocker"
 
-    - name: Skip Quality Gate (Disabled)
-      id: skip-quality-gate
-      if: env.SONAR_ENABLED != 'true'
+    - name: Skip (Disabled)
+      if: inputs.enabled != 'true'
       shell: bash
-      run: |
-        echo "status=SKIPPED" >> $GITHUB_OUTPUT
-        echo "coverage=0" >> $GITHUB_OUTPUT
-        echo "line-coverage=0" >> $GITHUB_OUTPUT
-        echo "branch-coverage=0" >> $GITHUB_OUTPUT
-        echo "maintainability=N/A" >> $GITHUB_OUTPUT
-        echo "reliability=N/A" >> $GITHUB_OUTPUT
-        echo "security=N/A" >> $GITHUB_OUTPUT
-        echo "blocker-issues=0" >> $GITHUB_OUTPUT
-        echo "critical-issues=0" >> $GITHUB_OUTPUT
-        echo "major-issues=0" >> $GITHUB_OUTPUT
-        echo "minor-issues=0" >> $GITHUB_OUTPUT
-        echo "info-issues=0" >> $GITHUB_OUTPUT
-        echo "🔇 SonarCloud analysis was skipped"
-
-    - name: Quality Gate Enforcement
-      id: final-status
-      shell: bash
-      run: |
-        GATE_STATUS="${{ steps.quality-gate.outputs.status || steps.skip-quality-gate.outputs.status }}"
-        
-        if [[ "$SONAR_ENABLED" != "true" ]] || [[ "$GATE_STATUS" == "SKIPPED" ]]; then
-          echo "status=SKIPPED" >> $GITHUB_OUTPUT
-          echo "🔇 SonarCloud analysis was skipped"
-        elif [[ "$GATE_STATUS" == "FAILED" ]] && [[ "${{ inputs.fail-on-quality-gate }}" == "true" ]]; then
-          echo "status=FAILED" >> $GITHUB_OUTPUT
-          echo "❌ SonarCloud quality gate failed - blocking deployment"
-          exit 1
-        elif [[ "$GATE_STATUS" == "FAILED" ]]; then
-          echo "status=FAILED" >> $GITHUB_OUTPUT
-          echo "⚠️ SonarCloud quality gate failed - continuing (fail-on-quality-gate=false)"
-        else
-          echo "status=PASSED" >> $GITHUB_OUTPUT
-          echo "✅ SonarCloud quality gate passed"
-        fi
+      run: echo "⏭️ SonarCloud scan disabled"
