@@ -667,10 +667,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Azure Login
-        uses: azure/login@v1
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      # No Azure login needed - using managed identity
       
       - name: Rotate Secrets
         run: |
