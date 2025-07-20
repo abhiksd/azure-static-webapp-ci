@@ -83,41 +83,125 @@ jobs:
         with:
           fetch-depth: 0
           
-      - name: Detect changes
+      - name: Detect deployment targets
         id: changes
         run: |
-          # Determine deployment targets based on branch and changes
+          # Determine deployment targets based on branch, tags, and release events
           BRANCH="${{ github.ref_name }}"
+          REF_TYPE="${{ github.ref_type }}"
+          EVENT_NAME="${{ github.event_name }}"
           
-          echo "Branch: $BRANCH"
+          echo "🔍 Deployment Detection:"
+          echo "  Branch: $BRANCH"
+          echo "  Ref Type: $REF_TYPE"
+          echo "  Event: $EVENT_NAME"
           
-          case "$BRANCH" in
-            "main")
-              echo "should-deploy-dev=true" >> $GITHUB_OUTPUT
-              echo "should-deploy-staging=true" >> $GITHUB_OUTPUT
-              echo "should-deploy-prod=true" >> $GITHUB_OUTPUT
-              ;;
-            "develop")
-              echo "should-deploy-dev=true" >> $GITHUB_OUTPUT
-              echo "should-deploy-staging=false" >> $GITHUB_OUTPUT
-              echo "should-deploy-prod=false" >> $GITHUB_OUTPUT
-              ;;
-            "staging")
-              echo "should-deploy-dev=false" >> $GITHUB_OUTPUT
-              echo "should-deploy-staging=true" >> $GITHUB_OUTPUT
-              echo "should-deploy-prod=false" >> $GITHUB_OUTPUT
-              ;;
-            "preprod")
-              echo "should-deploy-dev=false" >> $GITHUB_OUTPUT
-              echo "should-deploy-staging=false" >> $GITHUB_OUTPUT
-              echo "should-deploy-prod=true" >> $GITHUB_OUTPUT
-              ;;
-            *)
-              echo "should-deploy-dev=false" >> $GITHUB_OUTPUT
-              echo "should-deploy-staging=false" >> $GITHUB_OUTPUT
-              echo "should-deploy-prod=false" >> $GITHUB_OUTPUT
-              ;;
-          esac
+          # Initialize all deployment flags to false
+          DEPLOY_DEV=false
+          DEPLOY_STAGING=false
+          DEPLOY_PREPROD=false
+          DEPLOY_PROD=false
+          
+          # Check for semantic version tags (production releases)
+          if [[ "$REF_TYPE" == "tag" ]] && [[ "$BRANCH" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "🏷️ Production release tag detected: $BRANCH"
+            DEPLOY_PROD=true
+            
+          # Check for pre-release tags (pre-production)
+          elif [[ "$REF_TYPE" == "tag" ]] && [[ "$BRANCH" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-pre\. ]]; then
+            echo "🏷️ Pre-release tag detected: $BRANCH"
+            DEPLOY_PREPROD=true
+            
+          # Check for release candidate tags
+          elif [[ "$REF_TYPE" == "tag" ]] && [[ "$BRANCH" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc\. ]]; then
+            echo "🏷️ Release candidate tag detected: $BRANCH"
+            DEPLOY_PREPROD=true
+            
+          # Branch-based deployments
+          elif [[ "$REF_TYPE" == "branch" ]]; then
+            case "$BRANCH" in
+              "main")
+                echo "🌟 Main branch: Deploy to dev and staging (production requires tags)"
+                DEPLOY_DEV=true
+                DEPLOY_STAGING=true
+                ;;
+              "develop")
+                echo "🔧 Develop branch: Deploy to dev only"
+                DEPLOY_DEV=true
+                ;;
+              "staging")
+                echo "🧪 Staging branch: Deploy to staging only"
+                DEPLOY_STAGING=true
+                ;;
+              "preprod"|"preproduction")
+                echo "🎯 Pre-production branch: Deploy to pre-prod"
+                DEPLOY_PREPROD=true
+                ;;
+              release/*)
+                echo "🚀 Release branch: Deploy to pre-prod and staging"
+                DEPLOY_STAGING=true
+                DEPLOY_PREPROD=true
+                ;;
+              hotfix/*)
+                echo "🔥 Hotfix branch: Deploy to dev and staging"
+                DEPLOY_DEV=true
+                DEPLOY_STAGING=true
+                ;;
+              feature/*)
+                echo "✨ Feature branch: Deploy to dev only"
+                DEPLOY_DEV=true
+                ;;
+              *)
+                echo "🔍 Other branch: No automatic deployment"
+                ;;
+            esac
+          fi
+          
+          # Handle workflow dispatch manual overrides
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            TARGET_ENV="${{ github.event.inputs.environment }}"
+            echo "🎛️ Manual deployment to: $TARGET_ENV"
+            
+            case "$TARGET_ENV" in
+              "development")
+                DEPLOY_DEV=true
+                DEPLOY_STAGING=false
+                DEPLOY_PREPROD=false
+                DEPLOY_PROD=false
+                ;;
+              "staging")
+                DEPLOY_DEV=false
+                DEPLOY_STAGING=true
+                DEPLOY_PREPROD=false
+                DEPLOY_PROD=false
+                ;;
+              "pre-production")
+                DEPLOY_DEV=false
+                DEPLOY_STAGING=false
+                DEPLOY_PREPROD=true
+                DEPLOY_PROD=false
+                ;;
+              "production")
+                DEPLOY_DEV=false
+                DEPLOY_STAGING=false
+                DEPLOY_PREPROD=false
+                DEPLOY_PROD=true
+                ;;
+            esac
+          fi
+          
+          # Output deployment decisions
+          echo "should-deploy-dev=$DEPLOY_DEV" >> $GITHUB_OUTPUT
+          echo "should-deploy-staging=$DEPLOY_STAGING" >> $GITHUB_OUTPUT
+          echo "should-deploy-preprod=$DEPLOY_PREPROD" >> $GITHUB_OUTPUT
+          echo "should-deploy-prod=$DEPLOY_PROD" >> $GITHUB_OUTPUT
+          
+          echo ""
+          echo "📋 Deployment Plan:"
+          echo "  Development: $DEPLOY_DEV"
+          echo "  Staging: $DEPLOY_STAGING"
+          echo "  Pre-Production: $DEPLOY_PREPROD"
+          echo "  Production: $DEPLOY_PROD"
           
       - name: Generate Environment-Specific Versions
         id: version
