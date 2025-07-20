@@ -308,12 +308,16 @@ jobs:
           echo "  🧪 Staging: $STAGING_VERSION"
           echo "  🎯 Semantic (Pre-prod/Prod): $SEMANTIC_VERSION"
 
-  # Comprehensive build and quality checks
+  # Comprehensive build and quality checks using composite actions
   quality-checks:
     name: 🔨 Build & Quality Checks
     runs-on: ubuntu-latest
     outputs:
-      sonar-quality-gate: ${{ steps.sonar-gate.outputs.quality-gate }}
+      sonar-quality-gate: ${{ steps.sonar-analysis.outputs.quality-gate }}
+      sonar-coverage: ${{ steps.sonar-analysis.outputs.coverage }}
+      checkmarx-status: ${{ steps.checkmarx-scan.outputs.scan-status }}
+      checkmarx-critical: ${{ steps.checkmarx-scan.outputs.critical-count }}
+      checkmarx-high: ${{ steps.checkmarx-scan.outputs.high-count }}
       security-scan-status: ${{ steps.security-summary.outputs.status }}
     
     steps:
@@ -335,7 +339,7 @@ jobs:
         run: |
           echo "🧪 Running comprehensive quality checks..."
           
-          # Unit tests
+          # Unit tests with coverage
           npm run test -- --coverage --ci || echo "No tests configured"
           
           # Linting
@@ -347,73 +351,67 @@ jobs:
           echo "✅ Basic quality checks completed"
 
       - name: 🔬 SonarCloud Analysis
-        if: env.ENABLE_SONAR == 'true' && secrets.SONAR_TOKEN != ''
-        uses: SonarSource/sonarcloud-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
-      - name: 📊 SonarCloud Quality Gate
-        id: sonar-gate
-        if: env.ENABLE_SONAR == 'true' && secrets.SONAR_TOKEN != ''
-        run: |
-          echo "📊 Evaluating SonarCloud Quality Gate..."
-          
-          # Simulate quality gate evaluation (replace with actual SonarCloud API call)
-          QUALITY_GATE="PASSED"  # This would come from SonarCloud API
-          COVERAGE="85"          # This would come from SonarCloud API
-          
-          echo "quality-gate=$QUALITY_GATE" >> $GITHUB_OUTPUT
-          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
-          
-          if [[ "$COVERAGE" -lt "${{ env.MIN_CODE_COVERAGE }}" ]]; then
-            echo "❌ Code coverage below threshold: ${COVERAGE}% < ${{ env.MIN_CODE_COVERAGE }}%"
-            echo "quality-gate=FAILED" >> $GITHUB_OUTPUT
-          else
-            echo "✅ Code coverage acceptable: ${COVERAGE}% >= ${{ env.MIN_CODE_COVERAGE }}%"
-          fi
+        id: sonar-analysis
+        uses: ./.github/actions/sonar-analysis
+        with:
+          enabled: ${{ env.ENABLE_SONAR }}
+          sonar-token: ${{ secrets.SONAR_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          min-code-coverage: ${{ env.MIN_CODE_COVERAGE }}
+          min-branch-coverage: ${{ vars.MIN_BRANCH_COVERAGE || '70' }}
+          sonar-maintainability-rating: ${{ vars.SONAR_MAINTAINABILITY_RATING || 'A' }}
+          sonar-reliability-rating: ${{ vars.SONAR_RELIABILITY_RATING || 'A' }}
+          sonar-security-rating: ${{ vars.SONAR_SECURITY_RATING || 'A' }}
+          max-blocker-issues: ${{ vars.MAX_BLOCKER_ISSUES || '0' }}
+          max-critical-issues: ${{ vars.MAX_CRITICAL_ISSUES || '0' }}
+          max-major-issues: ${{ vars.MAX_MAJOR_ISSUES || '5' }}
+          coverage-exclusions: ${{ vars.SONAR_COVERAGE_EXCLUSIONS || '**/node_modules/**,**/dist/**,**/build/**,**/coverage/**,**/*.test.*,**/*.spec.*' }}
 
       - name: 🔒 Checkmarx Security Scan
-        if: env.ENABLE_CHECKMARX == 'true' && secrets.CHECKMARX_CLIENT != ''
-        run: |
-          echo "🔒 Running Checkmarx Security Scan..."
-          echo "Scan Types: ${{ vars.CHECKMARX_SCAN_TYPES || 'sca,sast,kics' }}"
-          
-          # Simulate Checkmarx scan (replace with actual Checkmarx implementation)
-          echo "✅ Checkmarx scan completed"
-          
-          # Simulate results
-          CRITICAL_VULNS=0
-          HIGH_VULNS=1
-          MEDIUM_VULNS=3
-          
-          echo "📊 Security Scan Results:"
-          echo "  Critical: $CRITICAL_VULNS"
-          echo "  High: $HIGH_VULNS"
-          echo "  Medium: $MEDIUM_VULNS"
-          
-          # Validate against thresholds
-          if [[ "$CRITICAL_VULNS" -gt "${{ env.MAX_CRITICAL_VULNERABILITIES }}" ]]; then
-            echo "❌ Critical vulnerabilities exceed threshold: $CRITICAL_VULNS > ${{ env.MAX_CRITICAL_VULNERABILITIES }}"
-            exit 1
-          elif [[ "$HIGH_VULNS" -gt "${{ env.MAX_HIGH_VULNERABILITIES }}" ]]; then
-            echo "⚠️ High vulnerabilities exceed threshold: $HIGH_VULNS > ${{ env.MAX_HIGH_VULNERABILITIES }}"
-            echo "Proceeding with warning for non-production deployments"
-          else
-            echo "✅ Security scan passed all thresholds"
-          fi
+        id: checkmarx-scan
+        uses: ./.github/actions/checkmarx-scan
+        with:
+          enabled: ${{ env.ENABLE_CHECKMARX }}
+          checkmarx-client: ${{ secrets.CHECKMARX_CLIENT }}
+          checkmarx-secret: ${{ secrets.CHECKMARX_SECRET }}
+          checkmarx-server: ${{ secrets.CHECKMARX_SERVER || 'https://checkmarx.company.com' }}
+          scan-types: ${{ vars.CHECKMARX_SCAN_TYPES || 'sca,sast,kics' }}
+          max-critical-vulnerabilities: ${{ env.MAX_CRITICAL_VULNERABILITIES }}
+          max-high-vulnerabilities: ${{ env.MAX_HIGH_VULNERABILITIES }}
+          max-medium-vulnerabilities: ${{ vars.MAX_MEDIUM_VULNERABILITIES || '10' }}
+          max-sca-critical: ${{ vars.MAX_SCA_CRITICAL || '0' }}
+          max-sca-high: ${{ vars.MAX_SCA_HIGH || '2' }}
+          max-kics-high: ${{ vars.MAX_KICS_HIGH || '0' }}
+          preset: ${{ vars.CHECKMARX_PRESET || 'Checkmarx Default' }}
+          incremental: ${{ vars.CHECKMARX_INCREMENTAL || 'true' }}
+          exclude-folders: ${{ vars.CHECKMARX_EXCLUDE_FOLDERS || 'node_modules,dist,build,coverage' }}
+          exclude-files: ${{ vars.CHECKMARX_EXCLUDE_FILES || '*.min.js,*.bundle.js' }}
 
-      - name: 📋 Security Summary
+      - name: 📋 Security & Quality Summary
         id: security-summary
         run: |
-          SONAR_STATUS="${{ steps.sonar-gate.outputs.quality-gate || 'SKIPPED' }}"
+          SONAR_STATUS="${{ steps.sonar-analysis.outputs.scan-status }}"
+          CHECKMARX_STATUS="${{ steps.checkmarx-scan.outputs.scan-status }}"
           
-          if [[ "$SONAR_STATUS" == "FAILED" ]]; then
+          echo "📊 Security & Quality Summary:"
+          echo "=============================="
+          echo "🔬 SonarCloud: $SONAR_STATUS"
+          echo "🔒 Checkmarx: $CHECKMARX_STATUS"
+          
+          # Overall status determination
+          if [[ "$SONAR_STATUS" == "FAILED" ]] || [[ "$CHECKMARX_STATUS" == "FAILED" ]]; then
             echo "status=FAILED" >> $GITHUB_OUTPUT
             echo "❌ Quality checks failed"
+            
+            if [[ "$SONAR_STATUS" == "FAILED" ]]; then
+              echo "  - SonarCloud quality gate failed"
+            fi
+            if [[ "$CHECKMARX_STATUS" == "FAILED" ]]; then
+              echo "  - Checkmarx security thresholds exceeded"
+            fi
           else
             echo "status=PASSED" >> $GITHUB_OUTPUT
-            echo "✅ Quality checks passed"
+            echo "✅ All quality checks passed"
           fi
 
   # Development deployment with short SHA versioning
@@ -634,7 +632,11 @@ jobs:
           echo "🛡️ Quality & Security:"
           echo "  📊 Quality Checks: ${{ needs.quality-checks.result }}"
           echo "  🔬 SonarCloud Gate: ${{ needs.quality-checks.outputs.sonar-quality-gate || 'skipped' }}"
-          echo "  🔒 Security Status: ${{ needs.quality-checks.outputs.security-scan-status || 'skipped' }}"
+          echo "  📈 Code Coverage: ${{ needs.quality-checks.outputs.sonar-coverage || 'N/A' }}%"
+          echo "  🔒 Checkmarx Status: ${{ needs.quality-checks.outputs.checkmarx-status || 'skipped' }}"
+          echo "  🚨 Critical Vulns: ${{ needs.quality-checks.outputs.checkmarx-critical || '0' }}"
+          echo "  ⚠️ High Vulns: ${{ needs.quality-checks.outputs.checkmarx-high || '0' }}"
+          echo "  🛡️ Overall Status: ${{ needs.quality-checks.outputs.security-scan-status || 'skipped' }}"
           echo ""
           echo "📋 Risk Assessment:"
           echo "  📊 Deployment Risk: ${{ needs.detect-deployment.outputs.deployment-risk }}"

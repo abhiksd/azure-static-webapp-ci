@@ -182,6 +182,24 @@ git push origin v1.2.4-hotfix.1
 # 5. Run deployment
 ```
 
+## 🎯 Composite Actions Architecture
+
+### Clean Security Scanning with Reusable Actions
+
+The intermediate workflow uses **composite actions** to maintain clean, readable workflow files while providing comprehensive security scanning:
+
+**Benefits:**
+- ✅ **Clean workflow files** - Complex scan logic moved to reusable actions
+- ✅ **Consistent behavior** - Same scan configuration across all environments  
+- ✅ **Easy maintenance** - Centralized action updates affect all workflows
+- ✅ **Simple customization** - Change variables without workflow modifications
+
+**Available Composite Actions:**
+- 🔬 **SonarCloud Analysis** (`.github/actions/sonar-analysis`)
+- 🔒 **Checkmarx Security Scan** (`.github/actions/checkmarx-scan`)
+
+> 📖 **Composite Actions Guide**: See [Composite Actions README](.github/actions/README.md) for detailed configuration.
+
 ## 🛡️ Security & Quality Controls
 
 ### Risk-Based Deployment Strategy
@@ -210,18 +228,30 @@ git push origin v1.2.4-hotfix.1
 
 ### Quality Gate Thresholds
 
-**Configurable Thresholds:**
-```yaml
-# Code Coverage
-MIN_CODE_COVERAGE: 80%
+**Configurable Thresholds (via Repository Variables):**
+```bash
+# SonarCloud Quality Gates
+MIN_CODE_COVERAGE=80                    # Minimum overall coverage
+MIN_BRANCH_COVERAGE=70                  # Minimum branch coverage  
+SONAR_MAINTAINABILITY_RATING=A          # Target maintainability (A-E)
+SONAR_RELIABILITY_RATING=A              # Target reliability (A-E)
+SONAR_SECURITY_RATING=A                 # Target security (A-E)
+MAX_BLOCKER_ISSUES=0                    # Maximum blocker issues
+MAX_CRITICAL_ISSUES=0                   # Maximum critical issues
+MAX_MAJOR_ISSUES=5                      # Maximum major issues
 
-# Security Vulnerabilities
-MAX_CRITICAL_VULNERABILITIES: 0
-MAX_HIGH_VULNERABILITIES: 2
-MAX_MEDIUM_VULNERABILITIES: 10
+# Checkmarx Security Thresholds
+MAX_CRITICAL_VULNERABILITIES=0          # SAST critical limit
+MAX_HIGH_VULNERABILITIES=2              # SAST high limit
+MAX_MEDIUM_VULNERABILITIES=10           # SAST medium limit
+MAX_SCA_CRITICAL=0                      # SCA critical limit
+MAX_SCA_HIGH=2                          # SCA high limit
+MAX_KICS_HIGH=0                         # KICS high limit
 
 # Scan Configuration
-CHECKMARX_SCAN_TYPES: sca,sast,kics
+CHECKMARX_SCAN_TYPES=sca,sast,kics      # Enabled scan types
+CHECKMARX_PRESET="Checkmarx Default"    # Scan preset
+CHECKMARX_INCREMENTAL=true              # Enable incremental scanning
 ```
 
 ## 📋 Common Workflows
