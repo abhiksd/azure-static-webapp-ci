@@ -315,7 +315,6 @@ jobs:
           checkmarx_url: ${{ secrets.CHECKMARX_SERVER || 'https://checkmarx.company.com' }}
           checkmarx_client: ${{ secrets.CHECKMARX_CLIENT }}
           checkmarx_secret: ${{ secrets.CHECKMARX_SECRET }}
-          checkmarx_client_secret: ${{ secrets.CHECKMARX_CLIENT_SECRET }}
           scanners: sast
           params: --bug-tracker=GITHUBPULL --cx-flow.filter-severity --cx-flow.filter-category --cx-flow.filter-cwe --cx-flow.filter-state
 

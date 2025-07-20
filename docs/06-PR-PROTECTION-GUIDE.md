@@ -267,7 +267,6 @@ jobs:
           checkmarx_url: ${{ secrets.CHECKMARX_URL }}
           checkmarx_client: ${{ secrets.CHECKMARX_CLIENT }}
           checkmarx_secret: ${{ secrets.CHECKMARX_SECRET }}
-          checkmarx_client_secret: ${{ secrets.CHECKMARX_CLIENT_SECRET }}
           scanners: sast
           params: |
             --severity=High,Medium
