@@ -42,6 +42,12 @@ env:
   MIN_CODE_COVERAGE: ${{ vars.MIN_CODE_COVERAGE || '80' }}
   MAX_CRITICAL_VULNERABILITIES: ${{ vars.MAX_CRITICAL_VULNERABILITIES || '0' }}
   MAX_HIGH_VULNERABILITIES: ${{ vars.MAX_HIGH_VULNERABILITIES || '2' }}
+  
+  # Common Azure Static Web Apps deployment parameters
+  AZURE_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  AZURE_ACTION: "upload"
+  AZURE_APP_LOCATION: "/"
+  AZURE_OUTPUT_LOCATION: "build"
 
 permissions:
   contents: read
