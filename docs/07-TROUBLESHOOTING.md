@@ -325,49 +325,69 @@ npm test -- --verbose --detectOpenHandles
 
 ## 🔐 Azure Key Vault Issues
 
-### Issue: Key Vault Access Denied
+### Issue: Key Vault Access Denied (Managed Identity)
 
 **Symptoms:**
 - "Access denied" errors when retrieving secrets
 - Authentication failures in GitHub Actions
 - Secrets showing as undefined
+- "Azure CLI is not authenticated" errors
 
 **Diagnosis:**
 ```bash
-# Test Key Vault access locally
+# Test managed identity authentication
+az account show
+
+# Test Key Vault access
 az keyvault secret show --vault-name "myapp-kv-prod-eastus2" --name "API-Key"
 
-# Check access policies
-az keyvault show --name "myapp-kv-prod-eastus2" --query "properties.accessPolicies"
+# Check RBAC permissions
+az role assignment list --assignee $(az account show --query user.name -o tsv) --scope /subscriptions/<subscription-id>/resourceGroups/<rg-name>/providers/Microsoft.KeyVault/vaults/<vault-name>
 
-# Verify service principal permissions
-az ad sp show --id <service-principal-id>
+# Verify Key Vault RBAC is enabled
+az keyvault show --name "myapp-kv-prod-eastus2" --query "properties.enableRbacAuthorization"
 ```
 
 **Solutions:**
-1. **Fix Access Policies:**
+1. **Configure Managed Identity on Runner:**
    ```bash
-   # Grant access to service principal
-   SP_OBJECT_ID=$(az ad sp show --id <service-principal-id> --query objectId --output tsv)
-   az keyvault set-policy \
-     --name "myapp-kv-prod-eastus2" \
-     --object-id "$SP_OBJECT_ID" \
-     --secret-permissions get list
-   ```
-
-2. **Update GitHub Actions Credentials:**
-   ```bash
-   # Regenerate service principal credentials
-   az ad sp create-for-rbac --name "myapp-github-actions-sp" --role contributor --scopes "/subscriptions/<subscription-id>" --sdk-auth
+   # Ensure GitHub runner has managed identity enabled (done during deployment)
+   # This cannot be fixed from the workflow - contact your infrastructure team
    
-   # Update GitHub secret
-   gh secret set AZURE_CREDENTIALS --body "<new-credentials-json>"
+   # Verify managed identity is working
+   az account show
    ```
 
-3. **Check Network Restrictions:**
+2. **Grant RBAC Permissions:**
    ```bash
-   # Allow GitHub Actions IP ranges
+   # Get managed identity ID
+   MANAGED_IDENTITY_ID=$(az account show --query user.name -o tsv)
+   
+   # Grant Key Vault Secrets User role
+   az role assignment create \
+     --assignee "$MANAGED_IDENTITY_ID" \
+     --role "Key Vault Secrets User" \
+     --scope "/subscriptions/<subscription-id>/resourceGroups/<rg-name>/providers/Microsoft.KeyVault/vaults/<vault-name>"
+   ```
+
+3. **Enable RBAC Authorization on Key Vault:**
+   ```bash
+   # Enable RBAC authorization (required for managed identity)
+   az keyvault update \
+     --name "myapp-kv-prod-eastus2" \
+     --enable-rbac-authorization true
+   ```
+
+4. **Check Network Restrictions:**
+   ```bash
+   # Allow GitHub Actions IP ranges (if using network restrictions)
    az keyvault update --name "myapp-kv-prod-eastus2" --bypass AzureServices --default-action Allow
+   
+   # Or allow managed identity specifically
+   az keyvault network-rule add \
+     --name "myapp-kv-prod-eastus2" \
+     --vnet-name <vnet-name> \
+     --subnet <subnet-name>
    ```
 
 ### Issue: Secret Not Found

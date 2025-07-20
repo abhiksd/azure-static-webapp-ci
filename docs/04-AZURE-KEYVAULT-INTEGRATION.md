@@ -108,44 +108,51 @@ for env in "${environments[@]}"; do
 done
 ```
 
-### Step 3: Create Service Principal for GitHub Actions
+### Step 3: Configure Managed Identity for GitHub Runners
 
 ```bash
-# Create service principal for GitHub Actions
-SP_NAME="${PROJECT_NAME}-github-actions-sp"
+# Ensure GitHub Actions runners have managed identity configured
+# This is typically done during the runner deployment
 
-echo "Creating service principal: $SP_NAME"
-SP_OUTPUT=$(az ad sp create-for-rbac \
-    --name "$SP_NAME" \
-    --role contributor \
-    --scopes "/subscriptions/$SUBSCRIPTION_ID" \
-    --sdk-auth)
+# Verify managed identity authentication
+echo "Verifying managed identity authentication..."
+if az account show >/dev/null 2>&1; then
+    echo "✅ Managed identity is configured and working"
+    SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+    echo "Current subscription: ${SUBSCRIPTION_ID:0:8}****"
+else
+    echo "❌ Managed identity not configured"
+    echo "Please ensure GitHub Actions runners have managed identity enabled"
+    exit 1
+fi
 
-echo "Service Principal created. Store this output securely:"
-echo "$SP_OUTPUT"
-
-# Extract service principal details
-SP_APP_ID=$(echo "$SP_OUTPUT" | jq -r '.clientId')
-SP_OBJECT_ID=$(az ad sp show --id "$SP_APP_ID" --query objectId --output tsv)
-
-echo "Service Principal App ID: $SP_APP_ID"
-echo "Service Principal Object ID: $SP_OBJECT_ID"
+# Get the managed identity object ID
+MANAGED_IDENTITY_ID=$(az account show --query user.name -o tsv)
+echo "Managed Identity ID: $MANAGED_IDENTITY_ID"
 ```
 
-### Step 4: Grant Key Vault Access to Service Principal
+### Step 4: Grant Key Vault Access to Managed Identity
 
 ```bash
-# Grant Key Vault access to GitHub Actions service principal
+# Grant Key Vault access to GitHub Actions managed identity
 for env in "${environments[@]}"; do
     KV_NAME="${PROJECT_NAME}-kv-${env}-${LOCATION_SHORT}"
     
-    echo "Granting Key Vault access to GitHub Actions SP for $KV_NAME"
-    az keyvault set-policy \
-        --name "$KV_NAME" \
-        --object-id "$SP_OBJECT_ID" \
-        --secret-permissions get list
+    echo "Granting Key Vault access to managed identity for $KV_NAME"
+    
+    # Option 1: Using Azure RBAC (recommended)
+    az role assignment create \
+        --assignee "$MANAGED_IDENTITY_ID" \
+        --role "Key Vault Secrets User" \
+        --scope "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/${PROJECT_NAME}-rg-${env}-${LOCATION_SHORT}/providers/Microsoft.KeyVault/vaults/$KV_NAME"
+    
+    # Option 2: Using Access Policies (alternative)
+    # az keyvault set-policy \
+    #     --name "$KV_NAME" \
+    #     --object-id "$MANAGED_IDENTITY_OBJECT_ID" \
+    #     --secret-permissions get list
         
-    echo "✅ GitHub Actions access configured for $KV_NAME"
+    echo "✅ Managed identity access configured for $KV_NAME"
 done
 ```
 
@@ -302,31 +309,26 @@ fi
 
 ## 🔄 GitHub Actions Integration
 
-### Setup GitHub Secrets
+### Setup GitHub Variables (Managed Identity)
 
 ```bash
 #!/bin/bash
-# scripts/setup-github-secrets.sh
+# scripts/setup-github-variables.sh
 
 # GitHub repository (format: owner/repo)
 GITHUB_REPO="username/repository-name"
 
-# Service Principal credentials (from Step 3 above)
-AZURE_CREDENTIALS='{"clientId":"...","clientSecret":"...","subscriptionId":"...","tenantId":"..."}'
+# Set Key Vault names as repository variables (these are not sensitive)
+gh variable set AZURE_KEYVAULT_NAME_DEV --body "${PROJECT_NAME}-kv-dev-${LOCATION_SHORT}" --repo "$GITHUB_REPO"
+gh variable set AZURE_KEYVAULT_NAME_STAGING --body "${PROJECT_NAME}-kv-staging-${LOCATION_SHORT}" --repo "$GITHUB_REPO"
+gh variable set AZURE_KEYVAULT_NAME_PREPROD --body "${PROJECT_NAME}-kv-preprod-${LOCATION_SHORT}" --repo "$GITHUB_REPO"
+gh variable set AZURE_KEYVAULT_NAME_PROD --body "${PROJECT_NAME}-kv-prod-${LOCATION_SHORT}" --repo "$GITHUB_REPO"
 
-# Set GitHub repository secrets
-gh secret set AZURE_CREDENTIALS --body "$AZURE_CREDENTIALS" --repo "$GITHUB_REPO"
-
-# Set Key Vault names for each environment
-gh secret set AZURE_KEYVAULT_DEV --body "${PROJECT_NAME}-kv-dev-${LOCATION_SHORT}" --repo "$GITHUB_REPO"
-gh secret set AZURE_KEYVAULT_STAGING --body "${PROJECT_NAME}-kv-staging-${LOCATION_SHORT}" --repo "$GITHUB_REPO"
-gh secret set AZURE_KEYVAULT_PREPROD --body "${PROJECT_NAME}-kv-preprod-${LOCATION_SHORT}" --repo "$GITHUB_REPO"
-gh secret set AZURE_KEYVAULT_PROD --body "${PROJECT_NAME}-kv-prod-${LOCATION_SHORT}" --repo "$GITHUB_REPO"
-
-echo "✅ GitHub secrets configured"
+echo "✅ GitHub variables configured"
+echo "ℹ️ Note: No credentials needed - using managed identity authentication"
 ```
 
-### GitHub Actions Workflow Integration
+### GitHub Actions Workflow Integration (Managed Identity)
 
 ```yaml
 # .github/workflows/enhanced-ci-cd.yml
@@ -348,6 +350,11 @@ on:
         - pre-production
         - production
 
+# Required permissions for managed identity
+permissions:
+  id-token: write   # Required for requesting JWT
+  contents: read    # Required for actions/checkout
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -359,38 +366,41 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Azure Login
-        uses: azure/login@v1
+      # No Azure login needed - managed identity is pre-configured on the runner
+      
+      - name: Verify Azure Authentication
+        run: |
+          echo "🔍 Verifying Azure CLI authentication..."
+          if az account show >/dev/null 2>&1; then
+            echo "✅ Azure CLI authenticated with managed identity"
+            SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+            echo "Subscription: ${SUBSCRIPTION_ID:0:8}****"
+          else
+            echo "❌ Azure CLI authentication failed"
+            exit 1
+          fi
+      
+      - name: Get Azure Key Vault Secrets
+        uses: ./.github/actions/azure-keyvault
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          keyvault-name: ${{ vars.AZURE_KEYVAULT_NAME_DEV }}  # Use environment-specific variable
+          use-managed-identity: 'true'
+          set-env-vars: 'true'
+          output-format: 'mask'  # Automatically mask secrets in logs
       
-      - name: Get Environment Key Vault Name
-        id: keyvault
+      # Secrets are now available as environment variables
+      - name: Use Retrieved Secrets
         run: |
-          case "${{ matrix.environment }}" in
-            "development")
-              echo "name=${{ secrets.AZURE_KEYVAULT_DEV }}" >> $GITHUB_OUTPUT
-              ;;
-            "staging")
-              echo "name=${{ secrets.AZURE_KEYVAULT_STAGING }}" >> $GITHUB_OUTPUT
-              ;;
-            "pre-production")
-              echo "name=${{ secrets.AZURE_KEYVAULT_PREPROD }}" >> $GITHUB_OUTPUT
-              ;;
-            "production")
-              echo "name=${{ secrets.AZURE_KEYVAULT_PROD }}" >> $GITHUB_OUTPUT
-              ;;
-          esac
-      
-      - name: Get Secrets from Key Vault
-        id: secrets
-        run: |
-          # Retrieve secrets from Key Vault
-          API_KEY=$(az keyvault secret show --vault-name "${{ steps.keyvault.outputs.name }}" --name "API-Key" --query "value" --output tsv)
-          DB_CONNECTION=$(az keyvault secret show --vault-name "${{ steps.keyvault.outputs.name }}" --name "Database-ConnectionString" --query "value" --output tsv)
-          STORAGE_CONNECTION=$(az keyvault secret show --vault-name "${{ steps.keyvault.outputs.name }}" --name "Storage-ConnectionString" --query "value" --output tsv)
-          AI_KEY=$(az keyvault secret show --vault-name "${{ steps.keyvault.outputs.name }}" --name "ApplicationInsights-InstrumentationKey" --query "value" --output tsv)
-          JWT_SECRET=$(az keyvault secret show --vault-name "${{ steps.keyvault.outputs.name }}" --name "JWT-Secret" --query "value" --output tsv)
+          echo "🔍 Verifying secrets are available..."
+          if [ -n "$API_KEY" ]; then
+            echo "✅ API_KEY is available"
+          fi
+          if [ -n "$DATABASE_CONNECTIONSTRING" ]; then
+            echo "✅ DATABASE_CONNECTIONSTRING is available"
+          fi
+          if [ -n "$STORAGE_CONNECTIONSTRING" ]; then
+            echo "✅ STORAGE_CONNECTIONSTRING is available"
+          fi
           
           # Set as masked environment variables
           echo "::add-mask::$API_KEY"

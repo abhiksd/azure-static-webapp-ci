@@ -37,13 +37,6 @@ permissions:
 
 env:
   NODE_VERSION: '18'
-  
-  # Azure configuration - using OIDC
-  AZURE_CLIENT_ID_DEV: ${{ vars.AZURE_CLIENT_ID_DEV }}
-  AZURE_CLIENT_ID_STAGING: ${{ vars.AZURE_CLIENT_ID_STAGING }}  
-  AZURE_CLIENT_ID_PROD: ${{ vars.AZURE_CLIENT_ID_PROD }}
-  AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
-  AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
   # Static Web Apps tokens (these remain as secrets)
   AZURE_STATIC_WEB_APPS_API_TOKEN_DEV: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_DEV }}
@@ -167,13 +160,6 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Azure Login with Managed Identity
-        uses: azure/login@v2
-        with:
-          client-id: ${{ env.AZURE_CLIENT_ID_DEV }}
-          tenant-id: ${{ env.AZURE_TENANT_ID }}
-          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
-
       - name: Get Azure Key Vault secrets
         uses: ./.github/actions/azure-keyvault
         with:
@@ -226,13 +212,6 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Azure Login with Managed Identity
-        uses: azure/login@v2
-        with:
-          client-id: ${{ env.AZURE_CLIENT_ID_STAGING }}
-          tenant-id: ${{ env.AZURE_TENANT_ID }}
-          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
-
       - name: Get Azure Key Vault secrets
         uses: ./.github/actions/azure-keyvault
         with:
@@ -284,13 +263,6 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Azure Login with Managed Identity
-        uses: azure/login@v2
-        with:
-          client-id: ${{ env.AZURE_CLIENT_ID_PROD }}
-          tenant-id: ${{ env.AZURE_TENANT_ID }}
-          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
-
       - name: Get Azure Key Vault secrets
         uses: ./.github/actions/azure-keyvault
         with:
@@ -341,13 +313,6 @@ jobs:
         uses: ./.github/actions/setup-node
         with:
           node-version: ${{ env.NODE_VERSION }}
-
-      - name: Azure Login with Managed Identity
-        uses: azure/login@v2
-        with:
-          client-id: ${{ env.AZURE_CLIENT_ID_PROD }}
-          tenant-id: ${{ env.AZURE_TENANT_ID }}
-          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
 
       - name: Get Azure Key Vault secrets
         uses: ./.github/actions/azure-keyvault
@@ -412,31 +377,3 @@ jobs:
           echo "Pre-Production: ${{ needs.deploy-preprod.result }}"
           echo "Production: ${{ needs.deploy-production.result }}"
 
-  # Environment Configuration Helper
-  get-azure-config:
-    name: 🔧 Get Azure Configuration
-    runs-on: ubuntu-latest
-    outputs:
-      client-id: ${{ steps.config.outputs.client-id }}
-      keyvault-name: ${{ steps.config.outputs.keyvault-name }}
-    
-    steps:
-      - name: Determine Azure configuration
-        id: config
-        run: |
-          ENVIRONMENT="${{ github.event.inputs.environment || 'development' }}"
-          
-          case "$ENVIRONMENT" in
-            "development")
-              echo "client-id=${{ env.AZURE_CLIENT_ID_DEV }}" >> $GITHUB_OUTPUT
-              echo "keyvault-name=${{ vars.AZURE_KEYVAULT_NAME_DEV }}" >> $GITHUB_OUTPUT
-              ;;
-            "staging")
-              echo "client-id=${{ env.AZURE_CLIENT_ID_STAGING }}" >> $GITHUB_OUTPUT
-              echo "keyvault-name=${{ vars.AZURE_KEYVAULT_NAME_STAGING }}" >> $GITHUB_OUTPUT
-              ;;
-            "pre-production"|"production")
-              echo "client-id=${{ env.AZURE_CLIENT_ID_PROD }}" >> $GITHUB_OUTPUT
-              echo "keyvault-name=${{ vars.AZURE_KEYVAULT_NAME_PROD }}" >> $GITHUB_OUTPUT
-              ;;
-          esac

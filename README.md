@@ -29,12 +29,9 @@ Configure the following secrets in your GitHub repository:
 
 #### Azure Configuration
 ```
-AZURE_CREDENTIALS_DEV          # Service principal for development
-AZURE_CREDENTIALS_STAGING      # Service principal for staging
-AZURE_CREDENTIALS_PROD         # Service principal for production
-AZURE_KEYVAULT_NAME_DEV       # Development Key Vault name
-AZURE_KEYVAULT_NAME_STAGING   # Staging Key Vault name
-AZURE_KEYVAULT_NAME_PROD      # Production Key Vault name
+# Note: Using Azure Managed Identity - no service principal credentials needed
+# Key Vault names are stored as repository variables (not secrets)
+# These can be found in Repository Settings > Secrets and variables > Actions > Variables
 ```
 
 #### Azure Static Web Apps
