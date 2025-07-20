@@ -28,6 +28,7 @@ on:
 
 env:
   NODE_VERSION: '18'
+  
   # Security scan configuration - can be overridden by repository variables
   ENABLE_SONAR: ${{ vars.ENABLE_SONAR_SCAN || 'true' }}
   ENABLE_CHECKMARX: ${{ vars.ENABLE_CHECKMARX_SCAN || 'true' }}
@@ -35,11 +36,36 @@ env:
   ENABLE_LICENSE_SCAN: ${{ vars.ENABLE_LICENSE_SCAN || 'false' }}
   SECURITY_GATE_ENABLED: ${{ vars.SECURITY_GATE_ENABLED || 'true' }}
   
-  # Security thresholds
+  # Checkmarx scan configuration
+  CHECKMARX_SCAN_TYPES: ${{ vars.CHECKMARX_SCAN_TYPES || 'sca,sast,kics' }}
+  CHECKMARX_PRESET: ${{ vars.CHECKMARX_PRESET || 'Checkmarx Default' }}
+  CHECKMARX_INCREMENTAL: ${{ vars.CHECKMARX_INCREMENTAL || 'true' }}
+  CHECKMARX_EXCLUDE_FOLDERS: ${{ vars.CHECKMARX_EXCLUDE_FOLDERS || 'node_modules,dist,build,coverage' }}
+  CHECKMARX_EXCLUDE_FILES: ${{ vars.CHECKMARX_EXCLUDE_FILES || '*.min.js,*.bundle.js' }}
+  
+  # SonarCloud configuration
   SONAR_QUALITY_GATE: ${{ vars.SONAR_QUALITY_GATE || 'PASSED' }}
+  SONAR_COVERAGE_EXCLUSIONS: ${{ vars.SONAR_COVERAGE_EXCLUSIONS || '**/node_modules/**,**/dist/**,**/build/**,**/coverage/**,**/*.test.js,**/*.spec.js' }}
+  SONAR_DUPLICATED_LINES_DENSITY: ${{ vars.SONAR_DUPLICATED_LINES_DENSITY || '3.0' }}
+  SONAR_MAINTAINABILITY_RATING: ${{ vars.SONAR_MAINTAINABILITY_RATING || 'A' }}
+  SONAR_RELIABILITY_RATING: ${{ vars.SONAR_RELIABILITY_RATING || 'A' }}
+  SONAR_SECURITY_RATING: ${{ vars.SONAR_SECURITY_RATING || 'A' }}
+  
+  # Quality gate thresholds - configurable
+  MIN_CODE_COVERAGE: ${{ vars.MIN_CODE_COVERAGE || '80' }}
+  MIN_BRANCH_COVERAGE: ${{ vars.MIN_BRANCH_COVERAGE || '70' }}
+  MIN_LINE_COVERAGE: ${{ vars.MIN_LINE_COVERAGE || '80' }}
   MAX_CRITICAL_VULNERABILITIES: ${{ vars.MAX_CRITICAL_VULNERABILITIES || '0' }}
   MAX_HIGH_VULNERABILITIES: ${{ vars.MAX_HIGH_VULNERABILITIES || '2' }}
-  MIN_CODE_COVERAGE: ${{ vars.MIN_CODE_COVERAGE || '80' }}
+  MAX_MEDIUM_VULNERABILITIES: ${{ vars.MAX_MEDIUM_VULNERABILITIES || '10' }}
+  MAX_BLOCKER_ISSUES: ${{ vars.MAX_BLOCKER_ISSUES || '0' }}
+  MAX_CRITICAL_ISSUES: ${{ vars.MAX_CRITICAL_ISSUES || '0' }}
+  MAX_MAJOR_ISSUES: ${{ vars.MAX_MAJOR_ISSUES || '5' }}
+  
+  # Advanced quality thresholds
+  MAX_COMPLEXITY_THRESHOLD: ${{ vars.MAX_COMPLEXITY_THRESHOLD || '10' }}
+  MAX_TECHNICAL_DEBT_MINUTES: ${{ vars.MAX_TECHNICAL_DEBT_MINUTES || '60' }}
+  MIN_SECURITY_HOTSPOT_REVIEW_RATE: ${{ vars.MIN_SECURITY_HOTSPOT_REVIEW_RATE || '100' }}
 
 jobs:
   # Configuration Job - Determines what checks to run
@@ -257,11 +283,24 @@ jobs:
             -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY || github.repository }}
             -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
             -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
-            -Dsonar.coverage.exclusions=**/*.test.js,**/*.spec.js,**/node_modules/**
-            -Dsonar.exclusions=**/node_modules/**,**/build/**,**/dist/**
+            -Dsonar.coverage.exclusions=${{ env.SONAR_COVERAGE_EXCLUSIONS }}
+            -Dsonar.exclusions=${{ env.SONAR_COVERAGE_EXCLUSIONS }}
+            -Dsonar.cpd.exclusions=${{ env.SONAR_COVERAGE_EXCLUSIONS }}
             -Dsonar.pullrequest.key=${{ github.event.number }}
             -Dsonar.pullrequest.branch=${{ github.head_ref }}
             -Dsonar.pullrequest.base=${{ github.base_ref }}
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=300
+            -Dsonar.coverage.minimum=${{ env.MIN_CODE_COVERAGE }}
+            -Dsonar.coverage.branch.minimum=${{ env.MIN_BRANCH_COVERAGE }}
+            -Dsonar.coverage.line.minimum=${{ env.MIN_LINE_COVERAGE }}
+            -Dsonar.duplicated_lines_density.maximum=${{ env.SONAR_DUPLICATED_LINES_DENSITY }}
+            -Dsonar.maintainability_rating.target=${{ env.SONAR_MAINTAINABILITY_RATING }}
+            -Dsonar.reliability_rating.target=${{ env.SONAR_RELIABILITY_RATING }}
+            -Dsonar.security_rating.target=${{ env.SONAR_SECURITY_RATING }}
+            -Dsonar.complexity.maximum=${{ env.MAX_COMPLEXITY_THRESHOLD }}
+            -Dsonar.sqale_rating.target=${{ env.SONAR_MAINTAINABILITY_RATING }}
+            -Dsonar.security_hotspots_reviewed.minimum=${{ env.MIN_SECURITY_HOTSPOT_REVIEW_RATE }}
 
       - name: Wait for SonarCloud Analysis
         run: |
@@ -315,8 +354,20 @@ jobs:
           checkmarx_url: ${{ secrets.CHECKMARX_SERVER || 'https://checkmarx.company.com' }}
           checkmarx_client: ${{ secrets.CHECKMARX_CLIENT }}
           checkmarx_secret: ${{ secrets.CHECKMARX_SECRET }}
-          scanners: sast
-          params: --bug-tracker=GITHUBPULL --cx-flow.filter-severity --cx-flow.filter-category --cx-flow.filter-cwe --cx-flow.filter-state
+          scanners: ${{ env.CHECKMARX_SCAN_TYPES }}
+          params: |
+            --bug-tracker=GITHUBPULL
+            --preset="${{ env.CHECKMARX_PRESET }}"
+            --incremental=${{ env.CHECKMARX_INCREMENTAL }}
+            --exclude-folders="${{ env.CHECKMARX_EXCLUDE_FOLDERS }}"
+            --exclude-files="${{ env.CHECKMARX_EXCLUDE_FILES }}"
+            --cx-flow.filter-severity=High,Medium,Low
+            --cx-flow.filter-category
+            --cx-flow.filter-cwe
+            --cx-flow.filter-state
+            --severity-threshold=High
+            --sca-resolver=npm,gradle,maven
+            --kics-timeout=600
 
       - name: Process Checkmarx Results
         if: always()
@@ -482,8 +533,13 @@ jobs:
             GATE_PASSED=false
           fi
           
-          # SonarCloud Checks
+          # SonarCloud Checks with configurable thresholds
           if [ "${{ needs.configure-checks.outputs.enable-sonar }}" = "true" ]; then
+            SONAR_COVERAGE="${{ needs.sonar-analysis.outputs.coverage || '0' }}"
+            SONAR_MAINTAINABILITY="${{ needs.sonar-analysis.outputs.maintainability || 'A' }}"
+            SONAR_RELIABILITY="${{ needs.sonar-analysis.outputs.reliability || 'A' }}"
+            SONAR_SECURITY="${{ needs.sonar-analysis.outputs.security || 'A' }}"
+            
             if [ "${{ needs.sonar-analysis.outputs.quality-gate }}" != "PASSED" ] && [ "${{ needs.sonar-analysis.outputs.quality-gate }}" != "SKIPPED" ]; then
               SECURITY_SCORE=$((SECURITY_SCORE - 25))
               ISSUES+=("SonarCloud quality gate failed")
@@ -491,22 +547,78 @@ jobs:
                 GATE_PASSED=false
               fi
             fi
+            
+            # Check individual coverage thresholds
+            if (( $(echo "$SONAR_COVERAGE < ${{ env.MIN_CODE_COVERAGE }}" | bc -l) )); then
+              SECURITY_SCORE=$((SECURITY_SCORE - 15))
+              ISSUES+=("Code coverage below threshold: ${SONAR_COVERAGE}% < ${{ env.MIN_CODE_COVERAGE }}%")
+            fi
+            
+            # Check maintainability rating
+            if [ "$SONAR_MAINTAINABILITY" != "${{ env.SONAR_MAINTAINABILITY_RATING }}" ] && [ "$SONAR_MAINTAINABILITY" != "A" ]; then
+              SECURITY_SCORE=$((SECURITY_SCORE - 10))
+              ISSUES+=("Maintainability rating below target: $SONAR_MAINTAINABILITY")
+            fi
+            
+            # Check reliability rating
+            if [ "$SONAR_RELIABILITY" != "${{ env.SONAR_RELIABILITY_RATING }}" ] && [ "$SONAR_RELIABILITY" != "A" ]; then
+              SECURITY_SCORE=$((SECURITY_SCORE - 15))
+              ISSUES+=("Reliability rating below target: $SONAR_RELIABILITY")
+            fi
+            
+            # Check security rating
+            if [ "$SONAR_SECURITY" != "${{ env.SONAR_SECURITY_RATING }}" ] && [ "$SONAR_SECURITY" != "A" ]; then
+              SECURITY_SCORE=$((SECURITY_SCORE - 20))
+              ISSUES+=("Security rating below target: $SONAR_SECURITY")
+              GATE_PASSED=false
+            fi
           fi
           
-          # Checkmarx Checks
+          # Checkmarx Checks with enhanced thresholds
           if [ "${{ needs.configure-checks.outputs.enable-checkmarx }}" = "true" ]; then
             CRITICAL_COUNT="${{ needs.checkmarx-scan.outputs.critical-count || '0' }}"
             HIGH_COUNT="${{ needs.checkmarx-scan.outputs.high-count || '0' }}"
+            MEDIUM_COUNT="${{ needs.checkmarx-scan.outputs.medium-count || '0' }}"
+            SCA_CRITICAL="${{ needs.checkmarx-scan.outputs.sca-critical || '0' }}"
+            SCA_HIGH="${{ needs.checkmarx-scan.outputs.sca-high || '0' }}"
+            KICS_HIGH="${{ needs.checkmarx-scan.outputs.kics-high || '0' }}"
             
+            # SAST vulnerabilities
             if [ "$CRITICAL_COUNT" -gt "${{ env.MAX_CRITICAL_VULNERABILITIES }}" ]; then
               SECURITY_SCORE=$((SECURITY_SCORE - 30))
-              ISSUES+=("Critical vulnerabilities found: $CRITICAL_COUNT")
+              ISSUES+=("SAST Critical vulnerabilities: $CRITICAL_COUNT > ${{ env.MAX_CRITICAL_VULNERABILITIES }}")
               GATE_PASSED=false
             fi
             
             if [ "$HIGH_COUNT" -gt "${{ env.MAX_HIGH_VULNERABILITIES }}" ]; then
               SECURITY_SCORE=$((SECURITY_SCORE - 20))
-              ISSUES+=("High vulnerabilities exceed threshold: $HIGH_COUNT")
+              ISSUES+=("SAST High vulnerabilities: $HIGH_COUNT > ${{ env.MAX_HIGH_VULNERABILITIES }}")
+              if [ "${{ needs.configure-checks.outputs.change-scope }}" = "production" ]; then
+                GATE_PASSED=false
+              fi
+            fi
+            
+            if [ "$MEDIUM_COUNT" -gt "${{ env.MAX_MEDIUM_VULNERABILITIES }}" ]; then
+              SECURITY_SCORE=$((SECURITY_SCORE - 10))
+              ISSUES+=("SAST Medium vulnerabilities: $MEDIUM_COUNT > ${{ env.MAX_MEDIUM_VULNERABILITIES }}")
+            fi
+            
+            # SCA (Software Composition Analysis) vulnerabilities
+            if [ "$SCA_CRITICAL" -gt "0" ]; then
+              SECURITY_SCORE=$((SECURITY_SCORE - 25))
+              ISSUES+=("SCA Critical vulnerabilities in dependencies: $SCA_CRITICAL")
+              GATE_PASSED=false
+            fi
+            
+            if [ "$SCA_HIGH" -gt "2" ]; then
+              SECURITY_SCORE=$((SECURITY_SCORE - 15))
+              ISSUES+=("SCA High vulnerabilities in dependencies: $SCA_HIGH")
+            fi
+            
+            # KICS (Infrastructure as Code Security) issues
+            if [ "$KICS_HIGH" -gt "0" ]; then
+              SECURITY_SCORE=$((SECURITY_SCORE - 15))
+              ISSUES+=("KICS High severity IaC issues: $KICS_HIGH")
               if [ "${{ needs.configure-checks.outputs.change-scope }}" = "production" ]; then
                 GATE_PASSED=false
               fi

@@ -26,6 +26,38 @@ inputs:
     description: 'Checkmarx project name'
     required: false
     default: ''
+  checkmarx-scan-types:
+    description: 'Checkmarx scan types (sca,sast,kics)'
+    required: false
+    default: 'sca,sast,kics'
+  checkmarx-preset:
+    description: 'Checkmarx scan preset'
+    required: false
+    default: 'Checkmarx Default'
+  checkmarx-incremental:
+    description: 'Use incremental scan'
+    required: false
+    default: 'true'
+  min-code-coverage:
+    description: 'Minimum code coverage threshold'
+    required: false
+    default: '80'
+  min-branch-coverage:
+    description: 'Minimum branch coverage threshold'
+    required: false
+    default: '70'
+  sonar-coverage-exclusions:
+    description: 'SonarCloud coverage exclusions'
+    required: false
+    default: '**/node_modules/**,**/dist/**,**/build/**,**/coverage/**,**/*.test.js,**/*.spec.js'
+  max-critical-vulnerabilities:
+    description: 'Maximum allowed critical vulnerabilities'
+    required: false
+    default: '0'
+  max-high-vulnerabilities:
+    description: 'Maximum allowed high vulnerabilities'
+    required: false
+    default: '2'
   github-token:
     description: 'GitHub token for PR comments'
     required: true
@@ -67,7 +99,7 @@ runs:
           SONAR_PROJECT=$(echo $GITHUB_REPOSITORY | tr '/' '_')
         fi
         
-        # Create sonar-project.properties if it doesn't exist
+        # Create sonar-project.properties with configurable parameters
         if [ ! -f sonar-project.properties ]; then
           cat > sonar-project.properties << EOF
         sonar.projectKey=$SONAR_PROJECT
@@ -77,7 +109,11 @@ runs:
         sonar.test.inclusions=**/*.test.js,**/*.test.ts,**/*.test.tsx,**/*.spec.js,**/*.spec.ts,**/*.spec.tsx
         sonar.javascript.lcov.reportPaths=coverage/lcov.info
         sonar.typescript.lcov.reportPaths=coverage/lcov.info
-        sonar.exclusions=**/node_modules/**,**/dist/**,**/build/**,**/coverage/**
+        sonar.exclusions=${{ inputs.sonar-coverage-exclusions }}
+        sonar.coverage.exclusions=${{ inputs.sonar-coverage-exclusions }}
+        sonar.cpd.exclusions=${{ inputs.sonar-coverage-exclusions }}
+        sonar.coverage.minimum=${{ inputs.min-code-coverage }}
+        sonar.coverage.branch.minimum=${{ inputs.min-branch-coverage }}
         EOF
         fi
         
@@ -85,7 +121,14 @@ runs:
           -Dsonar.projectKey=$SONAR_PROJECT \
           -Dsonar.organization=$SONAR_ORG \
           -Dsonar.host.url=https://sonarcloud.io \
-          -Dsonar.login=$SONAR_TOKEN
+          -Dsonar.login=$SONAR_TOKEN \
+          -Dsonar.exclusions="${{ inputs.sonar-coverage-exclusions }}" \
+          -Dsonar.coverage.exclusions="${{ inputs.sonar-coverage-exclusions }}" \
+          -Dsonar.cpd.exclusions="${{ inputs.sonar-coverage-exclusions }}" \
+          -Dsonar.coverage.minimum=${{ inputs.min-code-coverage }} \
+          -Dsonar.coverage.branch.minimum=${{ inputs.min-branch-coverage }} \
+          -Dsonar.qualitygate.wait=true \
+          -Dsonar.qualitygate.timeout=300
 
     - name: SonarCloud Quality Gate Check
       shell: bash
