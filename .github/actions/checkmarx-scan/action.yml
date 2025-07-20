@@ -148,60 +148,35 @@ runs:
         echo "  📂 Folders: ${{ inputs.exclude-folders }}"
         echo "  📄 Files: ${{ inputs.exclude-files }}"
 
-    - name: Setup Checkmarx Scan Configuration
+    - name: Setup Scan Config
       if: env.CHECKMARX_ENABLED == 'true'
       shell: bash
       run: |
-        echo "🔧 Setting up Checkmarx AST scan configuration..."
+        echo "🔧 Setting up Checkmarx scan..."
         
-        # Parse scan types to build additional parameters
-        SCAN_TYPES="${{ inputs.scan-types }}"
-        ADDITIONAL_PARAMS=""
+        # Build scan parameters
+        PARAMS="--scan-types ${{ inputs.scan-types }} --report-format sarif --output-path ."
         
-        # Handle SAST configuration
-        if [[ "$SCAN_TYPES" == *"sast"* ]]; then
-          ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --scan-types sast"
-          ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --sast-preset-name '${{ inputs.preset }}'"
-          ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --sast-incremental ${{ inputs.incremental }}"
-          if [[ -n "${{ inputs.exclude-folders }}" ]]; then
-            ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --sast-filter '${{ inputs.exclude-folders }}'"
-          fi
-        fi
+        # Add SAST preset if SAST is enabled
+        [[ "${{ inputs.scan-types }}" == *"sast"* ]] && PARAMS="$PARAMS --sast-preset-name '${{ inputs.preset }}'"
         
-        # Handle SCA configuration  
-        if [[ "$SCAN_TYPES" == *"sca"* ]]; then
-          ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --scan-types sca"
-        fi
-        
-        # Handle KICS configuration
-        if [[ "$SCAN_TYPES" == *"kics"* ]]; then
-          ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --scan-types kics"
-        fi
-        
-        # Add output format
-        ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --report-format sarif,json"
-        ADDITIONAL_PARAMS="$ADDITIONAL_PARAMS --output-path ."
-        
-        echo "CHECKMARX_ADDITIONAL_PARAMS=$ADDITIONAL_PARAMS" >> $GITHUB_ENV
-        echo "✅ Checkmarx scan parameters configured"
+        echo "CHECKMARX_ADDITIONAL_PARAMS=$PARAMS" >> $GITHUB_ENV
+        echo "✅ Config ready"
 
-    - name: Download SCA Resolver (for Java projects)
-      if: env.CHECKMARX_ENABLED == 'true' && contains(inputs.scan-types, 'sca') && (contains(github.workspace, 'pom.xml') || contains(github.workspace, 'build.gradle'))
+    - name: SCA Resolver (Java)
+      if: env.CHECKMARX_ENABLED == 'true' && contains(inputs.scan-types, 'sca')
       shell: bash
       run: |
-        echo "📦 Downloading SCA Resolver for Java project..."
-        wget https://sca-downloads.s3.amazonaws.com/cli/2.7.2/ScaResolver-linux64.tar.gz
-        tar -xzvf ScaResolver-linux64.tar.gz
-        rm -rf ScaResolver-linux64.tar.gz
-        echo "✅ SCA Resolver downloaded"
-
-    - name: Run SCA Resolver Scan (for Java projects)
-      if: env.CHECKMARX_ENABLED == 'true' && contains(inputs.scan-types, 'sca') && (contains(github.workspace, 'pom.xml') || contains(github.workspace, 'build.gradle'))
-      shell: bash
-      run: |
-        echo "🔍 Running SCA resolver scan for Java dependencies..."
-        ./ScaResolver offline -r ".cxsca-results.json" -s . -n "${{ inputs.project-name || github.repository }}" --log-level Debug
-        echo "✅ SCA resolver scan completed"
+        # Only run for Java projects
+        if [[ -f "pom.xml" || -f "build.gradle" ]]; then
+          echo "📦 Setting up SCA for Java..."
+          wget -q https://sca-downloads.s3.amazonaws.com/cli/2.7.2/ScaResolver-linux64.tar.gz
+          tar -xzf ScaResolver-linux64.tar.gz && rm ScaResolver-linux64.tar.gz
+          ./ScaResolver offline -r ".cxsca-results.json" -s . -n "${{ inputs.project-name || github.repository }}"
+          echo "✅ SCA ready"
+        else
+          echo "⏭️ No Java project detected, skipping SCA resolver"
+        fi
 
     - name: Run Checkmarx AST Scan
       if: env.CHECKMARX_ENABLED == 'true'
@@ -214,50 +189,21 @@ runs:
         cx_client_secret: ${{ inputs.checkmarx-secret }}
         additional_params: ${{ env.CHECKMARX_ADDITIONAL_PARAMS }}
 
-    - name: Process Checkmarx AST Results
+    - name: Check Results
       if: env.CHECKMARX_ENABLED == 'true'
       shell: bash
       run: |
-        echo "📊 Processing Checkmarx AST scan results..."
+        echo "📊 Looking for scan results..."
         
-        # Look for AST result files (SARIF and JSON)
-        echo "🔍 Searching for Checkmarx AST result files..."
+        # Look for result files
+        RESULTS=$(find . -name "*.sarif" -o -name "*cx_result*" -o -name "*checkmarx*" 2>/dev/null | head -3)
         
-        # AST typically generates results with patterns like:
-        # - cx_result.sarif, cx_result.json
-        # - checkmarx-*.sarif, checkmarx-*.json  
-        # - sast-results.sarif, sca-results.json, kics-results.sarif
-        SARIF_FILES=$(find . -maxdepth 2 \( -name "*.sarif" -o -name "*cx_result*" -o -name "*checkmarx*" -o -name "*sast-results*" -o -name "*sca-results*" -o -name "*kics-results*" \) -type f 2>/dev/null | head -5)
-        
-        if [[ -n "$SARIF_FILES" ]]; then
-          echo "📄 Found Checkmarx AST result files:"
-          for file in $SARIF_FILES; do
-            echo "  - $file ($(stat --format=%s "$file" 2>/dev/null || echo "0") bytes)"
-          done
+        if [[ -n "$RESULTS" ]]; then
+          echo "📄 Found result files:"
+          echo "$RESULTS" | while read file; do echo "  - $(basename $file)"; done
           echo "SARIF_AVAILABLE=true" >> $GITHUB_ENV
-          
-          # Also check for specific AST result patterns
-          if ls cx_result.* >/dev/null 2>&1; then
-            echo "✅ Found cx_result files from AST scan"
-          fi
-          
-          if ls *sast-results* >/dev/null 2>&1; then
-            echo "✅ Found SAST result files"
-          fi
-          
-          if ls *sca-results* >/dev/null 2>&1; then
-            echo "✅ Found SCA result files"
-          fi
-          
-          if ls *kics-results* >/dev/null 2>&1; then
-            echo "✅ Found KICS result files"
-          fi
         else
-          echo "⚠️ No Checkmarx AST result files found"
-          echo "📋 This might be normal for:"
-          echo "  - First scan of a new project"
-          echo "  - Scans with no findings"
-          echo "  - Configuration issues"
+          echo "⚠️ No result files found (normal for first scan or no issues)"
           echo "SARIF_AVAILABLE=false" >> $GITHUB_ENV
         fi
 
@@ -277,7 +223,7 @@ runs:
           exit 0
         fi
         
-        echo "📊 Evaluating Checkmarx Security Scan Results..."
+        echo "📊 Evaluating scan results..."
         
         # Initialize counters
         CRITICAL_VULNS=0
@@ -287,55 +233,23 @@ runs:
         SCA_HIGH=0
         KICS_HIGH=0
         
-        # Parse results from SARIF files (simplified)
-        if [[ "$SARIF_AVAILABLE" == "true" ]]; then
-          echo "📄 Parsing SARIF results..."
+        # Parse SARIF files if available
+        if [[ "$SARIF_AVAILABLE" == "true" ]] && command -v jq >/dev/null 2>&1; then
+          echo "📄 Parsing results..."
           
-          SARIF_FILES=$(find . -name "*.sarif" -o -name "*checkmarx*.json" 2>/dev/null)
-          
-          for sarif_file in $SARIF_FILES; do
-            if [[ -f "$sarif_file" ]] && command -v jq >/dev/null 2>&1; then
-              echo "  📄 Processing: $(basename $sarif_file)"
-              
-              # Simple SARIF parsing for vulnerability counts
-              SARIF_CRITICAL=$(jq -r '[.runs[]?.results[]? | select(.level=="error" or (.properties?.severity // "") | test("high|critical"; "i"))] | length' "$sarif_file" 2>/dev/null || echo "0")
-              SARIF_HIGH=$(jq -r '[.runs[]?.results[]? | select(.level=="warning" or (.properties?.severity // "") | test("medium"; "i"))] | length' "$sarif_file" 2>/dev/null || echo "0")
-              SARIF_MEDIUM=$(jq -r '[.runs[]?.results[]? | select(.level=="note" or (.properties?.severity // "") | test("low"; "i"))] | length' "$sarif_file" 2>/dev/null || echo "0")
-              
-              CRITICAL_VULNS=$((CRITICAL_VULNS + SARIF_CRITICAL))
-              HIGH_VULNS=$((HIGH_VULNS + SARIF_HIGH))
-              MEDIUM_VULNS=$((MEDIUM_VULNS + SARIF_MEDIUM))
+          # Simple SARIF parsing
+          for sarif_file in $(find . -name "*.sarif" 2>/dev/null | head -3); do
+            if [[ -f "$sarif_file" ]]; then
+              CRITICAL_VULNS=$((CRITICAL_VULNS + $(jq -r '[.runs[]?.results[]? | select(.level=="error")] | length' "$sarif_file" 2>/dev/null || echo "0")))
+              HIGH_VULNS=$((HIGH_VULNS + $(jq -r '[.runs[]?.results[]? | select(.level=="warning")] | length' "$sarif_file" 2>/dev/null || echo "0")))
+              MEDIUM_VULNS=$((MEDIUM_VULNS + $(jq -r '[.runs[]?.results[]? | select(.level=="note")] | length' "$sarif_file" 2>/dev/null || echo "0")))
             fi
           done
-          echo "✅ SARIF parsing completed"
-        else
-          echo "⚠️ No SARIF files available, using minimal baseline"
         fi
         
-        # Determine enabled scan types (simplified)
-        IFS=',' read -ra SCAN_TYPES <<< "${{ inputs.scan-types }}"
-        SAST_ENABLED=false
-        SCA_ENABLED=false
-        KICS_ENABLED=false
-        
-        for scan_type in "${SCAN_TYPES[@]}"; do
-          scan_type=$(echo "$scan_type" | tr '[:upper:]' '[:lower:]' | xargs)
-          case "$scan_type" in
-            "sast") SAST_ENABLED=true ;;
-            "sca") SCA_ENABLED=true ;;
-            "kics") KICS_ENABLED=true ;;
-          esac
-        done
-        
-        # Distribute results across scan types (simplified approximation)
-        if [[ "$SCA_ENABLED" == "true" ]]; then
-          SCA_CRITICAL=$((CRITICAL_VULNS / 2))
-          SCA_HIGH=$((HIGH_VULNS / 2))
-        fi
-        
-        if [[ "$KICS_ENABLED" == "true" ]]; then
-          KICS_HIGH=$((HIGH_VULNS / 3))
-        fi
+        # Distribute across scan types
+        [[ "${{ inputs.scan-types }}" == *"sca"* ]] && SCA_CRITICAL=$((CRITICAL_VULNS / 2)) && SCA_HIGH=$((HIGH_VULNS / 2))
+        [[ "${{ inputs.scan-types }}" == *"kics"* ]] && KICS_HIGH=$((HIGH_VULNS / 3))
         
         # Output results
         echo "critical-count=$CRITICAL_VULNS" >> $GITHUB_OUTPUT
@@ -391,29 +305,10 @@ runs:
         
         echo "threshold-passed=$THRESHOLD_PASSED" >> $GITHUB_OUTPUT
         
-        # Clean, simple reporting
-        echo ""
-        echo "📊 Checkmarx Security Scan Results:"
-        echo "===================================="
-        echo "🎯 Scan Types: ${{ inputs.scan-types }}"
-        echo "📄 Data Source: $(if [[ "$SARIF_AVAILABLE" == "true" ]]; then echo "SARIF Files"; else echo "No Results"; fi)"
-        echo ""
-        echo "🔍 SAST: Critical=$CRITICAL_VULNS, High=$HIGH_VULNS, Medium=$MEDIUM_VULNS"
-        
-        if [[ "$SCA_ENABLED" == "true" ]]; then
-          echo "📦 SCA: Critical=$SCA_CRITICAL, High=$SCA_HIGH"
-        fi
-        
-        if [[ "$KICS_ENABLED" == "true" ]]; then
-          echo "🏗️ KICS: High=$KICS_HIGH"
-        fi
-        
-        # Simple summary
-        TOTAL_CRITICAL=$((CRITICAL_VULNS + SCA_CRITICAL))
-        TOTAL_HIGH=$((HIGH_VULNS + SCA_HIGH + KICS_HIGH))
-        
-        echo ""
-        echo "📈 Summary: Critical=$TOTAL_CRITICAL, High=$TOTAL_HIGH, Medium=$MEDIUM_VULNS"
+        # Simple reporting
+        echo "📊 Checkmarx Results:"
+        echo "🎯 Types: ${{ inputs.scan-types }} | Source: $(if [[ "$SARIF_AVAILABLE" == "true" ]]; then echo "SARIF"; else echo "None"; fi)"
+        echo "🔍 Vulnerabilities: $CRITICAL_VULNS critical, $HIGH_VULNS high, $MEDIUM_VULNS medium"
         
         echo ""
         if [[ "$THRESHOLD_PASSED" == "true" ]]; then

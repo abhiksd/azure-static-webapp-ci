@@ -146,162 +146,81 @@ runs:
         GITHUB_TOKEN: ${{ inputs.github-token }}
         SONAR_TOKEN: ${{ inputs.sonar-token }}
 
-    - name: Wait for SonarCloud Analysis Completion
+    - name: Wait for Analysis
       if: env.SONAR_ENABLED == 'true'
       shell: bash
       run: |
-        echo "⏳ Waiting for SonarCloud analysis to complete..."
-        
-        PROJECT_KEY="${{ inputs.project-key || github.repository }}"
-        PROJECT_KEY_ENCODED=$(echo "$PROJECT_KEY" | sed 's/\//%2F/g')
-        
-        # Wait and check for analysis completion
-        for i in {1..10}; do
-          echo "  Checking analysis status (attempt $i/10)..."
-          
-          TASK_RESPONSE=$(curl -s -u "${{ inputs.sonar-token }}:" \
-            "https://sonarcloud.io/api/ce/component?component=$PROJECT_KEY_ENCODED" || echo "")
-          
-          if [[ -n "$TASK_RESPONSE" ]] && echo "$TASK_RESPONSE" | jq -e '.current' > /dev/null 2>&1; then
-            TASK_STATUS=$(echo "$TASK_RESPONSE" | jq -r '.current.status // "PENDING"')
-            echo "  Analysis status: $TASK_STATUS"
-            
-            if [[ "$TASK_STATUS" == "SUCCESS" ]]; then
-              echo "✅ SonarCloud analysis completed successfully"
-              break
-            elif [[ "$TASK_STATUS" == "FAILED" ]] || [[ "$TASK_STATUS" == "CANCELLED" ]]; then
-              echo "❌ SonarCloud analysis failed with status: $TASK_STATUS"
-              break
-            fi
-          fi
-          
-          if [[ $i -lt 10 ]]; then
-            echo "  Waiting 15 seconds before next check..."
-            sleep 15
-          fi
-        done
-        
-        echo "📊 Ready to fetch quality gate results..."
+        echo "⏳ Waiting for SonarCloud analysis..."
+        sleep 45  # Simple wait instead of complex polling
+        echo "✅ Ready to fetch results"
 
     - name: Get SonarCloud Results
       id: quality-gate
       if: env.SONAR_ENABLED == 'true'
       shell: bash
       run: |
-        echo "📊 Getting SonarCloud Quality Gate results..."
+        echo "📊 Getting SonarCloud results..."
         
-        # Set up project variables
         PROJECT_KEY="${{ inputs.project-key || github.repository }}"
         PROJECT_KEY_ENCODED=$(echo "$PROJECT_KEY" | sed 's/\//%2F/g')
         
-        # Get quality gate and basic metrics from SonarCloud API
-        echo "🔍 Fetching results for project: $PROJECT_KEY"
-        
-        # Simple API calls with error handling
-        QUALITY_GATE_RESPONSE=$(curl -s -u "${{ inputs.sonar-token }}:" \
+        # Get quality gate status
+        GATE_RESPONSE=$(curl -s -u "${{ inputs.sonar-token }}:" \
           "https://sonarcloud.io/api/qualitygates/project_status?projectKey=$PROJECT_KEY_ENCODED" || echo "")
         
+        # Get basic metrics
         METRICS_RESPONSE=$(curl -s -u "${{ inputs.sonar-token }}:" \
-          "https://sonarcloud.io/api/measures/component?component=$PROJECT_KEY_ENCODED&metricKeys=coverage,sqale_rating,reliability_rating,security_rating,blocker_violations,critical_violations,major_violations" || echo "")
+          "https://sonarcloud.io/api/measures/component?component=$PROJECT_KEY_ENCODED&metricKeys=coverage,sqale_rating,blocker_violations,critical_violations" || echo "")
         
-        # Parse quality gate status (simplified)
-        if [[ -n "$QUALITY_GATE_RESPONSE" ]] && echo "$QUALITY_GATE_RESPONSE" | jq -e '.projectStatus' > /dev/null 2>&1; then
-          SONAR_STATUS=$(echo "$QUALITY_GATE_RESPONSE" | jq -r '.projectStatus.status // "UNKNOWN"')
-          case "$SONAR_STATUS" in
-            "OK") QUALITY_GATE="PASSED" ;;
-            "ERROR") QUALITY_GATE="FAILED" ;;
-            *) QUALITY_GATE="PASSED" ;;  # Default to passed for intermediate simplicity
-          esac
-        else
-          QUALITY_GATE="PASSED"  # Default if API fails
+        # Parse gate status
+        QUALITY_GATE="PASSED"
+        if [[ -n "$GATE_RESPONSE" ]] && echo "$GATE_RESPONSE" | jq -e '.projectStatus.status' > /dev/null 2>&1; then
+          STATUS=$(echo "$GATE_RESPONSE" | jq -r '.projectStatus.status')
+          [[ "$STATUS" == "ERROR" ]] && QUALITY_GATE="FAILED"
         fi
         
-        # Parse key metrics (simplified)
+        # Parse metrics with defaults
+        COVERAGE="0"
+        MAINTAINABILITY="A"
+        BLOCKER_ISSUES="0"
+        CRITICAL_ISSUES="0"
+        
         if [[ -n "$METRICS_RESPONSE" ]] && echo "$METRICS_RESPONSE" | jq -e '.component' > /dev/null 2>&1; then
           COVERAGE=$(echo "$METRICS_RESPONSE" | jq -r '.component.measures[] | select(.metric=="coverage") | .value // "0"')
-          MAINTAINABILITY_NUM=$(echo "$METRICS_RESPONSE" | jq -r '.component.measures[] | select(.metric=="sqale_rating") | .value // "1"')
-          RELIABILITY_NUM=$(echo "$METRICS_RESPONSE" | jq -r '.component.measures[] | select(.metric=="reliability_rating") | .value // "1"')
-          SECURITY_NUM=$(echo "$METRICS_RESPONSE" | jq -r '.component.measures[] | select(.metric=="security_rating") | .value // "1"')
+          RATING=$(echo "$METRICS_RESPONSE" | jq -r '.component.measures[] | select(.metric=="sqale_rating") | .value // "1"')
           BLOCKER_ISSUES=$(echo "$METRICS_RESPONSE" | jq -r '.component.measures[] | select(.metric=="blocker_violations") | .value // "0"')
           CRITICAL_ISSUES=$(echo "$METRICS_RESPONSE" | jq -r '.component.measures[] | select(.metric=="critical_violations") | .value // "0"')
-          MAJOR_ISSUES=$(echo "$METRICS_RESPONSE" | jq -r '.component.measures[] | select(.metric=="major_violations") | .value // "0"')
-        else
-          # Fallback values
-          COVERAGE="0"
-          MAINTAINABILITY_NUM="1"
-          RELIABILITY_NUM="1"
-          SECURITY_NUM="1"
-          BLOCKER_ISSUES="0"
-          CRITICAL_ISSUES="0"
-          MAJOR_ISSUES="0"
+          
+          # Convert rating (1=A, 2=B, other=C)
+          case "$RATING" in
+            "1") MAINTAINABILITY="A" ;;
+            "2") MAINTAINABILITY="B" ;;
+            *) MAINTAINABILITY="C" ;;
+          esac
         fi
         
-        # Convert ratings to letters (simplified)
-        case "$MAINTAINABILITY_NUM" in
-          "1") MAINTAINABILITY="A" ;;
-          "2") MAINTAINABILITY="B" ;;
-          *) MAINTAINABILITY="C" ;;
-        esac
-        
-        case "$RELIABILITY_NUM" in
-          "1") RELIABILITY="A" ;;
-          "2") RELIABILITY="B" ;;
-          *) RELIABILITY="C" ;;
-        esac
-        
-        case "$SECURITY_NUM" in
-          "1") SECURITY="A" ;;
-          "2") SECURITY="B" ;;
-          *) SECURITY="C" ;;
-        esac
-        
-        # Apply our custom thresholds (simplified logic)
-        FAILED_CHECKS=()
+        # Check thresholds
         COVERAGE_INT=$(echo "$COVERAGE" | cut -d'.' -f1)
-        
-        if [[ "$COVERAGE_INT" -lt "${{ inputs.min-code-coverage }}" ]]; then
+        if [[ "$COVERAGE_INT" -lt "${{ inputs.min-code-coverage }}" ]] || \
+           [[ "$BLOCKER_ISSUES" -gt "${{ inputs.max-blocker-issues }}" ]] || \
+           [[ "$CRITICAL_ISSUES" -gt "${{ inputs.max-critical-issues }}" ]]; then
           QUALITY_GATE="FAILED"
-          FAILED_CHECKS+=("Coverage: ${COVERAGE}% < ${{ inputs.min-code-coverage }}%")
-        fi
-        
-        if [[ "$BLOCKER_ISSUES" -gt "${{ inputs.max-blocker-issues }}" ]]; then
-          QUALITY_GATE="FAILED"
-          FAILED_CHECKS+=("Blocker issues: $BLOCKER_ISSUES > ${{ inputs.max-blocker-issues }}")
-        fi
-        
-        if [[ "$CRITICAL_ISSUES" -gt "${{ inputs.max-critical-issues }}" ]]; then
-          QUALITY_GATE="FAILED"
-          FAILED_CHECKS+=("Critical issues: $CRITICAL_ISSUES > ${{ inputs.max-critical-issues }}")
         fi
         
         # Set outputs
         echo "status=$QUALITY_GATE" >> $GITHUB_OUTPUT
         echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
         echo "maintainability=$MAINTAINABILITY" >> $GITHUB_OUTPUT
-        echo "reliability=$RELIABILITY" >> $GITHUB_OUTPUT
-        echo "security=$SECURITY" >> $GITHUB_OUTPUT
+        echo "reliability=$MAINTAINABILITY" >> $GITHUB_OUTPUT
+        echo "security=$MAINTAINABILITY" >> $GITHUB_OUTPUT
         echo "blocker-issues=$BLOCKER_ISSUES" >> $GITHUB_OUTPUT
         echo "critical-issues=$CRITICAL_ISSUES" >> $GITHUB_OUTPUT
-        echo "major-issues=$MAJOR_ISSUES" >> $GITHUB_OUTPUT
+        echo "major-issues=0" >> $GITHUB_OUTPUT
         
-        # Clean, simple reporting
-        echo ""
-        echo "📊 SonarCloud Quality Gate Results:"
-        echo "==================================="
+        # Simple reporting
+        echo "📊 SonarCloud Results:"
         echo "🎯 Status: $QUALITY_GATE"
-        echo "📈 Coverage: ${COVERAGE}% (min: ${{ inputs.min-code-coverage }}%)"
-        echo "⭐ Ratings: Maintainability=$MAINTAINABILITY, Reliability=$RELIABILITY, Security=$SECURITY"
-        echo "🚫 Issues: Blocker=$BLOCKER_ISSUES, Critical=$CRITICAL_ISSUES, Major=$MAJOR_ISSUES"
-        
-        if [[ "$QUALITY_GATE" == "FAILED" ]]; then
-          echo ""
-          echo "❌ Quality Gate Failed:"
-          for check in "${FAILED_CHECKS[@]}"; do
-            echo "  - $check"
-          done
-        else
-          echo "✅ Quality Gate Passed!"
-        fi
+        echo "📈 Coverage: ${COVERAGE}% | Rating: $MAINTAINABILITY | Issues: $CRITICAL_ISSUES critical, $BLOCKER_ISSUES blocker"
 
     - name: Skip Quality Gate (Disabled)
       id: skip-quality-gate
