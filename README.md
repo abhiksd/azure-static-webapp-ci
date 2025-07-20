@@ -96,8 +96,23 @@ TEAMS_WEBHOOK_URL            # Microsoft Teams webhook
 
 Choose the deployment approach that fits your team's needs:
 
-### 🏭 Enterprise-Grade (Full-Featured)
+### 🏭 Enterprise-Grade (Maximum Features)
 For large teams requiring comprehensive security and compliance controls.
+
+### 🎯 Intermediate (Recommended)
+Production-grade features with manageable complexity - **best of both worlds**.
+
+**Intermediate Deployment Features:**
+- ✅ **All deployment features you requested** (dev/staging short SHA, pre-prod/prod semantic tags)
+- ✅ **Production-grade security** (configurable thresholds, risk assessment, quality gates)
+- ✅ **Manageable complexity** (single workflow file, clear logic, easy to understand)
+- ✅ **Comprehensive controls** (manual overrides, approval workflows, emergency deployments)
+- ✅ **Risk-based strategies** (automatic risk assessment, approval requirements)
+- ✅ **Enterprise features** (without overwhelming complexity)
+
+**Perfect for:** Most teams wanting production-grade CI/CD without enterprise complexity.
+
+> 📖 **Intermediate Guide**: See [Intermediate Deployment Guide](docs/INTERMEDIATE-DEPLOYMENT-GUIDE.md) for complete setup.
 
 ### 🚀 Simplified (Easy to Maintain)  
 For smaller teams wanting essential features without complexity.
