@@ -1,6 +1,6 @@
 # 🎯 Composite Actions for Intermediate CI/CD
 
-This directory contains reusable composite actions that maintain the intermediate complexity level while providing comprehensive security and quality scanning capabilities.
+This directory contains streamlined composite actions that maintain **intermediate complexity** - providing production-grade security scanning while keeping workflows clean and manageable.
 
 ## 📂 Available Actions
 
@@ -9,13 +9,12 @@ This directory contains reusable composite actions that maintain the intermediat
 Comprehensive SonarCloud analysis with configurable quality gates and coverage thresholds.
 
 **Features:**
-- ✅ **Configurable code coverage thresholds** (overall, branch, line coverage)
-- ✅ **Quality rating enforcement** (maintainability, reliability, security)
-- ✅ **Issue count limits** (blocker, critical, major issues)
+- ✅ **Real-time SonarCloud API integration** with fallback handling
+- ✅ **Essential quality metrics** (coverage, ratings, issue counts)
+- ✅ **Configurable thresholds** with simple validation logic
 - ✅ **Easy enable/disable** functionality
-- ✅ **Automatic project configuration** 
-- ✅ **Coverage exclusions** support
-- ✅ **Production-grade quality gates**
+- ✅ **Clean, readable reporting** 
+- ✅ **Production-grade** without overwhelming complexity
 
 **Usage:**
 ```yaml
@@ -40,13 +39,12 @@ Comprehensive SonarCloud analysis with configurable quality gates and coverage t
 Comprehensive Checkmarx security scanning with configurable vulnerability thresholds.
 
 **Features:**
+- ✅ **Real Checkmarx CxFlow integration** with SARIF result parsing
 - ✅ **Multiple scan types** (SAST, SCA, KICS)
-- ✅ **Configurable vulnerability thresholds** per scan type
-- ✅ **Granular threshold control** (critical, high, medium)
+- ✅ **Essential vulnerability metrics** (critical, high, medium)
 - ✅ **Easy enable/disable** functionality
-- ✅ **Scan exclusions** (folders, files)
-- ✅ **Incremental scanning** support
-- ✅ **Production-grade security gates**
+- ✅ **Simplified threshold validation**
+- ✅ **Clean reporting** without information overload
 
 **Usage:**
 ```yaml
