@@ -4,9 +4,9 @@
 
 This guide shows you how to properly import SSL certificates for your enterprise SonarQube server instead of bypassing SSL verification. This is the **secure and recommended approach** for production environments.
 
-## Method 1: Auto-Import Server Certificate (Recommended)
+## Method 1: Auto-Import Complete Certificate Chain (Recommended)
 
-The action will automatically extract and import your SonarQube server's certificate.
+The action will automatically extract and import the complete CA certificate chain from your SonarQube server.
 
 ### Setup:
 ```bash
@@ -19,20 +19,38 @@ SONAR_ORGANIZATION = "your-organization"
 ```
 
 ### How it works:
-1. The action extracts the certificate from your SonarQube server using `openssl s_client`
-2. Adds it to Ubuntu's system certificate store (`/usr/local/share/ca-certificates/`)
-3. Updates the CA certificates with `update-ca-certificates`
-4. Sets `NODE_EXTRA_CA_CERTS` for Node.js (sonar-scanner)
-5. Creates a custom CA bundle for curl (API calls)
+1. The action extracts the **complete certificate chain** from your SonarQube server using `openssl s_client -showcerts`
+2. Validates each certificate in the chain (server cert, intermediate CAs, root CA)
+3. Adds the entire chain to Ubuntu's system certificate store (`/usr/local/share/ca-certificates/`)
+4. Updates the CA certificates with `update-ca-certificates`
+5. Sets `NODE_EXTRA_CA_CERTS` for Node.js (sonar-scanner) with the complete chain
+6. Creates a comprehensive CA bundle for curl (API calls)
+7. Tests certificate chain validation
 
 ### Expected output:
 ```
-Attempting to auto-import server certificate...
-Extracting certificate from: sonarqube-dces.schneider-electric.com
-Server certificate extracted successfully
-Certificate validation passed
-Auto-imported server certificate successfully
-Using custom CA certificate: /tmp/server-cert.crt
+Importing complete CA certificate chain from SONAR_HOST_URL...
+Extracting complete certificate chain from: sonarqube-dces.schneider-electric.com:443
+Certificate chain extracted successfully
+Found 3 certificate(s) in the chain
+Certificate 1: Valid
+  Subject: CN=sonarqube-dces.schneider-electric.com,O=Schneider Electric
+  Issuer: CN=Schneider Electric Intermediate CA,O=Schneider Electric
+Certificate 2: Valid
+  Subject: CN=Schneider Electric Intermediate CA,O=Schneider Electric
+  Issuer: CN=Schneider Electric Root CA,O=Schneider Electric
+Certificate 3: Valid
+  Subject: CN=Schneider Electric Root CA,O=Schneider Electric
+  Issuer: CN=Schneider Electric Root CA,O=Schneider Electric
+Successfully validated 3 out of 3 certificates
+Certificate chain added to system trust store
+Node.js configured to use certificate chain
+Curl configured with comprehensive CA bundle
+Testing certificate chain validation...
+Certificate chain validation: SUCCESS
+Complete CA certificate chain imported successfully
+Using complete CA certificate chain: /tmp/sonar-cert-chain.crt
+Certificate chain contains: 3 certificate(s)
 ```
 
 ## Method 2: Manual Certificate Import (Most Secure)
@@ -178,10 +196,11 @@ If you're currently using `SONAR_SKIP_SSL_VERIFICATION=true`:
 
 ## Expected Workflow Output
 
-### Successful Certificate Import:
+### Successful Certificate Chain Import:
 ```
-Auto-imported server certificate successfully
-Using custom CA certificate: /tmp/server-cert.crt
+Complete CA certificate chain imported successfully
+Using complete CA certificate chain: /tmp/sonar-cert-chain.crt
+Certificate chain contains: 3 certificate(s)
 [INFO] Bootstrapper: Server URL: https://sonarqube-dces.schneider-electric.com
 [INFO] Bootstrapper: Version: 4.3.0
 [INFO] Starting analysis...
