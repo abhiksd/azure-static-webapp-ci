@@ -70,25 +70,25 @@ runs:
     - name: Validate Inputs
       shell: bash
       run: |
-        echo "🔍 Validating deployment inputs..."
+        echo "Validating deployment inputs..."
         
         ENVIRONMENT="${{ inputs.environment }}"
         VERSION="${{ inputs.version }}"
         
         # Validate environment
         if [[ ! "$ENVIRONMENT" =~ ^(development|staging|pre-production|production)$ ]]; then
-          echo "❌ Invalid environment: $ENVIRONMENT"
+          echo "Invalid environment: $ENVIRONMENT"
           echo "Valid environments: development, staging, pre-production, production"
           exit 1
         fi
         
         # Validate version format
         if [ -z "$VERSION" ]; then
-          echo "❌ Version is required"
+          echo "Version is required"
           exit 1
         fi
         
-        echo "✅ Input validation passed"
+        echo "Input validation passed"
         echo "Environment: $ENVIRONMENT"
         echo "Version: $VERSION"
 
@@ -100,7 +100,7 @@ runs:
     - name: Prepare Environment Configuration
       shell: bash
       run: |
-        echo "⚙️ Preparing environment configuration..."
+        echo "Preparing environment configuration..."
         
         ENVIRONMENT="${{ inputs.environment }}"
         VERSION="${{ inputs.version }}"
@@ -130,60 +130,60 @@ runs:
         echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
         echo "DEPLOYMENT_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_ENV
         
-        echo "✅ Environment configuration prepared"
+        echo "Environment configuration prepared"
 
     - name: Pre-deployment Health Check
       shell: bash
       run: |
-        echo "🏥 Running pre-deployment health check..."
+        echo "Running pre-deployment health check..."
         
         # Check if there's a current deployment to verify
         if [ -f "deployment-history.json" ]; then
-          echo "📋 Found existing deployment history"
+          echo "Found existing deployment history"
           
           # If this is production, ensure staging is healthy
           if [ "${{ inputs.environment }}" = "production" ]; then
-            echo "🔍 Verifying staging environment health before production deployment..."
+            echo "Verifying staging environment health before production deployment..."
             
             # This would typically check staging health
             # For now, we'll simulate a check
-            echo "✅ Staging environment verified"
+            echo "Staging environment verified"
           fi
         else
-          echo "ℹ️ No deployment history found (first deployment)"
+          echo "No deployment history found (first deployment)"
         fi
 
     - name: Build Application
       shell: bash
       run: |
-        echo "🏗️ Building application for ${{ inputs.environment }}..."
+        echo "Building application for ${{ inputs.environment }}..."
         
         # Install dependencies if needed
         if [ -f "package.json" ] && [ ! -d "node_modules" ]; then
-          echo "📦 Installing dependencies..."
+          echo "Installing dependencies..."
           npm ci
         fi
         
         # Build application
-        echo "🔨 Building application..."
+        echo "Building application..."
         npm run build
         
         # Verify build output
         OUTPUT_DIR="${{ inputs.output-location }}"
         if [ -d "$OUTPUT_DIR" ]; then
-          echo "✅ Build completed successfully"
+          echo "Build completed successfully"
           echo "Build output size: $(du -sh $OUTPUT_DIR | cut -f1)"
           echo "Build contents:"
           ls -la $OUTPUT_DIR | head -20
         else
-          echo "❌ Build output directory not found: $OUTPUT_DIR"
+          echo "Build output directory not found: $OUTPUT_DIR"
           exit 1
         fi
 
     - name: Create Enhanced Configuration
       shell: bash
       run: |
-        echo "📝 Creating enhanced configuration..."
+        echo "Creating enhanced configuration..."
         
         ENVIRONMENT="${{ inputs.environment }}"
         VERSION="${{ inputs.version }}"
@@ -282,7 +282,7 @@ runs:
         }
         EOF
         
-        echo "✅ Enhanced configuration created"
+        echo "Enhanced configuration created"
 
     - name: Deploy to Azure Static Web Apps
       id: deploy
@@ -304,16 +304,16 @@ runs:
         
         if [ -n "$DEPLOYMENT_URL" ]; then
           echo "deployment_url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
-          echo "🌐 Deployment URL: $DEPLOYMENT_URL"
+          echo "Deployment URL: $DEPLOYMENT_URL"
         else
-          echo "❌ Deployment URL not available"
+          echo "Deployment URL not available"
           exit 1
         fi
 
     - name: Record Deployment
       shell: bash
       run: |
-        echo "📝 Recording deployment in history..."
+        echo "Recording deployment in history..."
         
         # Download rollback script if not present
         if [ ! -f "scripts/rollback.js" ]; then
@@ -335,24 +335,24 @@ runs:
         }
         EOF
         
-        echo "✅ Deployment recorded"
+        echo "Deployment recorded"
 
     - name: Comprehensive Health Check
       id: health-check
       if: inputs.enable-health-checks == 'true'
       shell: bash
       run: |
-        echo "🏥 Running comprehensive health checks..."
+        echo "Running comprehensive health checks..."
         
         DEPLOYMENT_URL="${{ steps.url.outputs.deployment_url }}"
         ENVIRONMENT="${{ inputs.environment }}"
         
         # Create health check script if not present
         if [ ! -f "scripts/health-check.js" ]; then
-          echo "⚠️ Health check script not found, using basic check"
+          echo "Health check script not found, using basic check"
           
           # Basic health check
-          echo "🔍 Performing basic health check..."
+          echo "Performing basic health check..."
           
           # Wait for deployment to be ready
           sleep 30
@@ -362,13 +362,13 @@ runs:
           
           if [ "$HTTP_STATUS" = "200" ]; then
             echo "status=healthy" >> $GITHUB_OUTPUT
-            echo "✅ Basic health check passed - HTTP $HTTP_STATUS"
+            echo "Basic health check passed - HTTP $HTTP_STATUS"
           else
             echo "status=unhealthy" >> $GITHUB_OUTPUT
-            echo "❌ Basic health check failed - HTTP $HTTP_STATUS"
+            echo "Basic health check failed - HTTP $HTTP_STATUS"
             
             if [ "${{ inputs.enable-rollback }}" = "true" ]; then
-              echo "🔄 Health check failed, rollback may be triggered"
+              echo "Health check failed, rollback may be triggered"
             fi
           fi
         else
@@ -377,10 +377,10 @@ runs:
           
           if [ $? -eq 0 ]; then
             echo "status=healthy" >> $GITHUB_OUTPUT
-            echo "✅ Comprehensive health check passed"
+            echo "Comprehensive health check passed"
           else
             echo "status=unhealthy" >> $GITHUB_OUTPUT
-            echo "❌ Comprehensive health check failed"
+            echo "Comprehensive health check failed"
           fi
         fi
 
@@ -388,16 +388,16 @@ runs:
       if: inputs.enable-rollback == 'true' && steps.health-check.outputs.status == 'unhealthy'
       shell: bash
       run: |
-        echo "🚨 Health check failed, initiating rollback..."
+        echo "Health check failed, initiating rollback..."
         
         ENVIRONMENT="${{ inputs.environment }}"
         
         if [ -f "scripts/rollback.js" ]; then
           # Run rollback script
-          node scripts/rollback.js rollback "$ENVIRONMENT" || echo "⚠️ Rollback script failed"
+          node scripts/rollback.js rollback "$ENVIRONMENT" || echo "Rollback script failed"
         else
-          echo "⚠️ Rollback script not available"
-          echo "🔴 Manual intervention required"
+          echo "Rollback script not available"
+          echo "Manual intervention required"
         fi
         
         # Mark deployment as failed
@@ -411,7 +411,7 @@ runs:
       if: inputs.enable-monitoring == 'true' && steps.health-check.outputs.status == 'healthy'
       shell: bash
       run: |
-        echo "📊 Setting up monitoring..."
+        echo "Setting up monitoring..."
         
         DEPLOYMENT_URL="${{ steps.url.outputs.deployment_url }}"
         ENVIRONMENT="${{ inputs.environment }}"
@@ -440,13 +440,13 @@ runs:
         EOF
         
         echo "dashboard_url=monitoring-dashboard.html" >> $GITHUB_OUTPUT
-        echo "✅ Monitoring configuration created"
+        echo "Monitoring configuration created"
 
     - name: Start Background Monitoring
       if: inputs.enable-monitoring == 'true' && steps.health-check.outputs.status == 'healthy'
       shell: bash
       run: |
-        echo "🔄 Starting background monitoring..."
+        echo "Starting background monitoring..."
         
         DURATION_SECONDS=$(( ${{ inputs.monitoring-duration }} * 60 ))
         
@@ -454,19 +454,19 @@ runs:
           # Start monitoring in background for specified duration
           timeout $DURATION_SECONDS node scripts/monitoring.js &
           MONITOR_PID=$!
-          echo "📊 Monitoring started (PID: $MONITOR_PID) for ${{ inputs.monitoring-duration }} minutes"
+          echo "Monitoring started (PID: $MONITOR_PID) for ${{ inputs.monitoring-duration }} minutes"
           
           # Store PID for potential cleanup
           echo $MONITOR_PID > monitoring.pid
         else
-          echo "⚠️ Monitoring script not available, skipping background monitoring"
+          echo "Monitoring script not available, skipping background monitoring"
         fi
 
     - name: Send Deployment Notifications
       if: always()
       shell: bash
       run: |
-        echo "📢 Sending deployment notifications..."
+        echo "Sending deployment notifications..."
         
         DEPLOYMENT_URL="${{ steps.url.outputs.deployment_url }}"
         ENVIRONMENT="${{ inputs.environment }}"
@@ -475,22 +475,14 @@ runs:
         
         # Determine deployment status
         if [ "$STATUS" = "healthy" ]; then
-          EMOJI="✅"
           COLOR="#28a745"
           STATUS_TEXT="SUCCESS"
         else
-          EMOJI="❌"
           COLOR="#dc3545"
           STATUS_TEXT="FAILED"
         fi
         
-        MESSAGE="$EMOJI Deployment $STATUS_TEXT: $ENVIRONMENT
-
-Environment: $ENVIRONMENT
-Version: $VERSION
-URL: $DEPLOYMENT_URL
-Status: $STATUS
-Time: $DEPLOYMENT_TIMESTAMP"
+        MESSAGE="Deployment $STATUS_TEXT: $ENVIRONMENT\n\nEnvironment: $ENVIRONMENT\nVersion: $VERSION\nURL: $DEPLOYMENT_URL\nStatus: $STATUS\nTime: $DEPLOYMENT_TIMESTAMP"
         
         echo "$MESSAGE"
         
@@ -505,14 +497,14 @@ Time: $DEPLOYMENT_TIMESTAMP"
                 \"footer\": \"Azure Static Web App Enhanced Deployment\"
               }]
             }" \
-            "${{ inputs.slack-webhook-url }}" || echo "⚠️ Failed to send Slack notification"
+            "${{ inputs.slack-webhook-url }}" || echo "Failed to send Slack notification"
         fi
 
     - name: Create Deployment Summary
       if: always()
       shell: bash
       run: |
-        echo "📋 Creating deployment summary..."
+        echo "Creating deployment summary..."
         
         DEPLOYMENT_URL="${{ steps.url.outputs.deployment_url }}"
         ENVIRONMENT="${{ inputs.environment }}"
@@ -522,24 +514,24 @@ Time: $DEPLOYMENT_TIMESTAMP"
         cat > deployment-summary.md << EOF
         # Deployment Summary
         
-        ## 📊 Overview
+        ##  Overview
         - **Environment**: $ENVIRONMENT
         - **Version**: $VERSION
         - **Status**: $STATUS
         - **URL**: [$DEPLOYMENT_URL]($DEPLOYMENT_URL)
         - **Timestamp**: $DEPLOYMENT_TIMESTAMP
         
-        ## 🏥 Health Check Results
-        - **Basic Connectivity**: $([ "$STATUS" = "healthy" ] && echo "✅ Passed" || echo "❌ Failed")
-        - **Security Headers**: $([ "$STATUS" = "healthy" ] && echo "✅ Verified" || echo "⚠️ Unknown")
-        - **Performance**: $([ "$STATUS" = "healthy" ] && echo "✅ Acceptable" || echo "⚠️ Unknown")
+        ##  Health Check Results
+        - **Basic Connectivity**: $([ "$STATUS" = "healthy" ] && echo "Passed" || echo "Failed")
+        - **Security Headers**: $([ "$STATUS" = "healthy" ] && echo "Verified" || echo "Unknown")
+        - **Performance**: $([ "$STATUS" = "healthy" ] && echo "Acceptable" || echo "Unknown")
         
-        ## 📈 Monitoring
+        ##  Monitoring
         - **Monitoring Enabled**: ${{ inputs.enable-monitoring }}
         - **Rollback Enabled**: ${{ inputs.enable-rollback }}
         - **Monitoring Duration**: ${{ inputs.monitoring-duration }} minutes
         
-        ## 🔗 Quick Links
+        ##  Quick Links
         - [Application URL]($DEPLOYMENT_URL)
         - [Health Endpoint]($DEPLOYMENT_URL/health)
         - [Monitoring Dashboard](monitoring-dashboard.html)
@@ -548,7 +540,7 @@ Time: $DEPLOYMENT_TIMESTAMP"
         *Generated by Enhanced Azure Static Web Apps Deployment*
         EOF
         
-        echo "✅ Deployment summary created"
+        echo "Deployment summary created"
 
     - name: Upload Deployment Artifacts
       uses: actions/upload-artifact@v4
@@ -569,13 +561,13 @@ Time: $DEPLOYMENT_TIMESTAMP"
       run: |
         STATUS="${{ steps.health-check.outputs.status || 'unknown' }}"
         
-        echo "🎯 Final deployment status: $STATUS"
+        echo "Final deployment status: $STATUS"
         
         if [ "$STATUS" = "healthy" ]; then
-          echo "✅ Deployment completed successfully!"
-          echo "🌐 Application is available at: ${{ steps.url.outputs.deployment_url }}"
+          echo "Deployment completed successfully!"
+          echo "Application is available at: ${{ steps.url.outputs.deployment_url }}"
         else
-          echo "❌ Deployment failed or unhealthy"
-          echo "🔍 Check health check results and consider rollback"
+          echo "Deployment failed or unhealthy"
+          echo "Check health check results and consider rollback"
           exit 1
         fi

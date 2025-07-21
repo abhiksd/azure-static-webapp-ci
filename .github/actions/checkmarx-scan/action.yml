@@ -55,7 +55,7 @@ runs:
       shell: bash
       run: |
         if [[ -f "pom.xml" || -f "build.gradle" ]]; then
-          echo "📦 Setup SCA for Java..."
+          echo "Setup SCA for Java..."
           wget -q https://sca-downloads.s3.amazonaws.com/cli/2.7.2/ScaResolver-linux64.tar.gz
           tar -xzf ScaResolver-linux64.tar.gz && rm ScaResolver-linux64.tar.gz
           ./ScaResolver offline -r ".cxsca-results.json" -s . -n "${{ github.repository }}"

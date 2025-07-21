@@ -57,23 +57,23 @@ runs:
         ENVIRONMENT="${{ inputs.environment }}"
         VERSION="${{ inputs.version }}"
         
-        echo "🚀 Deploying to environment: $ENVIRONMENT"
-        echo "📦 Version: $VERSION"
+        echo "Deploying to environment: $ENVIRONMENT"
+        echo "Version: $VERSION"
         
         # Validate environment
         if [[ ! "$ENVIRONMENT" =~ ^(development|staging|production)$ ]]; then
-          echo "❌ Invalid environment: $ENVIRONMENT"
+          echo "Invalid environment: $ENVIRONMENT"
           echo "Valid environments: development, staging, production"
           exit 1
         fi
         
         # Validate version format
         if [ -z "$VERSION" ]; then
-          echo "❌ Version is required"
+          echo "Version is required"
           exit 1
         fi
         
-        echo "✅ Environment validation passed"
+        echo "Environment validation passed"
 
     - name: Setup Environment Variables
       shell: bash
@@ -105,13 +105,13 @@ runs:
         echo "VITE_APP_VERSION=$VERSION" >> $GITHUB_ENV
         echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
         
-        echo "🔧 Environment variables set for $ENVIRONMENT"
+        echo "Environment variables set for $ENVIRONMENT"
 
     - name: Build Application
       if: inputs.skip-build != 'true'
       shell: bash
       run: |
-        echo "🏗️  Building application..."
+        echo " Building application..."
         
         # Install dependencies
         INSTALL_CMD="${{ inputs.install-command }}"
@@ -126,12 +126,12 @@ runs:
         # Verify build output
         OUTPUT_DIR="${{ inputs.output-location }}"
         if [ -d "$OUTPUT_DIR" ]; then
-          echo "✅ Build completed successfully"
+          echo "Build completed successfully"
           echo "Build output location: $OUTPUT_DIR"
           echo "Build contents:"
           ls -la $OUTPUT_DIR
         else
-          echo "❌ Build output directory not found: $OUTPUT_DIR"
+          echo "Build output directory not found: $OUTPUT_DIR"
           exit 1
         fi
 
@@ -190,7 +190,7 @@ runs:
           }
         }
         EOF
-          echo "📝 Created staticwebapp.config.json"
+          echo "Created staticwebapp.config.json"
         fi
         
         # Create environment-specific config
@@ -206,7 +206,7 @@ runs:
         }
         EOF
         
-        echo "📋 Created deployment configuration"
+        echo "Created deployment configuration"
 
     - name: Deploy to Azure Static Web Apps
       id: deploy
@@ -229,11 +229,11 @@ runs:
         DEPLOYMENT_URL="${{ steps.deploy.outputs.static_web_app_url }}"
         
         if [ -n "$DEPLOYMENT_URL" ]; then
-          echo "✅ Deployment successful!"
-          echo "🌐 Application URL: $DEPLOYMENT_URL"
+          echo "Deployment successful!"
+          echo "Application URL: $DEPLOYMENT_URL"
           echo "deployment-url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
         else
-          echo "⚠️  Deployment URL not available"
+          echo " Deployment URL not available"
         fi
 
     - name: Health Check
@@ -242,7 +242,7 @@ runs:
         DEPLOYMENT_URL="${{ steps.deploy.outputs.static_web_app_url }}"
         
         if [ -n "$DEPLOYMENT_URL" ]; then
-          echo "🏥 Running health check..."
+          echo "Running health check..."
           
           # Wait for deployment to be ready
           sleep 30
@@ -251,21 +251,21 @@ runs:
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$DEPLOYMENT_URL" || echo "000")
           
           if [ "$HTTP_STATUS" = "200" ]; then
-            echo "✅ Health check passed - Application is accessible"
+            echo "Health check passed - Application is accessible"
           else
-            echo "⚠️  Health check warning - HTTP status: $HTTP_STATUS"
+            echo " Health check warning - HTTP status: $HTTP_STATUS"
             echo "This might be expected for SPAs that return 200 for all routes"
           fi
           
           # Check if common static assets are available
           ASSETS_CHECK=$(curl -s -o /dev/null -w "%{http_code}" "$DEPLOYMENT_URL/static/css/" || echo "000")
           if [ "$ASSETS_CHECK" = "200" ] || [ "$ASSETS_CHECK" = "403" ]; then
-            echo "✅ Static assets check passed"
+            echo "Static assets check passed"
           else
-            echo "ℹ️  Static assets check: $ASSETS_CHECK"
+            echo " Static assets check: $ASSETS_CHECK"
           fi
         else
-          echo "⚠️  Skipping health check - deployment URL not available"
+          echo " Skipping health check - deployment URL not available"
         fi
 
     - name: Update Deployment Status
@@ -275,11 +275,11 @@ runs:
         VERSION="${{ inputs.version }}"
         DEPLOYMENT_URL="${{ steps.deploy.outputs.static_web_app_url }}"
         
-        echo "📊 Deployment Summary:"
+        echo "Deployment Summary:"
         echo "Environment: $ENVIRONMENT"
         echo "Version: $VERSION"
         echo "URL: $DEPLOYMENT_URL"
-        echo "Status: ✅ Deployed"
+        echo "Status:  Deployed"
         
         # Create deployment summary
         cat > deployment-summary.json << EOF
@@ -294,7 +294,7 @@ runs:
         }
         EOF
         
-        echo "💾 Deployment summary created"
+        echo "Deployment summary created"
 
     - name: Notify Deployment
       shell: bash
@@ -303,11 +303,11 @@ runs:
         VERSION="${{ inputs.version }}"
         DEPLOYMENT_URL="${{ steps.deploy.outputs.static_web_app_url }}"
         
-        echo "🔔 Deployment notification:"
-        echo "🚀 Successfully deployed to $ENVIRONMENT"
-        echo "📦 Version: $VERSION"
-        echo "🌐 URL: $DEPLOYMENT_URL"
-        echo "⏰ Time: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
+        echo "Deployment notification:"
+        echo "Successfully deployed to $ENVIRONMENT"
+        echo "Version: $VERSION"
+        echo "URL: $DEPLOYMENT_URL"
+        echo "Time: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
 
     - name: Upload Deployment Artifacts
       uses: actions/upload-artifact@v4

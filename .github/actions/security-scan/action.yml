@@ -157,10 +157,10 @@ runs:
         echo "Quality Gate Status: $QUALITY_GATE"
         
         if [ "$QUALITY_GATE" != "OK" ] && [ "${{ inputs.fail-on-quality-gate }}" = "true" ]; then
-          echo "❌ SonarCloud Quality Gate failed"
+          echo "SonarCloud Quality Gate failed"
           exit 1
         else
-          echo "✅ SonarCloud Quality Gate passed"
+          echo "SonarCloud Quality Gate passed"
         fi
 
     - name: Install Checkmarx CLI
@@ -201,16 +201,16 @@ runs:
           echo "High vulnerabilities: $HIGH_VULNS"
           
           if [ "$CRITICAL_VULNS" -gt 0 ]; then
-            echo "❌ Critical vulnerabilities found"
+            echo "Critical vulnerabilities found"
             exit 1
           elif [ "$HIGH_VULNS" -gt 10 ]; then
-            echo "⚠️  High number of high-severity vulnerabilities found"
+            echo " High number of high-severity vulnerabilities found"
             exit 1
           else
-            echo "✅ Checkmarx scan passed"
+            echo "Checkmarx scan passed"
           fi
         else
-          echo "⚠️  Checkmarx results file not found"
+          echo " Checkmarx results file not found"
         fi
 
     - name: Upload Security Results
@@ -231,19 +231,19 @@ runs:
         script: |
           const fs = require('fs');
           
-          let comment = '## 🔒 Security Scan Results\n\n';
+          let comment = '##  Security Scan Results\n\n';
           
           // Add SonarCloud results
           comment += '### SonarCloud Analysis\n';
-          comment += '- ✅ Code quality analysis completed\n';
-          comment += '- 📊 [View detailed results on SonarCloud](https://sonarcloud.io/dashboard?id=' + 
+          comment += '-  Code quality analysis completed\n';
+          comment += '-  [View detailed results on SonarCloud](https://sonarcloud.io/dashboard?id=' + 
                      process.env.GITHUB_REPOSITORY.replace('/', '_') + ')\n\n';
           
           // Add Checkmarx results if available
           if (fs.existsSync('checkmarx-results.json')) {
             comment += '### Checkmarx Security Scan\n';
-            comment += '- ✅ Security vulnerability scan completed\n';
-            comment += '- 🔍 Check the Actions tab for detailed results\n\n';
+            comment += '-  Security vulnerability scan completed\n';
+            comment += '-  Check the Actions tab for detailed results\n\n';
           }
           
           comment += '---\n*Security scans are required to pass before merging*';

@@ -66,7 +66,7 @@ env:
 jobs:
   # Detect changes and determine deployment strategy
   detect-changes:
-    name: 🔍 Detect Changes
+    name:  Detect Changes
     runs-on: ubuntu-latest
     outputs:
       # Deployment decisions
@@ -95,7 +95,7 @@ jobs:
         with:
           fetch-depth: 0
           
-      - name: 🏭 Production-Grade Deployment Strategy
+      - name:  Production-Grade Deployment Strategy
         id: changes
         run: |
           # Enterprise-level deployment strategy with comprehensive validations
@@ -104,15 +104,15 @@ jobs:
           EVENT_NAME="${{ github.event_name }}"
           ACTOR="${{ github.actor }}"
           
-          echo "🏭 PRODUCTION-GRADE DEPLOYMENT ANALYSIS"
+          echo "PRODUCTION-GRADE DEPLOYMENT ANALYSIS"
           echo "=================================================="
-          echo "🔍 Context Analysis:"
-          echo "  Branch/Tag: $BRANCH"
-          echo "  Reference Type: $REF_TYPE"
-          echo "  Trigger Event: $EVENT_NAME"
-          echo "  Initiated by: $ACTOR"
-          echo "  Repository: ${{ github.repository }}"
-          echo "  Commit SHA: ${{ github.sha }}"
+          echo "Context Analysis:"
+          echo " Branch/Tag: $BRANCH"
+          echo " Reference Type: $REF_TYPE"
+          echo " Trigger Event: $EVENT_NAME"
+          echo " Initiated by: $ACTOR"
+          echo " Repository: ${{ github.repository }}"
+          echo " Commit SHA: ${{ github.sha }}"
           echo ""
           
           # Initialize deployment flags with strict defaults
@@ -129,10 +129,10 @@ jobs:
           
           # Production-Grade Tag-Based Deployments
           
-          # 🏭 PRODUCTION DEPLOYMENT (Highest Security Level)
+          #  PRODUCTION DEPLOYMENT (Highest Security Level)
           if [[ "$REF_TYPE" == "tag" ]] && [[ "$BRANCH" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "🎯 PRODUCTION RELEASE TAG DETECTED: $BRANCH"
-            echo "🔒 Initiating Enterprise-Grade Production Deployment Validation"
+            echo "PRODUCTION RELEASE TAG DETECTED: $BRANCH"
+            echo "Initiating Enterprise-Grade Production Deployment Validation"
             echo ""
             
             # Version analysis and validation
@@ -140,76 +140,76 @@ jobs:
             MINOR=$(echo "$BRANCH" | sed -E 's/^v([0-9]+)\.([0-9]+)\.([0-9]+)$/\2/')
             PATCH=$(echo "$BRANCH" | sed -E 's/^v([0-9]+)\.([0-9]+)\.([0-9]+)$/\3/')
             
-            echo "📊 Version Analysis:"
-            echo "  📦 Version: $BRANCH (Major: $MAJOR, Minor: $MINOR, Patch: $PATCH)"
+            echo "Version Analysis:"
+            echo "  Version: $BRANCH (Major: $MAJOR, Minor: $MINOR, Patch: $PATCH)"
             
             # Determine release type and risk level
             if [[ "$MAJOR" -gt 0 ]] && [[ "$MINOR" -eq 0 ]] && [[ "$PATCH" -eq 0 ]]; then
               DEPLOYMENT_RISK="CRITICAL"
               NOTIFICATION_LEVEL="CRITICAL"
-              echo "  🚨 MAJOR RELEASE: Breaking changes expected"
+              echo "  MAJOR RELEASE: Breaking changes expected"
             elif [[ "$MINOR" -gt 0 ]] && [[ "$PATCH" -eq 0 ]]; then
               DEPLOYMENT_RISK="HIGH"
               NOTIFICATION_LEVEL="HIGH"
-              echo "  ⚠️ MINOR RELEASE: New features added"
+              echo "  MINOR RELEASE: New features added"
             else
               DEPLOYMENT_RISK="MEDIUM"
               NOTIFICATION_LEVEL="MEDIUM"
-              echo "  🔧 PATCH RELEASE: Bug fixes and improvements"
+              echo "  PATCH RELEASE: Bug fixes and improvements"
             fi
             
             # Production-grade security validations
             echo ""
-            echo "🛡️ Security Validation Checklist:"
+            echo "Security Validation Checklist:"
             
             # 1. Tag signature verification (Critical security requirement)
-            echo "  1️⃣ Tag Signature Verification:"
+            echo "  Tag Signature Verification:"
             if git verify-tag "$BRANCH" 2>/dev/null; then
-              echo "    ✅ Tag is properly signed with GPG key"
+              echo "    Tag is properly signed with GPG key"
               TAG_SIGNED=true
             else
-              echo "    ❌ Tag signature verification failed"
+              echo "    Tag signature verification failed"
               TAG_SIGNED=false
               
               if [[ "${{ vars.SKIP_TAG_VERIFICATION }}" == "true" ]]; then
-                echo "    ⚠️ SECURITY OVERRIDE: Tag verification disabled (SKIP_TAG_VERIFICATION=true)"
+                echo "    SECURITY OVERRIDE: Tag verification disabled (SKIP_TAG_VERIFICATION=true)"
               elif [[ "${{ vars.ALLOW_UNSIGNED_PROD_TAGS }}" == "true" ]]; then
-                echo "    🔓 POLICY EXCEPTION: Unsigned tags allowed (ALLOW_UNSIGNED_PROD_TAGS=true)"
+                echo "    POLICY EXCEPTION: Unsigned tags allowed (ALLOW_UNSIGNED_PROD_TAGS=true)"
               else
-                echo "    🚫 DEPLOYMENT BLOCKED: Production requires signed tags"
-                echo "    📋 Resolution steps:"
-                echo "       - Sign the tag: git tag -s $BRANCH -f"
-                echo "       - Or set ALLOW_UNSIGNED_PROD_TAGS=true (not recommended)"
+                echo "    DEPLOYMENT BLOCKED: Production requires signed tags"
+                echo "    Resolution steps:"
+                echo "      - Sign the tag: git tag -s $BRANCH -f"
+                echo "      - Or set ALLOW_UNSIGNED_PROD_TAGS=true (not recommended)"
                 exit 1
               fi
             fi
             
             # 2. Release notes and changelog validation
-            echo "  2️⃣ Release Documentation:"
+            echo "  Release Documentation:"
             if [[ -f "CHANGELOG.md" ]] || [[ -f "RELEASE_NOTES.md" ]]; then
-              echo "    ✅ Release documentation found"
+              echo "    Release documentation found"
               DOCS_PRESENT=true
             else
-              echo "    ⚠️ No CHANGELOG.md or RELEASE_NOTES.md found"
+              echo "    No CHANGELOG.md or RELEASE_NOTES.md found"
               DOCS_PRESENT=false
               if [[ "${{ vars.REQUIRE_RELEASE_DOCS }}" == "true" ]]; then
-                echo "    🚫 DEPLOYMENT BLOCKED: Release documentation required"
+                echo "    DEPLOYMENT BLOCKED: Release documentation required"
                 exit 1
               fi
             fi
             
             # 3. Security scan requirements
-            echo "  3️⃣ Security Scan Requirements:"
+            echo "  Security Scan Requirements:"
             if [[ "${{ vars.SKIP_PROD_SECURITY_SCANS }}" == "true" ]]; then
-              echo "    🔓 Security scans disabled for production (SKIP_PROD_SECURITY_SCANS=true)"
+              echo "    Security scans disabled for production (SKIP_PROD_SECURITY_SCANS=true)"
               SKIP_SECURITY_SCANS=true
             else
-              echo "    🛡️ Full security scan suite required for production"
+              echo "    Full security scan suite required for production"
               SKIP_SECURITY_SCANS=false
             fi
             
             # 4. Deployment time window validation
-            echo "  4️⃣ Deployment Time Window:"
+            echo "  Deployment Time Window:"
             CURRENT_HOUR=$(date +%H)
             CURRENT_DOW=$(date +%u)  # 1=Monday, 7=Sunday
             
@@ -222,57 +222,57 @@ jobs:
             
             if [[ "$CURRENT_HOUR" -ge "$START_HOUR" ]] && [[ "$CURRENT_HOUR" -le "$END_HOUR" ]] && 
                [[ "$CURRENT_DOW" -ge "$START_DAY" ]] && [[ "$CURRENT_DOW" -le "$END_DAY" ]]; then
-              echo "    ✅ Within production deployment window"
+              echo "    Within production deployment window"
               TIME_WINDOW_OK=true
             else
-              echo "    ⚠️ Outside production deployment window (Hours: $ALLOWED_HOURS, Days: $ALLOWED_DAYS)"
+              echo "    Outside production deployment window (Hours: $ALLOWED_HOURS, Days: $ALLOWED_DAYS)"
               TIME_WINDOW_OK=false
               
               if [[ "${{ vars.EMERGENCY_DEPLOYMENT }}" == "true" ]]; then
-                echo "    🚨 EMERGENCY DEPLOYMENT: Time window override enabled"
+                echo "    EMERGENCY DEPLOYMENT: Time window override enabled"
                 TIME_WINDOW_OK=true
               elif [[ "${{ vars.IGNORE_DEPLOYMENT_WINDOW }}" == "true" ]]; then
-                echo "    🔓 POLICY OVERRIDE: Deployment window ignored"
+                echo "    POLICY OVERRIDE: Deployment window ignored"
                 TIME_WINDOW_OK=true
               else
-                echo "    🚫 DEPLOYMENT BLOCKED: Outside allowed deployment window"
-                echo "    📋 Options:"
-                echo "       - Wait for deployment window: $ALLOWED_HOURS (weekdays)"
-                echo "       - Set EMERGENCY_DEPLOYMENT=true for critical fixes"
-                echo "       - Set IGNORE_DEPLOYMENT_WINDOW=true (not recommended)"
+                echo "    DEPLOYMENT BLOCKED: Outside allowed deployment window"
+                echo "    Options:"
+                echo "      - Wait for deployment window: $ALLOWED_HOURS (weekdays)"
+                echo "      - Set EMERGENCY_DEPLOYMENT=true for critical fixes"
+                echo "      - Set IGNORE_DEPLOYMENT_WINDOW=true (not recommended)"
                 exit 1
               fi
             fi
             
             # 5. Approval requirements
-            echo "  5️⃣ Approval Requirements:"
+            echo "  Approval Requirements:"
             if [[ "$DEPLOYMENT_RISK" == "CRITICAL" ]] || [[ "${{ vars.REQUIRE_PROD_APPROVAL }}" == "true" ]]; then
-              echo "    📋 Production deployment requires manual approval"
+              echo "    Production deployment requires manual approval"
               REQUIRE_APPROVAL=true
             else
-              echo "    ✅ Automated deployment approved for this release type"
+              echo "    Automated deployment approved for this release type"
               REQUIRE_APPROVAL=false
             fi
             
             # Final production deployment decision
             echo ""
-            echo "🎯 PRODUCTION DEPLOYMENT DECISION:"
+            echo "PRODUCTION DEPLOYMENT DECISION:"
             if [[ "$TAG_SIGNED" == "true" || "${{ vars.ALLOW_UNSIGNED_PROD_TAGS }}" == "true" ]] && 
                [[ "$TIME_WINDOW_OK" == "true" ]] &&
                [[ "$DOCS_PRESENT" == "true" || "${{ vars.REQUIRE_RELEASE_DOCS }}" != "true" ]]; then
               DEPLOY_PROD=true
-              echo "  ✅ PRODUCTION DEPLOYMENT APPROVED"
-              echo "  📊 Risk Level: $DEPLOYMENT_RISK"
-              echo "  🔔 Notification Level: $NOTIFICATION_LEVEL"
+              echo "  PRODUCTION DEPLOYMENT APPROVED"
+              echo "  Risk Level: $DEPLOYMENT_RISK"
+              echo "  Notification Level: $NOTIFICATION_LEVEL"
             else
-              echo "  🚫 PRODUCTION DEPLOYMENT BLOCKED"
-              echo "  📋 Review security validation failures above"
+              echo "  PRODUCTION DEPLOYMENT BLOCKED"
+              echo "  Review security validation failures above"
             fi
             
-          # 🎯 PRE-PRODUCTION DEPLOYMENT (Release Candidate Validation)
+          #  PRE-PRODUCTION DEPLOYMENT (Release Candidate Validation)
           elif [[ "$REF_TYPE" == "tag" ]] && [[ "$BRANCH" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-(pre|rc|alpha|beta)\. ]]; then
-            echo "🎯 PRE-PRODUCTION RELEASE TAG DETECTED: $BRANCH"
-            echo "🔍 Initiating Release Candidate Validation Pipeline"
+            echo "PRE-PRODUCTION RELEASE TAG DETECTED: $BRANCH"
+            echo "Initiating Release Candidate Validation Pipeline"
             echo ""
             
             # Extract and analyze pre-release information
@@ -280,23 +280,23 @@ jobs:
             PRERELEASE_VERSION=$(echo "$BRANCH" | sed -E 's/^v[0-9]+\.[0-9]+\.[0-9]+-[^.]+\.(.*)$/\1/')
             BASE_VERSION=$(echo "$BRANCH" | sed -E 's/^(v[0-9]+\.[0-9]+\.[0-9]+)-.*$/\1/')
             
-            echo "📊 Pre-Release Analysis:"
-            echo "  📦 Full Version: $BRANCH"
-            echo "  🏷️ Base Version: $BASE_VERSION"
-            echo "  🔖 Pre-Release Type: $PRERELEASE_TYPE"
-            echo "  📈 Pre-Release Version: $PRERELEASE_VERSION"
+            echo "Pre-Release Analysis:"
+            echo "  Full Version: $BRANCH"
+            echo "  Base Version: $BASE_VERSION"
+            echo "  Pre-Release Type: $PRERELEASE_TYPE"
+            echo "  Pre-Release Version: $PRERELEASE_VERSION"
             echo ""
             
             # Pre-production deployment strategy based on release type
             case "$PRERELEASE_TYPE" in
               "rc")
-                echo "🚀 RELEASE CANDIDATE (Production-Ready Testing)"
-                echo "  📋 Deployment Strategy:"
-                echo "    - Target: Pre-Production Environment"
-                echo "    - Security: Full security scan suite"
-                echo "    - Testing: Complete integration and UAT"
-                echo "    - Monitoring: Enhanced monitoring and alerting"
-                echo "    - Rollback: Immediate rollback capability"
+                echo "RELEASE CANDIDATE (Production-Ready Testing)"
+                echo "  Deployment Strategy:"
+                echo "   - Target: Pre-Production Environment"
+                echo "   - Security: Full security scan suite"
+                echo "   - Testing: Complete integration and UAT"
+                echo "   - Monitoring: Enhanced monitoring and alerting"
+                echo "   - Rollback: Immediate rollback capability"
                 
                 DEPLOY_PREPROD=true
                 DEPLOYMENT_RISK="MEDIUM"
@@ -305,20 +305,20 @@ jobs:
                 
                 # RC-specific validations
                 echo ""
-                echo "🛡️ Release Candidate Validations:"
-                echo "  ✅ Full security scan required"
-                echo "  ✅ Performance testing enabled"
-                echo "  ✅ Database migration validation"
-                echo "  ✅ Rollback plan verified"
+                echo "Release Candidate Validations:"
+                echo "  Full security scan required"
+                echo "  Performance testing enabled"
+                echo "  Database migration validation"
+                echo "  Rollback plan verified"
                 ;;
                 
               "pre")
-                echo "🧪 PRE-RELEASE (Development Testing)"
-                echo "  📋 Deployment Strategy:"
-                echo "    - Target: Pre-Production Environment"
-                echo "    - Security: Standard security scans"
-                echo "    - Testing: Basic integration testing"
-                echo "    - Purpose: Feature validation and testing"
+                echo "PRE-RELEASE (Development Testing)"
+                echo "  Deployment Strategy:"
+                echo "   - Target: Pre-Production Environment"
+                echo "   - Security: Standard security scans"
+                echo "   - Testing: Basic integration testing"
+                echo "   - Purpose: Feature validation and testing"
                 
                 DEPLOY_PREPROD=true
                 DEPLOYMENT_RISK="LOW"
@@ -326,12 +326,12 @@ jobs:
                 ;;
                 
               "alpha")
-                echo "🔬 ALPHA RELEASE (Early Testing)"
-                echo "  📋 Deployment Strategy:"
-                echo "    - Target: Staging + Pre-Production"
-                echo "    - Security: Basic security validation"
-                echo "    - Testing: Feature testing and validation"
-                echo "    - Audience: Internal testing team"
+                echo "ALPHA RELEASE (Early Testing)"
+                echo "  Deployment Strategy:"
+                echo "   - Target: Staging + Pre-Production"
+                echo "   - Security: Basic security validation"
+                echo "   - Testing: Feature testing and validation"
+                echo "   - Audience: Internal testing team"
                 
                 DEPLOY_STAGING=true
                 DEPLOY_PREPROD=true
@@ -340,18 +340,18 @@ jobs:
                 
                 # Alpha releases can skip some checks for faster iteration
                 if [[ "${{ vars.ALPHA_SKIP_SECURITY_SCANS }}" == "true" ]]; then
-                  echo "  🔓 Security scans skipped for alpha (ALPHA_SKIP_SECURITY_SCANS=true)"
+                  echo "  Security scans skipped for alpha (ALPHA_SKIP_SECURITY_SCANS=true)"
                   SKIP_SECURITY_SCANS=true
                 fi
                 ;;
                 
               "beta")
-                echo "🧪 BETA RELEASE (User Testing)"
-                echo "  📋 Deployment Strategy:"
-                echo "    - Target: Staging + Pre-Production"
-                echo "    - Security: Enhanced security validation"
-                echo "    - Testing: User acceptance testing"
-                echo "    - Audience: Beta users and stakeholders"
+                echo "BETA RELEASE (User Testing)"
+                echo "  Deployment Strategy:"
+                echo "   - Target: Staging + Pre-Production"
+                echo "   - Security: Enhanced security validation"
+                echo "   - Testing: User acceptance testing"
+                echo "   - Audience: Beta users and stakeholders"
                 
                 DEPLOY_STAGING=true
                 DEPLOY_PREPROD=true
@@ -360,11 +360,11 @@ jobs:
                 ;;
                 
               *)
-                echo "🔍 UNKNOWN PRE-RELEASE TYPE: $PRERELEASE_TYPE"
-                echo "  📋 Default Strategy:"
-                echo "    - Target: Staging Environment (Safe default)"
-                echo "    - Security: Standard validation"
-                echo "    - Risk: Minimal (staging only)"
+                echo "UNKNOWN PRE-RELEASE TYPE: $PRERELEASE_TYPE"
+                echo "  Default Strategy:"
+                echo "   - Target: Staging Environment (Safe default)"
+                echo "   - Security: Standard validation"
+                echo "   - Risk: Minimal (staging only)"
                 
                 DEPLOY_STAGING=true
                 DEPLOYMENT_RISK="LOW"
@@ -374,186 +374,186 @@ jobs:
             
             # Pre-production environment validations
             echo ""
-            echo "🔍 Pre-Production Environment Checks:"
+            echo "Pre-Production Environment Checks:"
             
             # Check for conflicting deployments
-            echo "  1️⃣ Environment Availability:"
+            echo "  Environment Availability:"
             if [[ "${{ vars.PREPROD_MAINTENANCE_MODE }}" == "true" ]]; then
-              echo "    ⚠️ Pre-production environment in maintenance mode"
-              echo "    🔧 Set PREPROD_MAINTENANCE_MODE=false to enable deployment"
+              echo "    Pre-production environment in maintenance mode"
+              echo "    Set PREPROD_MAINTENANCE_MODE=false to enable deployment"
               if [[ "${{ vars.OVERRIDE_MAINTENANCE_MODE }}" != "true" ]]; then
-                echo "    🚫 DEPLOYMENT BLOCKED: Environment unavailable"
+                echo "    DEPLOYMENT BLOCKED: Environment unavailable"
                 DEPLOY_PREPROD=false
               else
-                echo "    🔓 OVERRIDE: Maintenance mode bypassed"
+                echo "    OVERRIDE: Maintenance mode bypassed"
               fi
             else
-              echo "    ✅ Pre-production environment available"
+              echo "    Pre-production environment available"
             fi
             
             # Validate database migration compatibility
-            echo "  2️⃣ Database Compatibility:"
+            echo "  Database Compatibility:"
             if [[ -d "migrations" ]] || [[ -d "database/migrations" ]] || [[ -f "schema.sql" ]]; then
-              echo "    ✅ Database migrations detected - will be validated"
+              echo "    Database migrations detected - will be validated"
               REQUIRE_DB_VALIDATION=true
             else
-              echo "    ✅ No database changes detected"
+              echo "    No database changes detected"
               REQUIRE_DB_VALIDATION=false
             fi
             
             echo ""
-            echo "🎯 PRE-PRODUCTION DEPLOYMENT DECISION:"
-            echo "  ✅ PRE-PRODUCTION DEPLOYMENT APPROVED"
-            echo "  📊 Risk Level: $DEPLOYMENT_RISK"
-            echo "  🔔 Notification Level: $NOTIFICATION_LEVEL"
-            echo "  🛡️ Security Scans: $([ "$SKIP_SECURITY_SCANS" == "true" ] && echo "Skipped" || echo "Required")"
+            echo "PRE-PRODUCTION DEPLOYMENT DECISION:"
+            echo "  PRE-PRODUCTION DEPLOYMENT APPROVED"
+            echo "  Risk Level: $DEPLOYMENT_RISK"
+            echo "  Notification Level: $NOTIFICATION_LEVEL"
+            echo "  Security Scans: $([ "$SKIP_SECURITY_SCANS" == "true" ] && echo "Skipped" || echo "Required")"
             
           # Production-Grade Branch-Based Deployments
           elif [[ "$REF_TYPE" == "branch" ]]; then
-            echo "🔀 Branch-based deployment logic"
+            echo "Branch-based deployment logic"
             
             case "$BRANCH" in
               "main"|"master")
-                echo "🌟 MAIN BRANCH (Production-ready code)"
-                echo "  - Automatic: Development + Staging (CI/CD validation)"
-                echo "  - Production: Requires manual release tag creation"
+                echo "MAIN BRANCH (Production-ready code)"
+                echo " - Automatic: Development + Staging (CI/CD validation)"
+                echo " - Production: Requires manual release tag creation"
                 
                 # Main branch gets automatic dev/staging for integration testing
                 DEPLOY_DEV=true
                 DEPLOY_STAGING=true
                 
                 # Production requires explicit tagging (security best practice)
-                echo "  📋 For production deployment:"
-                echo "    1. Validate staging deployment"
-                echo "    2. Create signed semantic version tag: git tag -s v1.2.3"
-                echo "    3. Push tag: git push origin v1.2.3"
+                echo "  For production deployment:"
+                echo "   1. Validate staging deployment"
+                echo "   2. Create signed semantic version tag: git tag -s v1.2.3"
+                echo "   3. Push tag: git push origin v1.2.3"
                 ;;
                 
               "develop"|"development")
-                echo "🔧 DEVELOP BRANCH (Active development)"
-                echo "  - Purpose: Feature integration and testing"
-                echo "  - Deployment: Development environment only"
-                echo "  - Quality gates: Basic CI checks"
+                echo "DEVELOP BRANCH (Active development)"
+                echo " - Purpose: Feature integration and testing"
+                echo " - Deployment: Development environment only"
+                echo " - Quality gates: Basic CI checks"
                 
                 DEPLOY_DEV=true
                 ;;
                 
               "staging")
-                echo "🧪 STAGING BRANCH (Pre-production testing)"
-                echo "  - Purpose: User acceptance testing and staging validation"
-                echo "  - Deployment: Staging environment with full security scans"
-                echo "  - Requirements: All quality gates must pass"
+                echo "STAGING BRANCH (Pre-production testing)"
+                echo " - Purpose: User acceptance testing and staging validation"
+                echo " - Deployment: Staging environment with full security scans"
+                echo " - Requirements: All quality gates must pass"
                 
                 # Staging branch requires enhanced security validation
                 if [[ "${{ vars.STAGING_REQUIRES_APPROVAL }}" == "true" ]]; then
-                  echo "  ⚠️ Staging deployment requires manual approval"
-                  echo "    Set STAGING_AUTO_DEPLOY=true to enable automatic deployment"
+                  echo "  Staging deployment requires manual approval"
+                  echo "   Set STAGING_AUTO_DEPLOY=true to enable automatic deployment"
                 fi
                 DEPLOY_STAGING=true
                 ;;
                 
               "preprod"|"preproduction"|"pre-production")
-                echo "🎯 PRE-PRODUCTION BRANCH (Release preparation)"
-                echo "  - Purpose: Final pre-production validation"
-                echo "  - Deployment: Pre-production environment"
-                echo "  - Security: Full security scans + penetration testing"
-                echo "  - Performance: Load testing and monitoring"
+                echo "PRE-PRODUCTION BRANCH (Release preparation)"
+                echo " - Purpose: Final pre-production validation"
+                echo " - Deployment: Pre-production environment"
+                echo " - Security: Full security scans + penetration testing"
+                echo " - Performance: Load testing and monitoring"
                 
                 DEPLOY_PREPROD=true
                 ;;
                 
               release/*)
-                echo "🚀 RELEASE BRANCH (Release candidate)"
+                echo "RELEASE BRANCH (Release candidate)"
                 RELEASE_VERSION=$(echo "$BRANCH" | sed 's/release\///')
-                echo "  - Release version: $RELEASE_VERSION"
-                echo "  - Purpose: Release stabilization and final testing"
-                echo "  - Deployment: Staging + Pre-production"
-                echo "  - Next step: Create RC tag when ready"
+                echo " - Release version: $RELEASE_VERSION"
+                echo " - Purpose: Release stabilization and final testing"
+                echo " - Deployment: Staging + Pre-production"
+                echo " - Next step: Create RC tag when ready"
                 
                 # Release branches deploy to staging and pre-prod for validation
                 DEPLOY_STAGING=true
                 DEPLOY_PREPROD=true
                 
-                echo "  📋 Release process:"
-                echo "    1. Deploy to staging for integration testing"
-                echo "    2. Deploy to pre-prod for final validation"
-                echo "    3. Create RC tag: git tag v${RELEASE_VERSION}-rc.1"
-                echo "    4. After validation, create production tag: git tag v${RELEASE_VERSION}"
+                echo "  Release process:"
+                echo "   1. Deploy to staging for integration testing"
+                echo "   2. Deploy to pre-prod for final validation"
+                echo "   3. Create RC tag: git tag v${RELEASE_VERSION}-rc.1"
+                echo "   4. After validation, create production tag: git tag v${RELEASE_VERSION}"
                 ;;
                 
               hotfix/*)
-                echo "🔥 HOTFIX BRANCH (Critical production fix)"
+                echo "HOTFIX BRANCH (Critical production fix)"
                 HOTFIX_VERSION=$(echo "$BRANCH" | sed 's/hotfix\///')
-                echo "  - Hotfix version: $HOTFIX_VERSION"
-                echo "  - Purpose: Critical production issue resolution"
-                echo "  - Deployment: Development + Staging (expedited)"
-                echo "  - Fast-track: Can proceed to production with minimal validation"
+                echo " - Hotfix version: $HOTFIX_VERSION"
+                echo " - Purpose: Critical production issue resolution"
+                echo " - Deployment: Development + Staging (expedited)"
+                echo " - Fast-track: Can proceed to production with minimal validation"
                 
                 DEPLOY_DEV=true
                 DEPLOY_STAGING=true
                 
                 # Hotfix can optionally deploy to pre-prod for critical fixes
                 if [[ "${{ vars.HOTFIX_SKIP_PREPROD }}" != "true" ]]; then
-                  echo "  - Also deploying to pre-production for validation"
+                  echo " - Also deploying to pre-production for validation"
                   DEPLOY_PREPROD=true
                 fi
                 
-                echo "  ⚡ Expedited process:"
-                echo "    1. Deploy to dev/staging for validation"
-                echo "    2. Create hotfix tag: git tag v${HOTFIX_VERSION}"
-                echo "    3. Emergency production deployment available"
+                echo "  Expedited process:"
+                echo "   1. Deploy to dev/staging for validation"
+                echo "   2. Create hotfix tag: git tag v${HOTFIX_VERSION}"
+                echo "   3. Emergency production deployment available"
                 ;;
                 
               feature/*|feat/*)
-                echo "✨ FEATURE BRANCH (New feature development)"
+                echo "FEATURE BRANCH (New feature development)"
                 FEATURE_NAME=$(echo "$BRANCH" | sed 's/feature\///' | sed 's/feat\///')
-                echo "  - Feature: $FEATURE_NAME"
-                echo "  - Purpose: Isolated feature development"
-                echo "  - Deployment: Development environment only"
-                echo "  - Testing: Unit tests + basic integration"
+                echo " - Feature: $FEATURE_NAME"
+                echo " - Purpose: Isolated feature development"
+                echo " - Deployment: Development environment only"
+                echo " - Testing: Unit tests + basic integration"
                 
                 DEPLOY_DEV=true
                 ;;
                 
               bugfix/*|fix/*)
-                echo "🐛 BUGFIX BRANCH (Bug resolution)"
+                echo "BUGFIX BRANCH (Bug resolution)"
                 BUG_NAME=$(echo "$BRANCH" | sed 's/bugfix\///' | sed 's/fix\///')
-                echo "  - Bug fix: $BUG_NAME"
-                echo "  - Purpose: Non-critical bug resolution"
-                echo "  - Deployment: Development environment"
+                echo " - Bug fix: $BUG_NAME"
+                echo " - Purpose: Non-critical bug resolution"
+                echo " - Deployment: Development environment"
                 
                 DEPLOY_DEV=true
                 ;;
                 
               experimental/*|exp/*)
-                echo "🔬 EXPERIMENTAL BRANCH (Research and experiments)"
-                echo "  - Purpose: Proof of concept and experimentation"
-                echo "  - Deployment: Development environment (optional)"
-                echo "  - Validation: Minimal requirements"
+                echo "EXPERIMENTAL BRANCH (Research and experiments)"
+                echo " - Purpose: Proof of concept and experimentation"
+                echo " - Deployment: Development environment (optional)"
+                echo " - Validation: Minimal requirements"
                 
                 # Experimental branches only deploy if explicitly enabled
                 if [[ "${{ vars.DEPLOY_EXPERIMENTAL }}" == "true" ]]; then
                   DEPLOY_DEV=true
-                  echo "  ✅ Experimental deployment enabled"
+                  echo "  Experimental deployment enabled"
                 else
-                  echo "  🚫 Experimental deployment disabled (set DEPLOY_EXPERIMENTAL=true to enable)"
+                  echo "  Experimental deployment disabled (set DEPLOY_EXPERIMENTAL=true to enable)"
                 fi
                 ;;
                 
               *)
-                echo "🔍 UNKNOWN BRANCH TYPE"
-                echo "  - Branch: $BRANCH"
-                echo "  - Status: No automatic deployment configured"
-                echo "  - Options: Use workflow dispatch for manual deployment"
+                echo "UNKNOWN BRANCH TYPE"
+                echo " - Branch: $BRANCH"
+                echo " - Status: No automatic deployment configured"
+                echo " - Options: Use workflow dispatch for manual deployment"
                 echo ""
-                echo "  📚 Supported branch patterns:"
-                echo "    - main/master: dev + staging"
-                echo "    - develop: dev only"
-                echo "    - staging: staging only"
-                echo "    - release/*: staging + pre-prod"
-                echo "    - hotfix/*: dev + staging (+ pre-prod)"
-                echo "    - feature/*: dev only"
-                echo "    - bugfix/*: dev only"
+                echo "  Supported branch patterns:"
+                echo "   - main/master: dev + staging"
+                echo "   - develop: dev only"
+                echo "   - staging: staging only"
+                echo "   - release/*: staging + pre-prod"
+                echo "   - hotfix/*: dev + staging (+ pre-prod)"
+                echo "   - feature/*: dev only"
+                echo "   - bugfix/*: dev only"
                 ;;
             esac
           fi
@@ -561,7 +561,7 @@ jobs:
           # Handle workflow dispatch manual overrides
           if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
             TARGET_ENV="${{ github.event.inputs.environment }}"
-            echo "🎛️ Manual deployment to: $TARGET_ENV"
+            echo "Manual deployment to: $TARGET_ENV"
             
             case "$TARGET_ENV" in
               "development")
@@ -604,31 +604,31 @@ jobs:
           echo "require-approval=$REQUIRE_APPROVAL" >> $GITHUB_OUTPUT
           
           echo ""
-          echo "🏭 PRODUCTION-GRADE DEPLOYMENT PLAN"
+          echo "PRODUCTION-GRADE DEPLOYMENT PLAN"
           echo "=================================================="
-          echo "📋 Environment Targets:"
-          echo "  🔧 Development: $DEPLOY_DEV"
-          echo "  🧪 Staging: $DEPLOY_STAGING"
-          echo "  🎯 Pre-Production: $DEPLOY_PREPROD"
-          echo "  🏭 Production: $DEPLOY_PROD"
+          echo "Environment Targets:"
+          echo "  Development: $DEPLOY_DEV"
+          echo "  Staging: $DEPLOY_STAGING"
+          echo "  Pre-Production: $DEPLOY_PREPROD"
+          echo "  Production: $DEPLOY_PROD"
           echo ""
-          echo "🛡️ Security & Compliance:"
-          echo "  📊 Risk Level: $DEPLOYMENT_RISK"
-          echo "  🔔 Notification Level: $NOTIFICATION_LEVEL"
-          echo "  🛡️ Security Scans: $([ "$SKIP_SECURITY_SCANS" == "true" ] && echo "Skipped" || echo "Required")"
-          echo "  📋 Manual Approval: $([ "$REQUIRE_APPROVAL" == "true" ] && echo "Required" || echo "Not Required")"
+          echo "Security & Compliance:"
+          echo "  Risk Level: $DEPLOYMENT_RISK"
+          echo "  Notification Level: $NOTIFICATION_LEVEL"
+          echo "  Security Scans: $([ "$SKIP_SECURITY_SCANS" == "true" ] && echo "Skipped" || echo "Required")"
+          echo "  Manual Approval: $([ "$REQUIRE_APPROVAL" == "true" ] && echo "Required" || echo "Not Required")"
           echo ""
-          echo "🎯 Next Steps:"
+          echo "Next Steps:"
           if [[ "$DEPLOY_PROD" == "true" ]]; then
-            echo "  🏭 Production deployment will proceed with enterprise-grade validations"
+            echo "  Production deployment will proceed with enterprise-grade validations"
           elif [[ "$DEPLOY_PREPROD" == "true" ]]; then
-            echo "  🎯 Pre-production deployment will include release candidate testing"
+            echo "  Pre-production deployment will include release candidate testing"
           elif [[ "$DEPLOY_STAGING" == "true" ]]; then
-            echo "  🧪 Staging deployment will perform integration validation"
+            echo "  Staging deployment will perform integration validation"
           elif [[ "$DEPLOY_DEV" == "true" ]]; then
-            echo "  🔧 Development deployment will run basic CI checks"
+            echo "  Development deployment will run basic CI checks"
           else
-            echo "  ✋ No automatic deployment scheduled - manual intervention may be required"
+            echo "  No automatic deployment scheduled - manual intervention may be required"
           fi
           
       - name: Generate Environment-Specific Versions
@@ -688,14 +688,14 @@ jobs:
           # Legacy compatibility - use semantic version as primary
           echo "new-version=$SEMANTIC_VERSION" >> $GITHUB_OUTPUT
           
-          echo "🏷️ Version Summary:"
-          echo "  Development: $DEV_VERSION"
-          echo "  Staging: $STAGING_VERSION"
-          echo "  Pre-Production/Production: $SEMANTIC_VERSION"
+          echo "Version Summary:"
+          echo " Development: $DEV_VERSION"
+          echo " Staging: $STAGING_VERSION"
+          echo " Pre-Production/Production: $SEMANTIC_VERSION"
 
   # Quality checks and security scanning
   quality-checks:
-    name: 🔍 Quality & Security Checks
+    name:  Quality & Security Checks
     runs-on: ubuntu-latest
     
     steps:
@@ -711,7 +711,7 @@ jobs:
 
       - name: Run quality checks
         run: |
-          echo "🔍 Running quality checks..."
+          echo "Running quality checks..."
           npm run lint
           npm run test:coverage
           npm run build
@@ -753,7 +753,7 @@ jobs:
 
   # Deploy to Development Environment
   deploy-development:
-    name: 🚀 Deploy to Development
+    name:  Deploy to Development
     runs-on: ubuntu-latest
     needs: [detect-changes, quality-checks]
     if: needs.detect-changes.outputs.should-deploy-dev == 'true'
@@ -798,14 +798,14 @@ jobs:
           
           # Update GitHub deployment status
           if [ "$STATUS" = "healthy" ]; then
-            echo "🎯 Development environment is healthy"
+            echo "Development environment is healthy"
           else
-            echo "⚠️ Development environment needs attention"
+            echo "Development environment needs attention"
           fi
 
   # Deploy to Staging Environment
   deploy-staging:
-    name: 🚀 Deploy to Staging
+    name:  Deploy to Staging
     runs-on: ubuntu-latest
     needs: [detect-changes, quality-checks, deploy-development]
     if: needs.detect-changes.outputs.should-deploy-staging == 'true' && (success() || needs.deploy-development.result == 'skipped')
@@ -844,19 +844,19 @@ jobs:
 
       - name: Run Integration Tests
         run: |
-          echo "🧪 Running integration tests against staging..."
+          echo "Running integration tests against staging..."
           # Add your integration test commands here
           npm run test:integration || echo "Integration tests not configured"
 
       - name: Performance Testing
         run: |
-          echo "⚡ Running performance tests..."
+          echo "Running performance tests..."
           # Add Lighthouse or other performance testing
           npx lighthouse https://staging.yourdomain.com --output=json --output-path=lighthouse-staging.json --chrome-flags="--headless --no-sandbox" || echo "Performance tests not configured"
 
   # Deploy to Pre-Production Environment
   deploy-preprod:
-    name: 🚀 Deploy to Pre-Production
+    name:  Deploy to Pre-Production
     runs-on: ubuntu-latest
     needs: [detect-changes, quality-checks, deploy-staging]
     if: needs.detect-changes.outputs.should-deploy-preprod == 'true' && (success() || needs.deploy-staging.result == 'skipped')
@@ -895,19 +895,19 @@ jobs:
 
       - name: Security Testing
         run: |
-          echo "🔒 Running security tests..."
+          echo "Running security tests..."
           # Add security testing commands
           echo "Security tests completed"
 
       - name: Load Testing
         run: |
-          echo "📊 Running load tests..."
+          echo "Running load tests..."
           # Add load testing commands
           echo "Load tests completed"
 
   # Deploy to Production Environment (requires manual approval)
   deploy-production:
-    name: 🚀 Deploy to Production
+    name:  Deploy to Production
     runs-on: ubuntu-latest
     needs: [detect-changes, quality-checks, deploy-preprod]
     if: needs.detect-changes.outputs.should-deploy-prod == 'true' && success()
@@ -946,7 +946,7 @@ jobs:
 
       - name: Post-deployment Validation
         run: |
-          echo "✅ Running post-deployment validation..."
+          echo "Running post-deployment validation..."
           # Add post-deployment validation commands
           curl -f https://yourdomain.com/api/health || echo "Health check failed"
 
@@ -959,7 +959,7 @@ jobs:
           tag_name: ${{ needs.detect-changes.outputs.semantic-version }}
           release_name: Release ${{ needs.detect-changes.outputs.semantic-version }}
           body: |
-            🚀 Production deployment successful
+            Production deployment successful
             
             **Version:** ${{ needs.detect-changes.outputs.semantic-version }}
             **Commit:** ${{ github.sha }}
@@ -972,7 +972,7 @@ jobs:
 
   # Cleanup and Notifications
   post-deployment:
-    name: 📊 Post-Deployment Tasks
+    name:  Post-Deployment Tasks
     runs-on: ubuntu-latest
     needs: [deploy-production]
     if: always()
@@ -980,16 +980,16 @@ jobs:
     steps:
       - name: Deployment Summary
         run: |
-          echo "📊 Deployment Summary"
+          echo "Deployment Summary"
           echo "===================="
-          echo "🏷️ Version Tags:"
-          echo "  Development: ${{ needs.detect-changes.outputs.dev-version }}"
-          echo "  Staging: ${{ needs.detect-changes.outputs.staging-version }}"
-          echo "  Pre-Production/Production: ${{ needs.detect-changes.outputs.semantic-version }}"
+          echo "Version Tags:"
+          echo " Development: ${{ needs.detect-changes.outputs.dev-version }}"
+          echo " Staging: ${{ needs.detect-changes.outputs.staging-version }}"
+          echo " Pre-Production/Production: ${{ needs.detect-changes.outputs.semantic-version }}"
           echo ""
-          echo "🚀 Deployment Results:"
-          echo "  Development: ${{ needs.deploy-development.result }}"
-          echo "  Staging: ${{ needs.deploy-staging.result }}"
-          echo "  Pre-Production: ${{ needs.deploy-preprod.result }}"
+          echo "Deployment Results:"
+          echo " Development: ${{ needs.deploy-development.result }}"
+          echo " Staging: ${{ needs.deploy-staging.result }}"
+          echo " Pre-Production: ${{ needs.deploy-preprod.result }}"
           echo "Production: ${{ needs.deploy-production.result }}"
 

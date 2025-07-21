@@ -138,7 +138,7 @@ jobs:
       - name: Get release info
         if: steps.release.outputs.new-release-published == 'true'
         run: |
-          echo "✅ New release published!"
+          echo "New release published!"
           echo "Version: ${{ steps.release.outputs.new-release-version }}"
           echo "Git Tag: ${{ steps.release.outputs.new-release-git-tag }}"
 
@@ -170,9 +170,9 @@ jobs:
                 ref: tagName
               });
               
-              console.log(`✅ Production deployment triggered for ${tagName}`);
+              console.log(` Production deployment triggered for ${tagName}`);
             } catch (error) {
-              console.error('❌ Failed to trigger production deployment:', error.message);
+              console.error(' Failed to trigger production deployment:', error.message);
             }
 
       - name: Create deployment issue
@@ -185,7 +185,7 @@ jobs:
             const version = '${{ needs.semantic-release.outputs.new-release-version }}';
             const tag = '${{ needs.semantic-release.outputs.new-release-git-tag }}';
             
-            const issueBody = `## 🚀 Production Deployment - ${version}
+            const issueBody = `##  Production Deployment - ${version}
             
             A new release has been automatically created and is being deployed to production.
             
@@ -219,7 +219,7 @@ jobs:
             await github.rest.issues.create({
               owner,
               repo,
-              title: `🚀 Production Deployment - ${version}`,
+              title: ` Production Deployment - ${version}`,
               body: issueBody,
               labels: ['deployment', 'production', 'automated']
             });
@@ -240,7 +240,7 @@ jobs:
           
           curl -X POST -H 'Content-type: application/json' \
             --data "{
-              \"text\": \"🚀 New release deployed!\",
+              \"text\": \" New release deployed!\",
               \"attachments\": [{
                 \"color\": \"good\",
                 \"fields\": [{
@@ -278,7 +278,7 @@ jobs:
               \"@context\": \"https://schema.org/extensions\",
               \"summary\": \"New Release Deployed\",
               \"themeColor\": \"0078D4\",
-              \"title\": \"🚀 New Release Deployed - $VERSION\",
+              \"title\": \" New Release Deployed - $VERSION\",
               \"sections\": [{
                 \"activityTitle\": \"Release Information\",
                 \"facts\": [{

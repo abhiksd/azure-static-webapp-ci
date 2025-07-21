@@ -1,4 +1,4 @@
-name: 🛡️ PR Protection & Security Gate
+name: PR Protection & Security Gate
 
 on:
   pull_request:
@@ -70,7 +70,7 @@ env:
 jobs:
   # Configuration Job - Determines what checks to run
   configure-checks:
-    name: 🔧 Configure Security Checks
+    name: Configure Security Checks
     runs-on: ubuntu-latest
     outputs:
       enable-sonar: ${{ steps.config.outputs.enable-sonar }}
@@ -88,7 +88,7 @@ jobs:
       - name: Configure Security Checks
         id: config
         run: |
-          echo "🔧 Configuring security checks based on environment and inputs..."
+          echo "Configuring security checks based on environment and inputs..."
           
           # Determine if this is a manual run
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
@@ -127,13 +127,13 @@ jobs:
             echo "change-scope=feature" >> $GITHUB_OUTPUT
           fi
           
-          echo "✅ Configuration completed"
+          echo "Configuration completed"
           echo "Target Branch: $TARGET_BRANCH"
           echo "Change Scope: $([ "$TARGET_BRANCH" = "main" ] && echo "production" || echo "development")"
 
   # Basic Quality Checks
   quality-gate:
-    name: 🔍 Quality Gate
+    name:  Quality Gate
     runs-on: ubuntu-latest
     needs: configure-checks
     outputs:
@@ -154,7 +154,7 @@ jobs:
       - name: Analyze Changes
         id: changes
         run: |
-          echo "📊 Analyzing PR changes..."
+          echo "Analyzing PR changes..."
           
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             BASE_SHA="${{ github.event.pull_request.base.sha }}"
@@ -190,33 +190,33 @@ jobs:
       - name: Run Linting
         id: lint
         run: |
-          echo "🔍 Running ESLint checks..."
+          echo "Running ESLint checks..."
           
           if npm run lint; then
             echo "passed=true" >> $GITHUB_OUTPUT
-            echo "✅ Linting passed"
+            echo "Linting passed"
           else
             echo "passed=false" >> $GITHUB_OUTPUT
-            echo "❌ Linting failed"
+            echo "Linting failed"
           fi
 
       - name: Run Tests
         id: tests
         run: |
-          echo "🧪 Running test suite..."
+          echo "Running test suite..."
           
           if npm run test:coverage; then
             echo "passed=true" >> $GITHUB_OUTPUT
-            echo "✅ Tests passed"
+            echo "Tests passed"
           else
             echo "passed=false" >> $GITHUB_OUTPUT
-            echo "❌ Tests failed"
+            echo "Tests failed"
           fi
 
       - name: Check Code Coverage
         id: coverage
         run: |
-          echo "📊 Checking code coverage..."
+          echo "Checking code coverage..."
           
           # Extract coverage percentage
           COVERAGE=$(npm run test:coverage 2>&1 | grep -o 'Lines.*: [0-9.]*%' | grep -o '[0-9.]*' | head -1 || echo "0")
@@ -226,11 +226,11 @@ jobs:
           if (( $(echo "$COVERAGE >= ${{ env.MIN_CODE_COVERAGE }}" | bc -l) )); then
             echo "passed=true" >> $GITHUB_OUTPUT
             echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
-            echo "✅ Coverage requirement met: ${COVERAGE}%"
+            echo "Coverage requirement met: ${COVERAGE}%"
           else
             echo "passed=false" >> $GITHUB_OUTPUT
             echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
-            echo "❌ Coverage below threshold: ${COVERAGE}% < ${{ env.MIN_CODE_COVERAGE }}%"
+            echo "Coverage below threshold: ${COVERAGE}% < ${{ env.MIN_CODE_COVERAGE }}%"
           fi
 
       - name: Upload Test Results
@@ -245,7 +245,7 @@ jobs:
 
   # SonarCloud Analysis
   sonar-analysis:
-    name: 🔬 SonarCloud Analysis
+    name:  SonarCloud Analysis
     runs-on: ubuntu-latest
     needs: [configure-checks, quality-gate]
     if: needs.configure-checks.outputs.enable-sonar == 'true'
@@ -274,7 +274,7 @@ jobs:
 
       - name: Run Tests for SonarCloud
         run: |
-          echo "🧪 Running tests for SonarCloud analysis..."
+          echo "Running tests for SonarCloud analysis..."
           npm run test:coverage
 
       - name: SonarCloud Scan
@@ -309,13 +309,13 @@ jobs:
 
       - name: Wait for SonarCloud Analysis
         run: |
-          echo "⏳ Waiting for SonarCloud analysis to complete..."
+          echo "Waiting for SonarCloud analysis to complete..."
           sleep 30
 
       - name: Get SonarCloud Quality Gate
         id: sonar-quality-gate
         run: |
-          echo "🔍 Checking SonarCloud Quality Gate with configurable thresholds..."
+          echo "Checking SonarCloud Quality Gate with configurable thresholds..."
           
           if [ "${{ secrets.SONAR_TOKEN }}" != "" ]; then
             # Simulated results - in real implementation, call SonarCloud API
@@ -329,7 +329,7 @@ jobs:
             CRITICAL_ISSUES=0
             MAJOR_ISSUES=2
             
-            echo "📊 SonarCloud Analysis Results:"
+            echo "SonarCloud Analysis Results:"
             echo "Coverage: ${ACTUAL_COVERAGE}% (Required: ${{ env.MIN_CODE_COVERAGE }}%)"
             echo "Branch Coverage: ${ACTUAL_BRANCH_COVERAGE}% (Required: ${{ env.MIN_BRANCH_COVERAGE }}%)"
             echo "Duplications: ${ACTUAL_DUPLICATIONS}% (Max: ${{ env.SONAR_DUPLICATED_LINES_DENSITY }}%)"
@@ -406,11 +406,11 @@ jobs:
             if [ "$QUALITY_GATE_PASSED" = true ]; then
               echo "quality-gate=PASSED" >> $GITHUB_OUTPUT
               echo "threshold-passed=true" >> $GITHUB_OUTPUT
-              echo "✅ SonarCloud Quality Gate: PASSED"
+              echo "SonarCloud Quality Gate: PASSED"
             else
               echo "quality-gate=FAILED" >> $GITHUB_OUTPUT
               echo "threshold-passed=false" >> $GITHUB_OUTPUT
-              echo "❌ SonarCloud Quality Gate: FAILED"
+              echo "SonarCloud Quality Gate: FAILED"
               echo "Threshold violations:"
               printf '%s\n' "${THRESHOLD_VIOLATIONS[@]}"
             fi
@@ -418,12 +418,12 @@ jobs:
           else
             echo "quality-gate=SKIPPED" >> $GITHUB_OUTPUT
             echo "threshold-passed=true" >> $GITHUB_OUTPUT
-            echo "⚠️ SonarCloud token not configured, skipping analysis"
+            echo "SonarCloud token not configured, skipping analysis"
           fi
 
   # Checkmarx Security Scan
   checkmarx-scan:
-    name: 🔒 Checkmarx Security Scan
+    name:  Checkmarx Security Scan
     runs-on: ubuntu-latest
     needs: [configure-checks, quality-gate]
     if: needs.configure-checks.outputs.enable-checkmarx == 'true'
@@ -469,7 +469,7 @@ jobs:
         id: results
         if: always()
         run: |
-          echo "🔍 Processing Checkmarx scan results..."
+          echo "Processing Checkmarx scan results..."
           
           if [ "${{ secrets.CHECKMARX_CLIENT }}" != "" ]; then
             # Parse Checkmarx results (actual implementation would parse real results file)
@@ -483,7 +483,7 @@ jobs:
             SCA_HIGH=2
             KICS_HIGH=1
             
-            echo "📊 Checkmarx Scan Results Summary:"
+            echo "Checkmarx Scan Results Summary:"
             echo "SAST - Critical: $SAST_CRITICAL, High: $SAST_HIGH, Medium: $SAST_MEDIUM"
             echo "SCA - Critical: $SCA_CRITICAL, High: $SCA_HIGH"
             echo "KICS - High: $KICS_HIGH"
@@ -521,22 +521,22 @@ jobs:
             fi
             
             if [ ${#THRESHOLD_VIOLATIONS[@]} -gt 0 ]; then
-              echo "❌ Threshold violations found:"
+              echo "Threshold violations found:"
               printf '%s\n' "${THRESHOLD_VIOLATIONS[@]}"
               echo "threshold-passed=false" >> $GITHUB_OUTPUT
             else
-              echo "✅ All thresholds passed"
+              echo "All thresholds passed"
               echo "threshold-passed=true" >> $GITHUB_OUTPUT
             fi
             
           else
             echo "status=skipped" >> $GITHUB_OUTPUT
-            echo "⚠️ Checkmarx credentials not configured, skipping scan"
+            echo "Checkmarx credentials not configured, skipping scan"
           fi
 
   # Dependency Security Scan
   dependency-scan:
-    name: 📦 Dependency Security Scan
+    name:  Dependency Security Scan
     runs-on: ubuntu-latest
     needs: [configure-checks, quality-gate]
     if: needs.configure-checks.outputs.enable-dependency == 'true'
@@ -556,14 +556,14 @@ jobs:
       - name: npm Audit
         id: audit
         run: |
-          echo "🔍 Running npm audit..."
+          echo "Running npm audit..."
           
           # Run npm audit and capture results
           if npm audit --audit-level=moderate --json > audit-results.json 2>/dev/null; then
             echo "vulnerabilities=false" >> $GITHUB_OUTPUT
             echo "critical=0" >> $GITHUB_OUTPUT
             echo "high=0" >> $GITHUB_OUTPUT
-            echo "✅ No vulnerabilities found"
+            echo "No vulnerabilities found"
           else
             # Parse audit results
             CRITICAL=$(cat audit-results.json | jq -r '.metadata.vulnerabilities.critical // 0' 2>/dev/null || echo "0")
@@ -573,7 +573,7 @@ jobs:
             echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
             echo "high=$HIGH" >> $GITHUB_OUTPUT
             
-            echo "⚠️ Vulnerabilities found - Critical: $CRITICAL, High: $HIGH"
+            echo "Vulnerabilities found - Critical: $CRITICAL, High: $HIGH"
           fi
 
       - name: Upload Audit Results
@@ -586,7 +586,7 @@ jobs:
 
   # License Compliance Check
   license-check:
-    name: 📄 License Compliance Check
+    name:  License Compliance Check
     runs-on: ubuntu-latest
     needs: [configure-checks, quality-gate]
     if: needs.configure-checks.outputs.enable-license == 'true'
@@ -605,7 +605,7 @@ jobs:
       - name: License Check
         id: license
         run: |
-          echo "📄 Checking license compliance..."
+          echo "Checking license compliance..."
           
           # Install license-checker if not present
           if ! command -v license-checker &> /dev/null; then
@@ -619,11 +619,11 @@ jobs:
           if license-checker --excludePrivatePackages --onlyAllow "MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;Unlicense" > license-report.txt 2>&1; then
             echo "status=passed" >> $GITHUB_OUTPUT
             echo "restricted=0" >> $GITHUB_OUTPUT
-            echo "✅ All licenses are compliant"
+            echo "All licenses are compliant"
           else
             echo "status=failed" >> $GITHUB_OUTPUT
             echo "restricted=1" >> $GITHUB_OUTPUT
-            echo "❌ Restricted licenses found"
+            echo "Restricted licenses found"
           fi
 
       - name: Upload License Report
@@ -636,7 +636,7 @@ jobs:
 
   # Security Gate Evaluation
   security-gate:
-    name: 🛡️ Security Gate Evaluation
+    name:  Security Gate Evaluation
     runs-on: ubuntu-latest
     needs: [configure-checks, quality-gate, sonar-analysis, checkmarx-scan, dependency-scan, license-check]
     if: always()
@@ -647,7 +647,7 @@ jobs:
       - name: Evaluate Security Gate
         id: evaluate
         run: |
-          echo "🛡️ Evaluating security gate..."
+          echo "Evaluating security gate..."
           
           GATE_ENABLED="${{ needs.configure-checks.outputs.security-gate }}"
           SECURITY_SCORE=100
@@ -680,7 +680,7 @@ jobs:
           
           # SonarCloud Checks with configurable thresholds
           if [ "${{ needs.configure-checks.outputs.enable-sonar }}" = "true" ]; then
-            echo "🔬 Evaluating SonarCloud results..."
+            echo "Evaluating SonarCloud results..."
             SONAR_COVERAGE="${{ needs.sonar-analysis.outputs.coverage || '0' }}"
             SONAR_MAINTAINABILITY="${{ needs.sonar-analysis.outputs.maintainability || 'A' }}"
             SONAR_RELIABILITY="${{ needs.sonar-analysis.outputs.reliability || 'A' }}"
@@ -721,12 +721,12 @@ jobs:
           fi
           
           else
-            echo "🔬 SonarCloud analysis disabled - skipping quality checks"
+            echo "SonarCloud analysis disabled - skipping quality checks"
           fi
           
           # Checkmarx Checks with enhanced thresholds  
           if [ "${{ needs.configure-checks.outputs.enable-checkmarx }}" = "true" ]; then
-            echo "🔒 Evaluating Checkmarx security scan results..."
+            echo "Evaluating Checkmarx security scan results..."
             CRITICAL_COUNT="${{ needs.checkmarx-scan.outputs.critical-count || '0' }}"
             HIGH_COUNT="${{ needs.checkmarx-scan.outputs.high-count || '0' }}"
             MEDIUM_COUNT="${{ needs.checkmarx-scan.outputs.medium-count || '0' }}"
@@ -775,7 +775,7 @@ jobs:
               fi
             fi
           else
-            echo "🔒 Checkmarx security scanning disabled - skipping vulnerability checks"
+            echo "Checkmarx security scanning disabled - skipping vulnerability checks"
           fi
           
           # Dependency Checks
@@ -809,19 +809,19 @@ jobs:
           # Final evaluation
           if [ "$GATE_ENABLED" = "false" ]; then
             echo "status=disabled" >> $GITHUB_OUTPUT
-            echo "🔓 Security gate is disabled - allowing PR"
+            echo "Security gate is disabled - allowing PR"
           elif [ "$GATE_PASSED" = "true" ]; then
             echo "status=passed" >> $GITHUB_OUTPUT
-            echo "✅ Security gate passed"
+            echo "Security gate passed"
           else
             echo "status=failed" >> $GITHUB_OUTPUT
-            echo "❌ Security gate failed"
+            echo "Security gate failed"
           fi
           
           echo "score=$SECURITY_SCORE" >> $GITHUB_OUTPUT
           
           # Output summary
-          echo "🔍 Security Gate Summary:"
+          echo "Security Gate Summary:"
           echo "Status: $([ "$GATE_PASSED" = "true" ] && echo "PASSED" || echo "FAILED")"
           echo "Score: $SECURITY_SCORE/100"
           echo "Issues found: ${#ISSUES[@]}"
@@ -833,7 +833,7 @@ jobs:
 
   # PR Status Update
   update-pr-status:
-    name: 📊 Update PR Status
+    name:  Update PR Status
     runs-on: ubuntu-latest
     needs: [configure-checks, quality-gate, sonar-analysis, checkmarx-scan, dependency-scan, license-check, security-gate]
     if: always() && github.event_name == 'pull_request'
@@ -851,33 +851,33 @@ jobs:
             // Find existing security report comment
             const botComment = comments.find(comment => 
               comment.user.type === 'Bot' && 
-              comment.body.includes('🛡️ Security Gate Report')
+              comment.body.includes(' Security Gate Report')
             );
             
             const securityGateStatus = '${{ needs.security-gate.outputs.gate-status }}';
             const securityScore = '${{ needs.security-gate.outputs.security-score }}';
             const changeScope = '${{ needs.configure-checks.outputs.change-scope }}';
             
-            const statusIcon = securityGateStatus === 'passed' ? '✅' : 
-                             securityGateStatus === 'disabled' ? '🔓' : '❌';
+            const statusIcon = securityGateStatus === 'passed' ? '' : 
+                             securityGateStatus === 'disabled' ? '' : '';
             
-            const reportBody = `## 🛡️ Security Gate Report
+            const reportBody = `##  Security Gate Report
             
             **Status**: ${statusIcon} ${securityGateStatus.toUpperCase()}
             **Security Score**: ${securityScore}/100
             **Change Scope**: ${changeScope}
             
-            ### 📋 Check Results
+            ###  Check Results
             
             | Check | Status | Details |
             |-------|--------|---------|
-            | **Quality Gate** | ${{ needs.quality-gate.result == 'success' ? '✅' : '❌' }} | Tests: ${{ needs.quality-gate.outputs.tests-passed }}, Coverage: ${{ needs.quality-gate.outputs.coverage-passed }}, Lint: ${{ needs.quality-gate.outputs.lint-passed }} |
-            | **SonarCloud** | ${{ needs.sonar-analysis.result == 'success' ? '✅' : needs.sonar-analysis.result == 'skipped' ? '⏭️' : '❌' }} | Quality Gate: ${{ needs.sonar-analysis.outputs.quality-gate || 'N/A' }} |
-            | **Checkmarx** | ${{ needs.checkmarx-scan.result == 'success' ? '✅' : needs.checkmarx-scan.result == 'skipped' ? '⏭️' : '❌' }} | Critical: ${{ needs.checkmarx-scan.outputs.critical-count || '0' }}, High: ${{ needs.checkmarx-scan.outputs.high-count || '0' }} |
-            | **Dependencies** | ${{ needs.dependency-scan.result == 'success' ? '✅' : needs.dependency-scan.result == 'skipped' ? '⏭️' : '❌' }} | Critical: ${{ needs.dependency-scan.outputs.critical-deps || '0' }}, High: ${{ needs.dependency-scan.outputs.high-deps || '0' }} |
-            | **License** | ${{ needs.license-check.result == 'success' ? '✅' : needs.license-check.result == 'skipped' ? '⏭️' : '❌' }} | Status: ${{ needs.license-check.outputs.compliance-status || 'N/A' }} |
+            | **Quality Gate** | ${{ needs.quality-gate.result == 'success' ? '' : '' }} | Tests: ${{ needs.quality-gate.outputs.tests-passed }}, Coverage: ${{ needs.quality-gate.outputs.coverage-passed }}, Lint: ${{ needs.quality-gate.outputs.lint-passed }} |
+            | **SonarCloud** | ${{ needs.sonar-analysis.result == 'success' ? '' : needs.sonar-analysis.result == 'skipped' ? '' : '' }} | Quality Gate: ${{ needs.sonar-analysis.outputs.quality-gate || 'N/A' }} |
+            | **Checkmarx** | ${{ needs.checkmarx-scan.result == 'success' ? '' : needs.checkmarx-scan.result == 'skipped' ? '' : '' }} | Critical: ${{ needs.checkmarx-scan.outputs.critical-count || '0' }}, High: ${{ needs.checkmarx-scan.outputs.high-count || '0' }} |
+            | **Dependencies** | ${{ needs.dependency-scan.result == 'success' ? '' : needs.dependency-scan.result == 'skipped' ? '' : '' }} | Critical: ${{ needs.dependency-scan.outputs.critical-deps || '0' }}, High: ${{ needs.dependency-scan.outputs.high-deps || '0' }} |
+            | **License** | ${{ needs.license-check.result == 'success' ? '' : needs.license-check.result == 'skipped' ? '' : '' }} | Status: ${{ needs.license-check.outputs.compliance-status || 'N/A' }} |
             
-            ### 🔧 Configuration
+            ###  Configuration
             
             - **SonarCloud**: ${{ needs.configure-checks.outputs.enable-sonar == 'true' ? 'Enabled' : 'Disabled' }}
             - **Checkmarx**: ${{ needs.configure-checks.outputs.enable-checkmarx == 'true' ? 'Enabled' : 'Disabled' }}
@@ -885,7 +885,7 @@ jobs:
             - **License Check**: ${{ needs.configure-checks.outputs.enable-license == 'true' ? 'Enabled' : 'Disabled' }}
             - **Security Gate**: ${{ needs.configure-checks.outputs.security-gate == 'true' ? 'Enabled' : 'Disabled' }}
             
-            ### 📚 Resources
+            ###  Resources
             
             - [Security Scanning Configuration](../blob/main/.github/workflows/pr-protection.yml)
             - [Repository Security Settings](../settings/security_analysis)
@@ -943,14 +943,14 @@ jobs:
 
   # Final Gate Decision
   final-gate:
-    name: 🎯 Final Security Gate
+    name:  Final Security Gate
     runs-on: ubuntu-latest
     needs: [configure-checks, security-gate]
     if: always()
     steps:
       - name: Final Security Gate Decision
         run: |
-          echo "🎯 Final Security Gate Decision"
+          echo "Final Security Gate Decision"
           echo "=========================="
           
           GATE_STATUS="${{ needs.security-gate.outputs.gate-status }}"
@@ -962,10 +962,10 @@ jobs:
           echo "Change Scope: $CHANGE_SCOPE"
           
           if [ "$GATE_STATUS" = "passed" ] || [ "$GATE_STATUS" = "disabled" ]; then
-            echo "✅ PR is approved for merge"
+            echo "PR is approved for merge"
             exit 0
           else
-            echo "❌ PR is blocked by security gate"
+            echo "PR is blocked by security gate"
             echo ""
             echo "To resolve:"
             echo "1. Fix failing security checks"

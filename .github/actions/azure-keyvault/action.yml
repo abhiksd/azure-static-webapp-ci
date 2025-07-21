@@ -36,16 +36,16 @@ runs:
     - name: Verify Azure CLI Authentication
       shell: bash
       run: |
-        echo "🔍 Verifying Azure CLI authentication with managed identity..."
+        echo "Verifying Azure CLI authentication with managed identity..."
         
         # Check if Azure CLI is authenticated
         if ! az account show >/dev/null 2>&1; then
-          echo "❌ Azure CLI is not authenticated"
+          echo "Azure CLI is not authenticated"
           echo "Please ensure the GitHub runner has managed identity configured"
           exit 1
         fi
         
-        echo "✅ Azure CLI authentication verified"
+        echo "Azure CLI authentication verified"
         
         # Show current subscription (masked for security)
         SUBSCRIPTION_ID=$(az account show --query id -o tsv)
@@ -60,11 +60,11 @@ runs:
         SET_ENV_VARS="${{ inputs.set-env-vars }}"
         OUTPUT_FORMAT="${{ inputs.output-format }}"
         
-        echo "🔑 Retrieving secrets from Key Vault: $KEYVAULT_NAME"
+        echo "Retrieving secrets from Key Vault: $KEYVAULT_NAME"
         
         # Verify Key Vault access
         if ! az keyvault show --name "$KEYVAULT_NAME" >/dev/null 2>&1; then
-          echo "❌ Cannot access Key Vault: $KEYVAULT_NAME"
+          echo "Cannot access Key Vault: $KEYVAULT_NAME"
           echo "Please verify:"
           echo "1. Key Vault exists"
           echo "2. Managed identity has appropriate permissions"
@@ -72,11 +72,11 @@ runs:
           exit 1
         fi
         
-        echo "✅ Key Vault access verified"
+        echo "Key Vault access verified"
         
         # If no specific secrets list provided, get common application secrets
         if [ -z "$SECRETS_LIST" ]; then
-          echo "📋 No specific secrets list provided, discovering available secrets..."
+          echo "No specific secrets list provided, discovering available secrets..."
           
           # Get all available secrets (limit to prevent overwhelming output)
           AVAILABLE_SECRETS=$(az keyvault secret list --vault-name "$KEYVAULT_NAME" --query '[0:20].name' -o tsv 2>/dev/null || echo "")
@@ -84,11 +84,11 @@ runs:
           if [ -n "$AVAILABLE_SECRETS" ]; then
             # Use first 10 secrets or common patterns
             SECRETS_LIST=$(echo "$AVAILABLE_SECRETS" | head -10 | tr '\n' ',' | sed 's/,$//')
-            echo "📋 Found secrets: $SECRETS_LIST"
+            echo "Found secrets: $SECRETS_LIST"
           else
             # Fallback to common secret names
             SECRETS_LIST="app-config,database-connection,api-keys,jwt-secret,storage-connection"
-            echo "📋 Using default secret patterns: $SECRETS_LIST"
+            echo "Using default secret patterns: $SECRETS_LIST"
           fi
         fi
         
@@ -99,7 +99,7 @@ runs:
         SECRETS_JSON="{"
         FAILED_SECRETS=""
         
-        echo "🔄 Processing ${#SECRETS_ARRAY[@]} secrets..."
+        echo "Processing ${#SECRETS_ARRAY[@]} secrets..."
         
         for SECRET_NAME in "${SECRETS_ARRAY[@]}"; do
           # Trim whitespace
@@ -109,7 +109,7 @@ runs:
             continue
           fi
           
-          echo "🔍 Retrieving secret: $SECRET_NAME"
+          echo "Retrieving secret: $SECRET_NAME"
           
           # Retrieve secret value with error handling
           SECRET_VALUE=$(az keyvault secret show \
@@ -119,7 +119,7 @@ runs:
             -o tsv 2>/dev/null)
           
           if [ $? -eq 0 ] && [ -n "$SECRET_VALUE" ]; then
-            echo "✅ Successfully retrieved: $SECRET_NAME"
+            echo "Successfully retrieved: $SECRET_NAME"
             
             # Set as environment variable if requested
             if [ "$SET_ENV_VARS" = "true" ]; then
@@ -130,11 +130,11 @@ runs:
                 "mask")
                   echo "::add-mask::$SECRET_VALUE"
                   echo "$ENV_VAR_NAME=$SECRET_VALUE" >> $GITHUB_ENV
-                  echo "🔒 Set masked environment variable: $ENV_VAR_NAME"
+                  echo "Set masked environment variable: $ENV_VAR_NAME"
                   ;;
                 "env")
                   echo "$ENV_VAR_NAME=$SECRET_VALUE" >> $GITHUB_ENV
-                  echo "📝 Set environment variable: $ENV_VAR_NAME"
+                  echo "Set environment variable: $ENV_VAR_NAME"
                   ;;
               esac
             fi
@@ -147,19 +147,19 @@ runs:
             
             SECRETS_COUNT=$((SECRETS_COUNT + 1))
           else
-            echo "⚠️ Failed to retrieve secret: $SECRET_NAME"
+            echo "Failed to retrieve secret: $SECRET_NAME"
             FAILED_SECRETS="$FAILED_SECRETS $SECRET_NAME"
           fi
         done
         
         SECRETS_JSON+="}"
         
-        echo "📊 Summary:"
-        echo "  - Successfully retrieved: $SECRETS_COUNT secrets"
-        echo "  - Failed: $(echo $FAILED_SECRETS | wc -w) secrets"
+        echo "Summary:"
+        echo " - Successfully retrieved: $SECRETS_COUNT secrets"
+        echo " - Failed: $(echo $FAILED_SECRETS | wc -w) secrets"
         
         if [ -n "$FAILED_SECRETS" ]; then
-          echo "⚠️ Failed secrets:$FAILED_SECRETS"
+          echo "Failed secrets:$FAILED_SECRETS"
           echo "Please verify these secrets exist and the managed identity has read permissions"
         fi
         
@@ -168,17 +168,17 @@ runs:
         echo "secrets-json=$SECRETS_JSON" >> $GITHUB_OUTPUT
         
         if [ "$SECRETS_COUNT" -eq 0 ]; then
-          echo "❌ No secrets were retrieved successfully"
+          echo "No secrets were retrieved successfully"
           exit 1
         fi
         
-        echo "✅ Key Vault secrets retrieval completed"
+        echo "Key Vault secrets retrieval completed"
 
     - name: Verify Environment Variables
       shell: bash
       if: inputs.set-env-vars == 'true'
       run: |
-        echo "🔍 Verifying environment variables are set..."
+        echo "Verifying environment variables are set..."
         
         # Check for common environment variables
         ENV_VARS_SET=0
@@ -189,14 +189,14 @@ runs:
           fi
         done
         
-        echo "📊 Environment variables set: $ENV_VARS_SET"
-        echo "✅ Environment verification completed"
+        echo "Environment variables set: $ENV_VARS_SET"
+        echo "Environment verification completed"
 
     - name: Security Cleanup
       shell: bash
       if: always()
       run: |
-        echo "🧹 Performing security cleanup..."
+        echo "Performing security cleanup..."
         
         # Clear any temporary files that might contain secrets
         find /tmp -name "*azure*" -type f -delete 2>/dev/null || true
@@ -205,4 +205,4 @@ runs:
         # Clear Azure CLI cache if it contains sensitive data
         az account clear 2>/dev/null || true
         
-        echo "✅ Security cleanup completed"
+        echo "Security cleanup completed"
