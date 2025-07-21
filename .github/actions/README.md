@@ -52,9 +52,8 @@ Ultra-streamlined composite actions providing **production-grade security scanni
   uses: ./.github/actions/checkmarx-scan
   with:
     enabled: true
-    checkmarx-url: ${{ secrets.CHECKMARX_URL }}
-    checkmarx-username: ${{ secrets.CHECKMARX_USERNAME }}
-    checkmarx-password: ${{ secrets.CHECKMARX_PASSWORD }}
+    base-uri: ${{ secrets.CHECKMARX_BASE_URI }}
+    checkmarx-client-id: ${{ secrets.CHECKMARX_CLIENT_ID }}
     checkmarx-secret: ${{ secrets.CHECKMARX_SECRET }}
     tenant: ${{ secrets.CHECKMARX_TENANT }}
     scan-types: 'sca,sast,kics'
@@ -136,9 +135,8 @@ jobs:
 ```
 SONAR_TOKEN                # SonarCloud authentication
 SONAR_ORGANIZATION         # SonarCloud organization
-CHECKMARX_URL             # Checkmarx server URL
-CHECKMARX_USERNAME        # Checkmarx username
-CHECKMARX_PASSWORD        # Checkmarx password  
+CHECKMARX_BASE_URI        # Checkmarx AST base URI
+CHECKMARX_CLIENT_ID       # Checkmarx client ID
 CHECKMARX_SECRET          # Checkmarx client secret
 CHECKMARX_TENANT          # Checkmarx tenant
 ```

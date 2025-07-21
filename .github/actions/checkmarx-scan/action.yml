@@ -2,14 +2,12 @@ name: 'Checkmarx Security Scan'
 description: 'Run Checkmarx AST security scan with vulnerability thresholds'
 
 inputs:
-  checkmarx-url:
-    description: 'Checkmarx server URL'
-    required: true
-  checkmarx-username:
-    description: 'Checkmarx username'
-    required: true
-  checkmarx-password:
-    description: 'Checkmarx password'
+  base-uri:
+    description: 'Checkmarx AST base URI'
+    required: false
+    default: 'https://ast.checkmarx.net'
+  checkmarx-client-id:
+    description: 'Checkmarx client ID'
     required: true
   checkmarx-secret:
     description: 'Checkmarx client secret'
@@ -68,10 +66,9 @@ runs:
       uses: checkmarx/ast-github-action@86e9ae570a811f9a1fb85903647a307aa3bf6253
       with:
         project_name: ${{ github.repository }}
-        cx_server: ${{ inputs.checkmarx-url }}
-        cx_user: ${{ inputs.checkmarx-username }}
-        cx_password: ${{ inputs.checkmarx-password }}
         cx_tenant: ${{ inputs.tenant }}
+        base_uri: ${{ inputs.base-uri }}
+        cx_client_id: ${{ inputs.checkmarx-client-id }}
         cx_client_secret: ${{ inputs.checkmarx-secret }}
         additional_params: --scan-types ${{ inputs.scan-types }} --report-format sarif --output-path . --sast-preset-name "${{ inputs.preset }}"
 
