@@ -419,7 +419,7 @@ jobs:
           output_location: ${{ env.AZURE_OUTPUT_LOCATION }}
 
       - name: Success
-        run: echo "✅ Dev deployed: ${{ needs.detect-deployment.outputs.dev-version }}"
+        run: echo '✅ Dev deployed:' ${{ needs.detect-deployment.outputs.dev-version }}
 
   # Staging deployment with short SHA versioning
   deploy-staging:
@@ -452,7 +452,7 @@ jobs:
           output_location: ${{ env.AZURE_OUTPUT_LOCATION }}
 
       - name: Success
-        run: echo "✅ Staging deployed: ${{ needs.detect-deployment.outputs.staging-version }}"
+        run: echo '✅ Staging deployed:' ${{ needs.detect-deployment.outputs.staging-version }}
 
   # Pre-production deployment with semantic versioning
   deploy-preprod:
@@ -485,7 +485,7 @@ jobs:
           output_location: ${{ env.AZURE_OUTPUT_LOCATION }}
 
       - name: Success
-        run: echo "✅ Pre-prod deployed: ${{ needs.detect-deployment.outputs.semantic-version }}"
+        run: echo '✅ Pre-prod deployed:' ${{ needs.detect-deployment.outputs.semantic-version }}
 
   # Production deployment with semantic versioning and enhanced validations
   deploy-prod:
@@ -545,7 +545,7 @@ jobs:
             - URL: https://yourapp.azurestaticapps.net
 
       - name: Success
-        run: echo "🎉 Production deployed: ${{ needs.detect-deployment.outputs.semantic-version }}"
+        run: echo '🎉 Production deployed:' ${{ needs.detect-deployment.outputs.semantic-version }}
 
   # Comprehensive deployment summary
   deployment-summary:
