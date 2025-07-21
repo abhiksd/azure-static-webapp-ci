@@ -22,9 +22,6 @@ inputs:
     description: 'Skip SSL certificate verification for self-signed certificates'
     required: false
     default: 'false'
-  custom-ca-cert:
-    description: 'Base64 encoded custom CA certificate for enterprise servers'
-    required: false
   enabled:
     description: 'Enable SonarCloud scan'
     required: false
@@ -64,101 +61,14 @@ runs:
       shell: bash
       run: npm install -g sonarqube-scanner
 
-    - name: Import Custom CA Certificate
-      if: inputs.enabled == 'true' && inputs.custom-ca-cert != ''
-      shell: bash
-      run: |
-        echo "Setting up custom CA certificate for enterprise SonarQube server..."
-        
-        # Create custom certificate file
-        echo "${{ inputs.custom-ca-cert }}" | base64 -d > /tmp/sonar-ca-cert.crt
-        
-        # Verify certificate format
-        if openssl x509 -in /tmp/sonar-ca-cert.crt -text -noout > /dev/null 2>&1; then
-          echo "Certificate format validated successfully"
-        else
-          echo "Error: Invalid certificate format"
-          exit 1
-        fi
-        
-        # Add certificate to system trust store
-        sudo cp /tmp/sonar-ca-cert.crt /usr/local/share/ca-certificates/sonar-ca-cert.crt
-        sudo update-ca-certificates
-        
-        # Set Node.js to use system certificates
-        export NODE_EXTRA_CA_CERTS=/tmp/sonar-ca-cert.crt
-        echo "NODE_EXTRA_CA_CERTS=/tmp/sonar-ca-cert.crt" >> $GITHUB_ENV
-        
-        # Also add to curl's certificate bundle for API calls
-        cat /tmp/sonar-ca-cert.crt >> /tmp/curl-ca-bundle.crt
-        cat /etc/ssl/certs/ca-certificates.crt >> /tmp/curl-ca-bundle.crt
-        echo "CURL_CA_BUNDLE=/tmp/curl-ca-bundle.crt" >> $GITHUB_ENV
-        
-        echo "Custom CA certificate imported successfully"
-
-    - name: Get Server Certificate (Auto-Import)
-      if: inputs.enabled == 'true' && inputs.custom-ca-cert == '' && inputs.skip-ssl-verification == 'false'
-      shell: bash
-      run: |
-        echo "Attempting to auto-import server certificate..."
-        
-        # Extract hostname from URL
-        HOSTNAME=$(echo "${{ inputs.sonar-host-url }}" | sed -E 's|https?://([^/]+).*|\1|')
-        echo "Extracting certificate from: $HOSTNAME"
-        
-        # Get the server certificate
-        echo -n | openssl s_client -connect "$HOSTNAME:443" -servername "$HOSTNAME" 2>/dev/null | \
-          openssl x509 -out /tmp/server-cert.crt
-        
-        if [ -f /tmp/server-cert.crt ] && [ -s /tmp/server-cert.crt ]; then
-          echo "Server certificate extracted successfully"
-          
-          # Verify it's a valid certificate
-          if openssl x509 -in /tmp/server-cert.crt -text -noout > /dev/null 2>&1; then
-            echo "Certificate validation passed"
-            
-            # Add to system trust store
-            sudo cp /tmp/server-cert.crt /usr/local/share/ca-certificates/sonar-server-cert.crt
-            sudo update-ca-certificates
-            
-            # Set for Node.js
-            export NODE_EXTRA_CA_CERTS=/tmp/server-cert.crt
-            echo "NODE_EXTRA_CA_CERTS=/tmp/server-cert.crt" >> $GITHUB_ENV
-            
-            # Create bundle for curl
-            cat /tmp/server-cert.crt > /tmp/curl-ca-bundle.crt
-            cat /etc/ssl/certs/ca-certificates.crt >> /tmp/curl-ca-bundle.crt
-            echo "CURL_CA_BUNDLE=/tmp/curl-ca-bundle.crt" >> $GITHUB_ENV
-            
-            echo "Auto-imported server certificate successfully"
-          else
-            echo "Warning: Invalid certificate format, falling back to SSL skip"
-            export NODE_TLS_REJECT_UNAUTHORIZED=0
-            echo "NODE_TLS_REJECT_UNAUTHORIZED=0" >> $GITHUB_ENV
-          fi
-        else
-          echo "Warning: Could not extract server certificate, falling back to SSL skip"
-          export NODE_TLS_REJECT_UNAUTHORIZED=0
-          echo "NODE_TLS_REJECT_UNAUTHORIZED=0" >> $GITHUB_ENV
-        fi
-
     - name: Run SonarCloud Scan
       if: inputs.enabled == 'true'
       shell: bash
       run: |
-        # Handle SSL verification for self-signed certificates (fallback)
+        # Handle SSL verification for self-signed certificates
         if [ "${{ inputs.skip-ssl-verification }}" = "true" ]; then
           export NODE_TLS_REJECT_UNAUTHORIZED=0
-          echo "Warning: SSL certificate verification disabled (manual bypass)"
-        fi
-        
-        # Show certificate setup status
-        if [ -n "$NODE_EXTRA_CA_CERTS" ]; then
-          echo "Using custom CA certificate: $NODE_EXTRA_CA_CERTS"
-        elif [ "$NODE_TLS_REJECT_UNAUTHORIZED" = "0" ]; then
-          echo "Using SSL verification bypass"
-        else
-          echo "Using system certificate store"
+          echo "Warning: SSL certificate verification disabled"
         fi
         
         sonar-scanner \
@@ -178,10 +88,7 @@ runs:
         
         # Set curl SSL options
         CURL_OPTS="-s"
-        if [ -n "$CURL_CA_BUNDLE" ]; then
-          CURL_OPTS="$CURL_OPTS --cacert $CURL_CA_BUNDLE"
-          echo "Using custom CA bundle for API calls: $CURL_CA_BUNDLE"
-        elif [ "${{ inputs.skip-ssl-verification }}" = "true" ]; then
+        if [ "${{ inputs.skip-ssl-verification }}" = "true" ]; then
           CURL_OPTS="$CURL_OPTS -k"
           echo "Warning: Using insecure SSL for API calls"
         fi
@@ -210,7 +117,7 @@ runs:
         echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
         echo "SonarCloud: $STATUS | Coverage: ${COVERAGE}% | Issues: $CRITICALS critical, $BLOCKERS blocker"
 
-    - name: Skip (Disabled)
-      if: inputs.enabled != 'true'
-      shell: bash
-      run: echo "SonarCloud scan disabled"
+          - name: Skip (Disabled)
+        if: inputs.enabled != 'true'
+        shell: bash
+        run: echo "SonarCloud scan disabled"
