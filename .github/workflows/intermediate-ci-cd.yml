@@ -293,6 +293,15 @@ jobs:
           npm run build || true
           echo "Build completed"
 
+      - name: Debug SSL Configuration
+        run: |
+          echo "=== SSL Debug Information ==="
+          echo "SONAR_HOST_URL: ${{ env.SONAR_HOST_URL }}"
+          echo "SONAR_SKIP_SSL_VERIFICATION: ${{ env.SONAR_SKIP_SSL_VERIFICATION }}"
+          echo "SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}"
+          echo "Skip SSL will be passed to action as: ${{ env.SONAR_SKIP_SSL_VERIFICATION }}"
+          echo "=== End Debug ==="
+
       - name: SonarCloud Analysis
         id: sonar-analysis
         uses: ./.github/actions/sonar-analysis
