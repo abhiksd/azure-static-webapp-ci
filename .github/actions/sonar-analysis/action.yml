@@ -64,7 +64,7 @@ runs:
         sonar-scanner \
           -Dsonar.projectKey=${{ inputs.project-key || github.repository }} \
           -Dsonar.organization=${{ inputs.organization }} \
-          -Dsonar.host.url=https://sonarcloud.io \
+          -Dsonar.host.url=${{ inputs.sonar-host-url }} \
           -Dsonar.login=${{ inputs.sonar-token }}
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
@@ -78,12 +78,12 @@ runs:
         
         # Get quality gate
         GATE=$(curl -s -u "${{ inputs.sonar-token }}:" \
-          "https://sonarcloud.io/api/qualitygates/project_status?projectKey=${PROJECT_KEY//\//%2F}" | \
+          "${{ inputs.sonar-host-url }}/api/qualitygates/project_status?projectKey=${PROJECT_KEY//\//%2F}" | \
           jq -r '.projectStatus.status // "OK"')
         
         # Get metrics
         METRICS=$(curl -s -u "${{ inputs.sonar-token }}:" \
-          "https://sonarcloud.io/api/measures/component?component=${PROJECT_KEY//\//%2F}&metricKeys=coverage,blocker_violations,critical_violations")
+          "${{ inputs.sonar-host-url }}/api/measures/component?component=${PROJECT_KEY//\//%2F}&metricKeys=coverage,blocker_violations,critical_violations")
         
         COVERAGE=$(echo "$METRICS" | jq -r '.component.measures[] | select(.metric=="coverage") | .value // "0"')
         BLOCKERS=$(echo "$METRICS" | jq -r '.component.measures[] | select(.metric=="blocker_violations") | .value // "0"')

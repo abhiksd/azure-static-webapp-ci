@@ -24,6 +24,7 @@ Ultra-streamlined composite actions providing **production-grade security scanni
     sonar-token: ${{ secrets.SONAR_TOKEN }}
     github-token: ${{ secrets.GITHUB_TOKEN }}
     organization: ${{ vars.SONAR_ORGANIZATION }}
+    sonar-host-url: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}
     min-code-coverage: '80'
     max-blocker-issues: '0'
     max-critical-issues: '0'
@@ -40,6 +41,16 @@ Ultra-streamlined composite actions providing **production-grade security scanni
   }
 }
 ```
+
+**Parameters:**
+- `sonar-token`: SonarCloud/SonarQube authentication token (required)
+- `github-token`: GitHub token for API access (required)
+- `organization`: SonarCloud organization name (required)
+- `sonar-host-url`: SonarCloud/SonarQube server URL (optional, default: `https://sonarcloud.io`)
+- `enabled`: Enable/disable the scan (optional, default: `true`)
+- `min-code-coverage`: Minimum code coverage percentage (optional, default: `80`)
+- `max-blocker-issues`: Maximum blocker issues allowed (optional, default: `0`)
+- `max-critical-issues`: Maximum critical issues allowed (optional, default: `0`)
 
 **Outputs:** `status`, `coverage`
 

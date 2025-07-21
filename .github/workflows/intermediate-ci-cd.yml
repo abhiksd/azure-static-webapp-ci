@@ -38,6 +38,9 @@ env:
   ENABLE_SONAR: ${{ github.event.inputs.enable_sonar || vars.ENABLE_SONAR_SCAN || 'true' }}
   ENABLE_CHECKMARX: ${{ github.event.inputs.enable_checkmarx || vars.ENABLE_CHECKMARX_SCAN || 'true' }}
   
+  # SonarQube/SonarCloud configuration
+  SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}
+  
   # Quality gate thresholds
   MIN_CODE_COVERAGE: ${{ vars.MIN_CODE_COVERAGE || '80' }}
   MAX_CRITICAL_VULNERABILITIES: ${{ vars.MAX_CRITICAL_VULNERABILITIES || '0' }}
@@ -297,6 +300,7 @@ jobs:
           sonar-token: ${{ secrets.SONAR_TOKEN }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           organization: ${{ vars.SONAR_ORGANIZATION }}
+          sonar-host-url: ${{ env.SONAR_HOST_URL }}
           min-code-coverage: ${{ env.MIN_CODE_COVERAGE }}
           max-blocker-issues: ${{ vars.MAX_BLOCKER_ISSUES || '0' }}
           max-critical-issues: ${{ vars.MAX_CRITICAL_ISSUES || '0' }}
