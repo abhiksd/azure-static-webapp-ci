@@ -48,10 +48,11 @@ If no custom URL is provided, the action defaults to `https://sonarcloud.io`.
 
 ## Example Configurations
 
-### Enterprise SonarQube Server
+### Enterprise SonarQube Server (with self-signed certificate)
 ```yaml
 env:
   SONAR_HOST_URL: "https://sonarqube-dces.schneider-electric.com"
+  SONAR_SKIP_SSL_VERIFICATION: "true"  # For self-signed certificates
 ```
 
 ### Local Development SonarQube
@@ -75,6 +76,7 @@ env:
 ### Required Variables
 - `SONAR_ORGANIZATION`: Your SonarQube organization/group name
 - `SONAR_HOST_URL`: Your custom SonarQube server URL (optional)
+- `SONAR_SKIP_SSL_VERIFICATION`: Skip SSL verification for self-signed certificates (optional, default: false)
 
 ### Optional Variables
 - `MAX_BLOCKER_ISSUES`: Maximum blocker issues allowed (default: 0)
@@ -131,6 +133,21 @@ If you were using the previous version with hardcoded URLs, simply:
 3. No other changes needed - all existing functionality preserved
 
 ## Troubleshooting
+
+### SSL Certificate Issues
+**Error: `self-signed certificate in certificate chain`**
+
+This error occurs when your SonarQube server uses self-signed certificates. To fix:
+
+1. **Set the SSL skip variable:**
+   ```bash
+   # In GitHub repository variables
+   SONAR_SKIP_SSL_VERIFICATION = "true"
+   ```
+
+2. **Alternative: Add proper CA certificates** (recommended for production)
+   - Install proper SSL certificates on your SonarQube server
+   - Use certificates from a trusted CA
 
 ### Connection Issues
 - Verify your SonarQube server is accessible from GitHub Actions runners

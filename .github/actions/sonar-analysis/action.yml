@@ -18,6 +18,10 @@ inputs:
     description: 'SonarCloud/SonarQube host URL'
     required: false
     default: 'https://sonarcloud.io'
+  skip-ssl-verification:
+    description: 'Skip SSL certificate verification for self-signed certificates'
+    required: false
+    default: 'false'
   enabled:
     description: 'Enable SonarCloud scan'
     required: false
@@ -61,11 +65,17 @@ runs:
       if: inputs.enabled == 'true'
       shell: bash
       run: |
+        # Handle SSL verification for self-signed certificates
+        if [ "${{ inputs.skip-ssl-verification }}" = "true" ]; then
+          export NODE_TLS_REJECT_UNAUTHORIZED=0
+          echo "Warning: SSL certificate verification disabled"
+        fi
+        
         sonar-scanner \
           -Dsonar.projectKey=${{ inputs.project-key || github.repository }} \
           -Dsonar.organization=${{ inputs.organization }} \
           -Dsonar.host.url=${{ inputs.sonar-host-url }} \
-          -Dsonar.login=${{ inputs.sonar-token }}
+          -Dsonar.token=${{ inputs.sonar-token }}
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
 
@@ -76,13 +86,20 @@ runs:
       run: |
         PROJECT_KEY="${{ inputs.project-key || github.repository }}"
         
+        # Set curl SSL options
+        CURL_OPTS="-s"
+        if [ "${{ inputs.skip-ssl-verification }}" = "true" ]; then
+          CURL_OPTS="$CURL_OPTS -k"
+          echo "Warning: Using insecure SSL for API calls"
+        fi
+        
         # Get quality gate
-        GATE=$(curl -s -u "${{ inputs.sonar-token }}:" \
+        GATE=$(curl $CURL_OPTS -u "${{ inputs.sonar-token }}:" \
           "${{ inputs.sonar-host-url }}/api/qualitygates/project_status?projectKey=${PROJECT_KEY//\//%2F}" | \
           jq -r '.projectStatus.status // "OK"')
         
         # Get metrics
-        METRICS=$(curl -s -u "${{ inputs.sonar-token }}:" \
+        METRICS=$(curl $CURL_OPTS -u "${{ inputs.sonar-token }}:" \
           "${{ inputs.sonar-host-url }}/api/measures/component?component=${PROJECT_KEY//\//%2F}&metricKeys=coverage,blocker_violations,critical_violations")
         
         COVERAGE=$(echo "$METRICS" | jq -r '.component.measures[] | select(.metric=="coverage") | .value // "0"')

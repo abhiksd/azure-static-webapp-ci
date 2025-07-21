@@ -47,6 +47,7 @@ Ultra-streamlined composite actions providing **production-grade security scanni
 - `github-token`: GitHub token for API access (required)
 - `organization`: SonarCloud organization name (required)
 - `sonar-host-url`: SonarCloud/SonarQube server URL (optional, default: `https://sonarcloud.io`)
+- `skip-ssl-verification`: Skip SSL certificate verification for self-signed certs (optional, default: `false`)
 - `enabled`: Enable/disable the scan (optional, default: `true`)
 - `min-code-coverage`: Minimum code coverage percentage (optional, default: `80`)
 - `max-blocker-issues`: Maximum blocker issues allowed (optional, default: `0`)

@@ -40,6 +40,7 @@ env:
   
   # SonarQube/SonarCloud configuration
   SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}
+  SONAR_SKIP_SSL_VERIFICATION: ${{ vars.SONAR_SKIP_SSL_VERIFICATION || 'false' }}
   
   # Quality gate thresholds
   MIN_CODE_COVERAGE: ${{ vars.MIN_CODE_COVERAGE || '80' }}
@@ -301,6 +302,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           organization: ${{ vars.SONAR_ORGANIZATION }}
           sonar-host-url: ${{ env.SONAR_HOST_URL }}
+          skip-ssl-verification: ${{ env.SONAR_SKIP_SSL_VERIFICATION }}
           min-code-coverage: ${{ env.MIN_CODE_COVERAGE }}
           max-blocker-issues: ${{ vars.MAX_BLOCKER_ISSUES || '0' }}
           max-critical-issues: ${{ vars.MAX_CRITICAL_ISSUES || '0' }}
