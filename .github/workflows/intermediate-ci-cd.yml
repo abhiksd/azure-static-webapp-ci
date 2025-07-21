@@ -78,20 +78,14 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 🎯 Production-Grade Deployment Strategy
+      - name: Deployment Strategy
         id: strategy
         run: |
           BRANCH="${{ github.ref_name }}"
           REF_TYPE="${{ github.ref_type }}"
           EVENT_NAME="${{ github.event_name }}"
           
-          echo "🎯 INTERMEDIATE PRODUCTION-GRADE DEPLOYMENT DETECTION"
-          echo "====================================================="
-          echo "🔍 Context:"
-          echo "  Branch/Tag: $BRANCH"
-          echo "  Reference Type: $REF_TYPE"
-          echo "  Event: $EVENT_NAME"
-          echo "  Actor: ${{ github.actor }}"
+          echo "🎯 Deployment Detection: $BRANCH ($REF_TYPE, $EVENT_NAME)"
           
           # Initialize deployment flags
           DEPLOY_DEV=false
@@ -101,12 +95,10 @@ jobs:
           DEPLOYMENT_RISK="LOW"
           REQUIRE_APPROVAL=false
           
-          # Manual deployment with full control
+          # Manual deployment
           if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
-            echo ""
-            echo "🎛️ MANUAL DEPLOYMENT REQUEST"
             TARGET_ENV="${{ github.event.inputs.environment }}"
-            echo "  Target Environment: $TARGET_ENV"
+            echo "📋 Manual deployment to: $TARGET_ENV"
             
             case "$TARGET_ENV" in
               "development")
