@@ -96,101 +96,48 @@ runs:
         
         echo "Custom CA certificate imported successfully"
 
-    - name: Import Complete CA Certificate Chain
+    - name: Get Server Certificate (Auto-Import)
       if: inputs.enabled == 'true' && inputs.custom-ca-cert == '' && inputs.skip-ssl-verification == 'false'
       shell: bash
       run: |
-        echo "Importing complete CA certificate chain from SONAR_HOST_URL..."
+        echo "Attempting to auto-import server certificate..."
         
-        # Extract hostname and port from URL
-        HOSTNAME=$(echo "${{ inputs.sonar-host-url }}" | sed -E 's|https?://([^/:]+).*|\1|')
-        PORT=$(echo "${{ inputs.sonar-host-url }}" | sed -E 's|https?://[^/:]+:?([0-9]+)?.*|\1|')
-        if [ -z "$PORT" ] || [ "$PORT" = "$HOSTNAME" ]; then
-          PORT=443
-        fi
+        # Extract hostname from URL
+        HOSTNAME=$(echo "${{ inputs.sonar-host-url }}" | sed -E 's|https?://([^/]+).*|\1|')
+        echo "Extracting certificate from: $HOSTNAME"
         
-        echo "Extracting complete certificate chain from: $HOSTNAME:$PORT"
+        # Get the server certificate
+        echo -n | openssl s_client -connect "$HOSTNAME:443" -servername "$HOSTNAME" 2>/dev/null | \
+          openssl x509 -out /tmp/server-cert.crt
         
-        # Get the complete certificate chain (all certificates)
-        echo -n | openssl s_client -connect "$HOSTNAME:$PORT" -servername "$HOSTNAME" -showcerts 2>/dev/null | \
-          sed -n '/-----BEGIN CERTIFICATE-----/,/-----END CERTIFICATE-----/p' > /tmp/sonar-cert-chain.crt
-        
-        if [ -f /tmp/sonar-cert-chain.crt ] && [ -s /tmp/sonar-cert-chain.crt ]; then
-          echo "Certificate chain extracted successfully"
+        if [ -f /tmp/server-cert.crt ] && [ -s /tmp/server-cert.crt ]; then
+          echo "Server certificate extracted successfully"
           
-          # Count certificates in the chain
-          CERT_COUNT=$(grep -c "BEGIN CERTIFICATE" /tmp/sonar-cert-chain.crt)
-          echo "Found $CERT_COUNT certificate(s) in the chain"
-          
-          # Validate each certificate in the chain
-          VALID_CERTS=0
-          CERT_NUM=1
-          
-          # Split the chain into individual certificates and validate each
-          awk '/-----BEGIN CERTIFICATE-----/{cert=""} {cert=cert $0 "\n"} /-----END CERTIFICATE-----/{print cert > "/tmp/cert_" NR ".crt"; cert=""}' /tmp/sonar-cert-chain.crt
-          
-          for cert_file in /tmp/cert_*.crt; do
-            if [ -f "$cert_file" ]; then
-              if openssl x509 -in "$cert_file" -text -noout > /dev/null 2>&1; then
-                SUBJECT=$(openssl x509 -in "$cert_file" -noout -subject | sed 's/subject=//')
-                ISSUER=$(openssl x509 -in "$cert_file" -noout -issuer | sed 's/issuer=//')
-                echo "Certificate $CERT_NUM: Valid"
-                echo "  Subject: $SUBJECT"
-                echo "  Issuer: $ISSUER"
-                VALID_CERTS=$((VALID_CERTS + 1))
-              else
-                echo "Certificate $CERT_NUM: Invalid format"
-              fi
-              CERT_NUM=$((CERT_NUM + 1))
-            fi
-          done
-          
-          if [ $VALID_CERTS -gt 0 ]; then
-            echo "Successfully validated $VALID_CERTS out of $CERT_COUNT certificates"
+          # Verify it's a valid certificate
+          if openssl x509 -in /tmp/server-cert.crt -text -noout > /dev/null 2>&1; then
+            echo "Certificate validation passed"
             
-            # Add the complete chain to system trust store
-            sudo cp /tmp/sonar-cert-chain.crt /usr/local/share/ca-certificates/sonar-ca-chain.crt
+            # Add to system trust store
+            sudo cp /tmp/server-cert.crt /usr/local/share/ca-certificates/sonar-server-cert.crt
             sudo update-ca-certificates
-            echo "Certificate chain added to system trust store"
             
-            # Set for Node.js (sonar-scanner)
-            export NODE_EXTRA_CA_CERTS=/tmp/sonar-cert-chain.crt
-            echo "NODE_EXTRA_CA_CERTS=/tmp/sonar-cert-chain.crt" >> $GITHUB_ENV
-            echo "Node.js configured to use certificate chain"
+            # Set for Node.js
+            export NODE_EXTRA_CA_CERTS=/tmp/server-cert.crt
+            echo "NODE_EXTRA_CA_CERTS=/tmp/server-cert.crt" >> $GITHUB_ENV
             
-            # Create comprehensive CA bundle for curl (API calls)
-            # Include the extracted chain + system certificates
-            cat /tmp/sonar-cert-chain.crt > /tmp/curl-ca-bundle.crt
+            # Create bundle for curl
+            cat /tmp/server-cert.crt > /tmp/curl-ca-bundle.crt
             cat /etc/ssl/certs/ca-certificates.crt >> /tmp/curl-ca-bundle.crt
             echo "CURL_CA_BUNDLE=/tmp/curl-ca-bundle.crt" >> $GITHUB_ENV
-            echo "Curl configured with comprehensive CA bundle"
             
-            # Test certificate chain validation
-            echo "Testing certificate chain validation..."
-            if echo -n | openssl s_client -connect "$HOSTNAME:$PORT" -servername "$HOSTNAME" -CAfile /tmp/sonar-cert-chain.crt -verify_return_error 2>/dev/null; then
-              echo "Certificate chain validation: SUCCESS"
-            else
-              echo "Certificate chain validation: WARNING (may still work)"
-            fi
-            
-            echo "Complete CA certificate chain imported successfully"
-            
-            # Clean up individual certificate files
-            rm -f /tmp/cert_*.crt
-            
+            echo "Auto-imported server certificate successfully"
           else
-            echo "Error: No valid certificates found in the chain"
-            echo "Falling back to SSL verification bypass"
+            echo "Warning: Invalid certificate format, falling back to SSL skip"
             export NODE_TLS_REJECT_UNAUTHORIZED=0
             echo "NODE_TLS_REJECT_UNAUTHORIZED=0" >> $GITHUB_ENV
           fi
         else
-          echo "Warning: Could not extract certificate chain from $HOSTNAME:$PORT"
-          echo "This may happen if:"
-          echo "  - Server is not accessible from GitHub Actions runners"
-          echo "  - Server uses non-standard SSL configuration"
-          echo "  - Network connectivity issues"
-          echo "Falling back to SSL verification bypass"
+          echo "Warning: Could not extract server certificate, falling back to SSL skip"
           export NODE_TLS_REJECT_UNAUTHORIZED=0
           echo "NODE_TLS_REJECT_UNAUTHORIZED=0" >> $GITHUB_ENV
         fi
@@ -207,11 +154,7 @@ runs:
         
         # Show certificate setup status
         if [ -n "$NODE_EXTRA_CA_CERTS" ]; then
-          echo "Using complete CA certificate chain: $NODE_EXTRA_CA_CERTS"
-          if [ -f "$NODE_EXTRA_CA_CERTS" ]; then
-            CERT_COUNT=$(grep -c "BEGIN CERTIFICATE" "$NODE_EXTRA_CA_CERTS" 2>/dev/null || echo "1")
-            echo "Certificate chain contains: $CERT_COUNT certificate(s)"
-          fi
+          echo "Using custom CA certificate: $NODE_EXTRA_CA_CERTS"
         elif [ "$NODE_TLS_REJECT_UNAUTHORIZED" = "0" ]; then
           echo "Using SSL verification bypass"
         else
