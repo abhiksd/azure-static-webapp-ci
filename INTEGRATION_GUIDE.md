@@ -247,9 +247,8 @@ AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD=your_preprod_token
 AZURE_STATIC_WEB_APPS_API_TOKEN_PROD=your_prod_token
 
 # Checkmarx (if using security scanning)
-CHECKMARX_URL=https://your-checkmarx-server.com
-CHECKMARX_USERNAME=your_username
-CHECKMARX_PASSWORD=your_password
+CHECKMARX_BASE_URI=https://ast.checkmarx.net
+CHECKMARX_CLIENT_ID=your_client_id
 CHECKMARX_SECRET=your_client_secret
 CHECKMARX_TENANT=your_tenant
 ```
