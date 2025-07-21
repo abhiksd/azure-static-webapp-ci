@@ -56,6 +56,7 @@ chmod +x setup-frontend-pipeline.sh
 - ✅ Updates your `package.json` with required scripts
 - ✅ Creates `sonar-project.properties` 
 - ✅ Sets up Azure Static Web Apps configuration
+- ✅ Creates/updates `.gitignore` with comprehensive frontend patterns
 - ✅ Creates environment files
 - ✅ Tests everything to ensure it works
 
@@ -164,6 +165,7 @@ your-frontend-app/
 │   └── ... (your existing app code)
 ├── .env                                    # Development environment
 ├── .env.production                         # Production environment  
+├── .gitignore                              # Comprehensive frontend gitignore
 ├── package.json                            # Updated with pipeline scripts
 ├── sonar-project.properties               # SonarCloud configuration
 ├── setup-frontend-pipeline.sh             # Setup script (can delete after use)

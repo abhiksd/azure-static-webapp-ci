@@ -61,6 +61,7 @@ your-app/
 ├── sonar-project.properties                 ✨ GENERATED
 ├── .env                                     ✨ GENERATED
 ├── .env.production                          ✨ GENERATED
+├── .gitignore                               ✨ GENERATED/UPDATED
 └── PIPELINE_SETUP.md                       ✨ GENERATED
 ```
 

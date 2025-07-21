@@ -322,7 +322,7 @@ your-frontend-app/
 ├── .env
 ├── .env.staging
 ├── .env.production
-├── .gitignore
+├── .gitignore                              # Comprehensive frontend patterns
 ├── package.json
 ├── sonar-project.properties
 └── README.md
@@ -330,7 +330,55 @@ your-frontend-app/
 
 ---
 
-## 🚀 **8. Verification Steps**
+## 📝 **8. Git Ignore Configuration**
+
+The setup script automatically creates/updates a comprehensive `.gitignore` file that covers:
+
+### **Essential Exclusions:**
+```bash
+# Dependencies
+node_modules/
+
+# Build outputs  
+build/
+dist/
+out/
+
+# Environment files
+.env*
+
+# Coverage reports
+coverage/
+
+# Logs and cache
+*.log
+.eslintcache
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+```
+
+### **Framework-Specific:**
+- **React**: `/build`, React-specific cache files
+- **Vue**: `/dist`, Vue build artifacts  
+- **Next.js**: `.next/`, Next.js cache
+- **Angular**: `/dist`, Angular build outputs
+
+### **CI/CD Related:**
+- **SonarCloud**: `.scannerwork/`
+- **Azure**: `.azure/`
+- **Coverage**: `coverage/`, `*.lcov`
+
+**If you already have a `.gitignore`**, the script will add essential entries if missing.
+
+---
+
+## 🚀 **9. Verification Steps**
 
 ### **Local Testing:**
 
@@ -360,7 +408,7 @@ npm run sonar
 
 ---
 
-## ⚡ **9. Quick Setup Script**
+## ⚡ **10. Quick Setup Script**
 
 Create this setup script (`setup-pipeline.sh`):
 
@@ -388,7 +436,7 @@ echo "✅ Setup complete! Your app is ready for the CI/CD pipeline."
 
 ---
 
-## 🎯 **10. Common Issues & Solutions**
+## 🎯 **11. Common Issues & Solutions**
 
 ### **Issue: Tests Fail in CI**
 ```bash

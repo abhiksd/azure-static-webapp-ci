@@ -177,7 +177,97 @@ else
 fi
 
 echo ""
-echo -e "${BLUE}5. Creating environment files...${NC}"
+echo -e "${BLUE}5. Creating/updating .gitignore...${NC}"
+
+# Create or update .gitignore
+if [ ! -f ".gitignore" ]; then
+    echo "Creating comprehensive .gitignore..."
+    cat > .gitignore << 'EOF'
+# Frontend Application .gitignore
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Package managers  
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Coverage
+coverage/
+*.lcov
+.nyc_output
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.staging
+
+# Build outputs
+build/
+dist/
+out/
+.next/
+.nuxt/
+
+# Logs
+logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testing
+__tests__/__snapshots__/
+
+# SonarCloud
+.scannerwork/
+
+# Azure
+.azure/
+
+# Temporary files
+tmp/
+temp/
+*.backup
+*.bak
+
+# Source maps
+*.js.map
+*.css.map
+EOF
+    echo "✅ Created comprehensive .gitignore"
+else
+    echo "⚠️ .gitignore already exists"
+    # Add essential entries if missing
+    if ! grep -q "node_modules" .gitignore; then
+        echo "" >> .gitignore
+        echo "# Added by pipeline setup" >> .gitignore
+        echo "node_modules/" >> .gitignore
+        echo "coverage/" >> .gitignore
+        echo "build/" >> .gitignore
+        echo "dist/" >> .gitignore
+        echo ".env*" >> .gitignore
+        echo "✅ Added essential entries to existing .gitignore"
+    else
+        echo "✅ Essential entries already present in .gitignore"
+    fi
+fi
+
+echo ""
+echo -e "${BLUE}6. Creating environment files...${NC}"
 
 if [ ! -f ".env" ]; then
     cat > .env << EOF
@@ -204,7 +294,7 @@ else
 fi
 
 echo ""
-echo -e "${BLUE}6. Running verification tests...${NC}"
+echo -e "${BLUE}7. Running verification tests...${NC}"
 
 echo "Testing npm scripts..."
 
