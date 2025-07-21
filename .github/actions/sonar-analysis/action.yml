@@ -14,6 +14,10 @@ inputs:
   organization:
     description: 'SonarCloud organization'
     required: true
+  sonar-host-url:
+    description: 'SonarCloud/SonarQube host URL'
+    required: false
+    default: 'https://sonarcloud.io'
   enabled:
     description: 'Enable SonarCloud scan'
     required: false
