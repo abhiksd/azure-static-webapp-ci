@@ -311,6 +311,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           organization: ${{ vars.SONAR_ORGANIZATION }}
           sonar-host-url: ${{ env.SONAR_HOST_URL }}
+          custom-ca-cert: ${{ secrets.SONAR_CUSTOM_CA_CERT }}
           skip-ssl-verification: ${{ env.SONAR_SKIP_SSL_VERIFICATION }}
           min-code-coverage: ${{ env.MIN_CODE_COVERAGE }}
           max-blocker-issues: ${{ vars.MAX_BLOCKER_ISSUES || '0' }}
