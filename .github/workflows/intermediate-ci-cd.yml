@@ -57,9 +57,8 @@ permissions:
   pull-requests: write
 
 jobs:
-  # Production-grade deployment detection with all your requested features
   detect-deployment:
-    name: 🔍 Deployment Strategy Detection
+    name: Deployment Strategy Detection
     runs-on: ubuntu-latest
     outputs:
       deploy-dev: ${{ steps.strategy.outputs.deploy-dev }}
@@ -85,7 +84,7 @@ jobs:
           REF_TYPE="${{ github.ref_type }}"
           EVENT_NAME="${{ github.event_name }}"
           
-          echo "🎯 Deployment Detection: $BRANCH ($REF_TYPE, $EVENT_NAME)"
+          echo "Deployment Detection: $BRANCH ($REF_TYPE, $EVENT_NAME)"
           
           # Initialize deployment flags
           DEPLOY_DEV=false
@@ -98,7 +97,7 @@ jobs:
           # Manual deployment
           if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
             TARGET_ENV="${{ github.event.inputs.environment }}"
-            echo "📋 Manual deployment to: $TARGET_ENV"
+            echo "Manual deployment to: $TARGET_ENV"
             
             case "$TARGET_ENV" in
               "development")
@@ -123,139 +122,104 @@ jobs:
             
           # Production deployment: semantic version tags only (v1.2.3)
           elif [[ "$REF_TYPE" == "tag" ]] && [[ "$BRANCH" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo ""
-            echo "🏭 PRODUCTION RELEASE TAG: $BRANCH"
+            echo "PRODUCTION RELEASE TAG: $BRANCH"
             
             # Version analysis for risk assessment
             MAJOR=$(echo "$BRANCH" | sed -E 's/^v([0-9]+)\.([0-9]+)\.([0-9]+)$/\1/')
             MINOR=$(echo "$BRANCH" | sed -E 's/^v([0-9]+)\.([0-9]+)\.([0-9]+)$/\2/')
             PATCH=$(echo "$BRANCH" | sed -E 's/^v([0-9]+)\.([0-9]+)\.([0-9]+)$/\3/')
             
-            echo "  📊 Version Analysis: Major=$MAJOR, Minor=$MINOR, Patch=$PATCH"
+            echo "Version Analysis: Major=$MAJOR, Minor=$MINOR, Patch=$PATCH"
             
-            # Risk-based deployment strategy
-            if [[ "$MAJOR" -gt 0 ]] && [[ "$MINOR" -eq 0 ]] && [[ "$PATCH" -eq 0 ]]; then
-              echo "  🚨 MAJOR RELEASE - Breaking changes expected"
-              DEPLOYMENT_RISK="CRITICAL"
-              REQUIRE_APPROVAL=true
-            elif [[ "$MINOR" -gt 0 ]] && [[ "$PATCH" -eq 0 ]]; then
-              echo "  ⚠️ MINOR RELEASE - New features added"
-              DEPLOYMENT_RISK="HIGH"
-              REQUIRE_APPROVAL=true
-            else
-              echo "  🔧 PATCH RELEASE - Bug fixes and improvements"
-              DEPLOYMENT_RISK="MEDIUM"
-              REQUIRE_APPROVAL=${{ vars.REQUIRE_PATCH_APPROVAL || 'false' }}
-            fi
+                         # Risk-based deployment strategy
+             if [[ "$MAJOR" -gt 0 ]] && [[ "$MINOR" -eq 0 ]] && [[ "$PATCH" -eq 0 ]]; then
+               DEPLOYMENT_RISK="CRITICAL"
+               REQUIRE_APPROVAL=true
+             elif [[ "$MINOR" -gt 0 ]] && [[ "$PATCH" -eq 0 ]]; then
+               DEPLOYMENT_RISK="HIGH"
+               REQUIRE_APPROVAL=true
+             else
+               DEPLOYMENT_RISK="MEDIUM"
+               REQUIRE_APPROVAL=${{ vars.REQUIRE_PATCH_APPROVAL || 'false' }}
+             fi
             
             DEPLOY_PROD=true
             
-          # Pre-production deployment: pre-release tags (v1.2.3-pre.*, v1.2.3-rc.*)
-          elif [[ "$REF_TYPE" == "tag" ]] && [[ "$BRANCH" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-(pre|rc|alpha|beta) ]]; then
-            echo ""
-            echo "🎯 PRE-PRODUCTION RELEASE TAG: $BRANCH"
+                     # Pre-production deployment: pre-release tags
+           elif [[ "$REF_TYPE" == "tag" ]] && [[ "$BRANCH" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-(pre|rc|alpha|beta) ]]; then
+             PRERELEASE_TYPE=$(echo "$BRANCH" | sed -E 's/^v[0-9]+\.[0-9]+\.[0-9]+-([^.]+).*$/\1/')
+             echo "Pre-release: $BRANCH ($PRERELEASE_TYPE)"
+             
+             case "$PRERELEASE_TYPE" in
+               "rc")
+                 DEPLOY_PREPROD=true
+                 DEPLOYMENT_RISK="MEDIUM"
+                 ;;
+               "pre")
+                 DEPLOY_PREPROD=true
+                 DEPLOYMENT_RISK="LOW"
+                 ;;
+               "alpha"|"beta")
+                 DEPLOY_STAGING=true
+                 DEPLOY_PREPROD=true
+                 DEPLOYMENT_RISK="LOW"
+                 ;;
+             esac
             
-            PRERELEASE_TYPE=$(echo "$BRANCH" | sed -E 's/^v[0-9]+\.[0-9]+\.[0-9]+-([^.]+).*$/\1/')
-            echo "  🏷️ Pre-release Type: $PRERELEASE_TYPE"
-            
-            case "$PRERELEASE_TYPE" in
-              "rc")
-                echo "  🚀 Release Candidate - Production-ready testing"
-                DEPLOY_PREPROD=true
-                DEPLOYMENT_RISK="MEDIUM"
-                ;;
-              "pre")
-                echo "  🧪 Pre-release - Feature validation"
-                DEPLOY_PREPROD=true
-                DEPLOYMENT_RISK="LOW"
-                ;;
-              "alpha"|"beta")
-                echo "  🔬 Alpha/Beta - Early testing"
-                DEPLOY_STAGING=true
-                DEPLOY_PREPROD=true
-                DEPLOYMENT_RISK="LOW"
-                ;;
-            esac
-            
-          # Branch-based deployments with production-grade logic
-          elif [[ "$REF_TYPE" == "branch" ]]; then
-            echo ""
-            echo "🌿 BRANCH-BASED DEPLOYMENT"
+                     # Branch-based deployments
+           elif [[ "$REF_TYPE" == "branch" ]]; then
             
             case "$BRANCH" in
-              "main"|"master")
-                echo "  🌟 MAIN BRANCH - Deploy to dev + staging"
-                echo "    Production requires release tags for safety"
-                DEPLOY_DEV=true
-                DEPLOY_STAGING=true
-                DEPLOYMENT_RISK="LOW"
-                ;;
-              "develop"|"development")
-                echo "  🔧 DEVELOP BRANCH - Active development integration"
-                DEPLOY_DEV=true
-                DEPLOYMENT_RISK="LOW"
-                ;;
-              "staging")
-                echo "  🧪 STAGING BRANCH - Pre-production testing"
-                DEPLOY_STAGING=true
-                DEPLOYMENT_RISK="LOW"
-                ;;
-              "preprod"|"preproduction"|"pre-production")
-                echo "  🎯 PRE-PRODUCTION BRANCH - Release preparation"
-                DEPLOY_PREPROD=true
-                DEPLOYMENT_RISK="MEDIUM"
-                ;;
-              release/*)
-                echo "  🚀 RELEASE BRANCH - Release candidate preparation"
-                RELEASE_VERSION=$(echo "$BRANCH" | sed 's/release\///')
-                echo "    Release Version: $RELEASE_VERSION"
-                DEPLOY_STAGING=true
-                DEPLOY_PREPROD=true
-                DEPLOYMENT_RISK="MEDIUM"
-                ;;
-              hotfix/*)
-                echo "  🔥 HOTFIX BRANCH - Critical production fix"
-                HOTFIX_VERSION=$(echo "$BRANCH" | sed 's/hotfix\///')
-                echo "    Hotfix Version: $HOTFIX_VERSION"
-                DEPLOY_DEV=true
-                DEPLOY_STAGING=true
-                DEPLOYMENT_RISK="HIGH"
-                ;;
-              feature/*|feat/*)
-                echo "  ✨ FEATURE BRANCH - New feature development"
-                FEATURE_NAME=$(echo "$BRANCH" | sed 's/feature\///' | sed 's/feat\///')
-                echo "    Feature: $FEATURE_NAME"
-                DEPLOY_DEV=true
-                DEPLOYMENT_RISK="LOW"
-                ;;
-              *)
-                echo "  🔍 UNKNOWN BRANCH - No automatic deployment"
-                ;;
+                             "main"|"master")
+                 DEPLOY_DEV=true
+                 DEPLOY_STAGING=true
+                 DEPLOYMENT_RISK="LOW"
+                 ;;
+               "develop"|"development")
+                 DEPLOY_DEV=true
+                 DEPLOYMENT_RISK="LOW"
+                 ;;
+               "staging")
+                 DEPLOY_STAGING=true
+                 DEPLOYMENT_RISK="LOW"
+                 ;;
+               "preprod"|"pre-production")
+                 DEPLOY_PREPROD=true
+                 DEPLOYMENT_RISK="MEDIUM"
+                 ;;
+               release/*)
+                 DEPLOY_STAGING=true
+                 DEPLOY_PREPROD=true
+                 DEPLOYMENT_RISK="MEDIUM"
+                 ;;
+               hotfix/*)
+                 DEPLOY_DEV=true
+                 DEPLOY_STAGING=true
+                 DEPLOYMENT_RISK="HIGH"
+                 REQUIRE_APPROVAL=true
+                 ;;
+               feature/*)
+                 DEPLOY_DEV=true
+                 DEPLOYMENT_RISK="LOW"
+                 ;;
+               *)
+                 DEPLOYMENT_RISK="LOW"
+                 ;;
             esac
           fi
           
-          # Output deployment decisions
+                     # Output deployment decision
+           echo "Deploy: dev=$DEPLOY_DEV, staging=$DEPLOY_STAGING, preprod=$DEPLOY_PREPROD, prod=$DEPLOY_PROD (risk=$DEPLOYMENT_RISK)"
+          
+          # Set outputs
           echo "deploy-dev=$DEPLOY_DEV" >> $GITHUB_OUTPUT
           echo "deploy-staging=$DEPLOY_STAGING" >> $GITHUB_OUTPUT
           echo "deploy-preprod=$DEPLOY_PREPROD" >> $GITHUB_OUTPUT
           echo "deploy-prod=$DEPLOY_PROD" >> $GITHUB_OUTPUT
           echo "deployment-risk=$DEPLOYMENT_RISK" >> $GITHUB_OUTPUT
           echo "require-approval=$REQUIRE_APPROVAL" >> $GITHUB_OUTPUT
-          
-          echo ""
-          echo "🎯 DEPLOYMENT DECISION SUMMARY"
-          echo "=============================="
-          echo "📋 Target Environments:"
-          echo "  🔧 Development: $DEPLOY_DEV"
-          echo "  🧪 Staging: $DEPLOY_STAGING"
-          echo "  🎯 Pre-Production: $DEPLOY_PREPROD"
-          echo "  🏭 Production: $DEPLOY_PROD"
-          echo ""
-          echo "🛡️ Risk & Controls:"
-          echo "  📊 Risk Level: $DEPLOYMENT_RISK"
-          echo "  📋 Approval Required: $REQUIRE_APPROVAL"
 
-      - name: 🏷️ Environment-Specific Version Generation
+      - name: Version Generation
         id: versions
         run: |
           BRANCH="${{ github.ref_name }}"
@@ -263,52 +227,36 @@ jobs:
           SHORT_SHA=$(echo ${{ github.sha }} | head -c 7)
           TIMESTAMP=$(date +%Y%m%d-%H%M)
           
-          echo "🏷️ PRODUCTION-GRADE VERSION GENERATION"
-          echo "======================================"
+                     # Development and Staging versions
+           DEV_VERSION="dev-${SHORT_SHA}-${TIMESTAMP}"
+           STAGING_VERSION="staging-${SHORT_SHA}-${TIMESTAMP}"
           
-          # Development and Staging: Short SHA tags for rapid iteration
-          DEV_VERSION="dev-${SHORT_SHA}-${TIMESTAMP}"
-          STAGING_VERSION="staging-${SHORT_SHA}-${TIMESTAMP}"
+                     # Semantic versions for pre-prod and production
+           if [[ "${{ github.event.inputs.force_version }}" != "" ]]; then
+             SEMANTIC_VERSION="${{ github.event.inputs.force_version }}"
+           elif [[ "$REF_TYPE" == "tag" ]]; then
+             SEMANTIC_VERSION="$BRANCH"
+           else
+             # Auto-generate semantic version
+             LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+             if [[ "$LAST_TAG" =~ ^v?([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
+               MAJOR=${BASH_REMATCH[1]}
+               MINOR=${BASH_REMATCH[2]}
+               PATCH=${BASH_REMATCH[3]}
+               PATCH=$((PATCH + 1))
+               SEMANTIC_VERSION="v${MAJOR}.${MINOR}.${PATCH}-dev.${SHORT_SHA}"
+             else
+               SEMANTIC_VERSION="v1.0.0-dev.${SHORT_SHA}"
+             fi
+           fi
           
-          echo "📦 Short SHA Versions (Development/Staging):"
-          echo "  Development: $DEV_VERSION"
-          echo "  Staging: $STAGING_VERSION"
-          
-          # Pre-production and Production: Semantic versions
-          if [[ "${{ github.event.inputs.force_version }}" != "" ]]; then
-            SEMANTIC_VERSION="${{ github.event.inputs.force_version }}"
-            echo "🎛️ Manual Version Override: $SEMANTIC_VERSION"
-          elif [[ "$REF_TYPE" == "tag" ]]; then
-            SEMANTIC_VERSION="$BRANCH"
-            echo "🏷️ Tag-based Semantic Version: $SEMANTIC_VERSION"
-          else
-            # Auto-generate semantic version based on existing tags
-            LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-            if [[ "$LAST_TAG" =~ ^v?([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
-              MAJOR=${BASH_REMATCH[1]}
-              MINOR=${BASH_REMATCH[2]}
-              PATCH=${BASH_REMATCH[3]}
-              PATCH=$((PATCH + 1))
-              SEMANTIC_VERSION="v${MAJOR}.${MINOR}.${PATCH}-dev.${SHORT_SHA}"
-            else
-              SEMANTIC_VERSION="v1.0.0-dev.${SHORT_SHA}"
-            fi
-            echo "🔄 Auto-generated Semantic Version: $SEMANTIC_VERSION"
-          fi
-          
-          echo "dev-version=$DEV_VERSION" >> $GITHUB_OUTPUT
-          echo "staging-version=$STAGING_VERSION" >> $GITHUB_OUTPUT
-          echo "semantic-version=$SEMANTIC_VERSION" >> $GITHUB_OUTPUT
-          
-          echo ""
-          echo "📋 Version Summary:"
-          echo "  🔧 Development: $DEV_VERSION"
-          echo "  🧪 Staging: $STAGING_VERSION"
-          echo "  🎯 Semantic (Pre-prod/Prod): $SEMANTIC_VERSION"
+                     echo "dev-version=$DEV_VERSION" >> $GITHUB_OUTPUT
+           echo "staging-version=$STAGING_VERSION" >> $GITHUB_OUTPUT
+           echo "semantic-version=$SEMANTIC_VERSION" >> $GITHUB_OUTPUT
+           echo "Generated versions: dev=$DEV_VERSION, staging=$STAGING_VERSION, semantic=$SEMANTIC_VERSION"
 
-  # Comprehensive build and quality checks using composite actions
   quality-checks:
-    name: 🔨 Build & Quality Checks
+    name: Build & Quality Checks
     runs-on: ubuntu-latest
     outputs:
       sonar-status: ${{ steps.sonar-analysis.outputs.status }}
@@ -335,11 +283,11 @@ jobs:
 
       - name: Build & Test
         run: |
-          echo "🔨 Building and testing..."
+          echo "Building and testing..."
           npm run test -- --coverage --ci || true
           npm run lint || true
           npm run build || true
-          echo "✅ Build completed"
+          echo "Build completed"
 
       - name: SonarCloud Analysis
         id: sonar-analysis
@@ -372,7 +320,7 @@ jobs:
         run: |
           SONAR="${{ steps.sonar-analysis.outputs.status || 'SKIPPED' }}"
           CHECKMARX="${{ steps.checkmarx-scan.outputs.status || 'SKIPPED' }}"
-          echo "📊 Summary: SonarCloud=$SONAR | Checkmarx=$CHECKMARX"
+          echo "Summary: SonarCloud=$SONAR | Checkmarx=$CHECKMARX"
           
           # Overall status
           STATUS="PASSED"
@@ -380,9 +328,8 @@ jobs:
           echo "status=$STATUS" >> $GITHUB_OUTPUT
           echo "Overall: $STATUS"
 
-  # Development deployment with short SHA versioning
   deploy-dev:
-    name: 🔧 Deploy to Development
+    name: Deploy to Development
     runs-on: ubuntu-latest
     needs: [detect-deployment, quality-checks]
     if: needs.detect-deployment.outputs.deploy-dev == 'true'
@@ -411,11 +358,10 @@ jobs:
           output_location: ${{ env.AZURE_OUTPUT_LOCATION }}
 
       - name: Success
-        run: echo '✅ Dev deployed:' ${{ needs.detect-deployment.outputs.dev-version }}
+        run: echo 'Dev deployed:' ${{ needs.detect-deployment.outputs.dev-version }}
 
-  # Staging deployment with short SHA versioning
   deploy-staging:
-    name: 🧪 Deploy to Staging
+    name: Deploy to Staging
     runs-on: ubuntu-latest
     needs: [detect-deployment, quality-checks]
     if: needs.detect-deployment.outputs.deploy-staging == 'true'
@@ -444,11 +390,10 @@ jobs:
           output_location: ${{ env.AZURE_OUTPUT_LOCATION }}
 
       - name: Success
-        run: echo '✅ Staging deployed:' ${{ needs.detect-deployment.outputs.staging-version }}
+        run: echo 'Staging deployed:' ${{ needs.detect-deployment.outputs.staging-version }}
 
-  # Pre-production deployment with semantic versioning
   deploy-preprod:
-    name: 🎯 Deploy to Pre-Production
+    name: Deploy to Pre-Production
     runs-on: ubuntu-latest
     needs: [detect-deployment, quality-checks]
     if: needs.detect-deployment.outputs.deploy-preprod == 'true'
@@ -477,11 +422,10 @@ jobs:
           output_location: ${{ env.AZURE_OUTPUT_LOCATION }}
 
       - name: Success
-        run: echo '✅ Pre-prod deployed:' ${{ needs.detect-deployment.outputs.semantic-version }}
+        run: echo 'Pre-prod deployed:' ${{ needs.detect-deployment.outputs.semantic-version }}
 
-  # Production deployment with semantic versioning and enhanced validations
   deploy-prod:
-    name: 🏭 Deploy to Production
+    name: Deploy to Production
     runs-on: ubuntu-latest
     needs: [detect-deployment, quality-checks]
     if: needs.detect-deployment.outputs.deploy-prod == 'true'
@@ -493,9 +437,9 @@ jobs:
 
       - name: Validation
         run: |
-          echo "🏭 Production validation: ${{ needs.detect-deployment.outputs.semantic-version }}"
+          echo "Production validation: ${{ needs.detect-deployment.outputs.semantic-version }}"
           [[ "${{ needs.quality-checks.outputs.security-status }}" == "FAILED" ]] && exit 1
-          echo "✅ Validation passed"
+          echo "Validation passed"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -521,27 +465,21 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ needs.detect-deployment.outputs.semantic-version }}
-          release_name: Release ${{ needs.detect-deployment.outputs.semantic-version }}
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
           body: |
-            🚀 Production deployment successful
-            
-            **Version:** ${{ needs.detect-deployment.outputs.semantic-version }}
-            **Risk Level:** ${{ needs.detect-deployment.outputs.deployment-risk }}
-            **Quality Gate:** ${{ needs.quality-checks.outputs.sonar-quality-gate || 'N/A' }}
-            **Security Status:** ${{ needs.quality-checks.outputs.security-scan-status }}
-            
-            **Deployment Details:**
-            - Commit: ${{ github.sha }}
-            - Actor: ${{ github.actor }}
-            - URL: https://yourapp.azurestaticapps.net
+            Changes in this Release
+            - Automated release from tag ${{ github.ref }}
+            - Deployed to production environment
+            - Version: ${{ needs.detect-deployment.outputs.semantic-version }}
+          draft: false
+          prerelease: false
 
       - name: Success
-        run: echo '🎉 Production deployed:' ${{ needs.detect-deployment.outputs.semantic-version }}
+        run: echo 'Production deployed:' ${{ needs.detect-deployment.outputs.semantic-version }}
 
-  # Comprehensive deployment summary
   deployment-summary:
-    name: 📊 Deployment Summary
+    name: Deployment Summary
     runs-on: ubuntu-latest
     needs: [detect-deployment, quality-checks, deploy-dev, deploy-staging, deploy-preprod, deploy-prod]
     if: always()
@@ -549,7 +487,7 @@ jobs:
     steps:
       - name: Summary
         run: |
-          echo "📊 Deployment Summary:"
+          echo "Deployment Summary:"
           echo "Deployments: Dev=${{ needs.deploy-dev.result || 'skip' }} | Staging=${{ needs.deploy-staging.result || 'skip' }} | Prod=${{ needs.deploy-prod.result || 'skip' }}"
           echo "Quality: Sonar=${{ needs.quality-checks.outputs.sonar-status || 'skip' }} | Checkmarx=${{ needs.quality-checks.outputs.checkmarx-status || 'skip' }}"
           echo "Version: ${{ needs.detect-deployment.outputs.semantic-version }}"
