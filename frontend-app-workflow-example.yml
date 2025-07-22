@@ -1,0 +1,117 @@
+name: Frontend Application CI/CD
+
+on:
+  push:
+    branches: [main, develop, staging, preprod]
+    tags: ['v*']
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+        - development
+        - staging
+        - pre-production
+        - production
+      enable_sonar:
+        description: 'Enable SonarCloud analysis'
+        type: boolean
+        default: true
+      enable_checkmarx:
+        description: 'Enable Checkmarx security scanning'
+        type: boolean
+        default: true
+      force_version:
+        description: 'Override version (production only)'
+        required: false
+        type: string
+
+jobs:
+  call-shared-workflow:
+    uses: YOUR_ORG/shared-ci-cd-workflows/.github/workflows/shared-ci-cd.yml@main
+    with:
+      # Environment configuration
+      environment: ${{ github.event.inputs.environment || 'development' }}
+      
+      # Build configuration (customize for your frontend app)
+      node-version: '18'
+      app-location: '/'
+      output-location: 'build'          # or 'dist' for Vite/Vue apps
+      build-command: 'npm run build'    # customize as needed
+      install-command: 'npm ci'         # or 'npm install' if needed
+      
+      # Security scanning controls
+      enable-sonar: ${{ github.event.inputs.enable_sonar || true }}
+      enable-checkmarx: ${{ github.event.inputs.enable_checkmarx || true }}
+      
+      # Quality gate thresholds (customize for your app)
+      min-code-coverage: '75'           # adjust as needed
+      max-critical-vulnerabilities: '0'
+      max-high-vulnerabilities: '5'     # adjust as needed
+      
+      # Deployment controls
+      skip-deployment: false
+      force-version: ${{ github.event.inputs.force_version }}
+    
+    secrets:
+      # Azure Static Web Apps API tokens (set these in your frontend repo)
+      AZURE_STATIC_WEB_APPS_API_TOKEN_DEV: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_DEV }}
+      AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING }}
+      AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD }}
+      AZURE_STATIC_WEB_APPS_API_TOKEN_PROD: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PROD }}
+      
+      # Security scanning secrets (set these in your frontend repo)
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      CHECKMARX_CLIENT_ID: ${{ secrets.CHECKMARX_CLIENT_ID }}
+      CHECKMARX_SECRET: ${{ secrets.CHECKMARX_SECRET }}
+      CHECKMARX_TENANT: ${{ secrets.CHECKMARX_TENANT }}
+      CHECKMARX_BASE_URI: ${{ secrets.CHECKMARX_BASE_URI }}
+
+  # Optional: Add additional steps specific to your frontend app
+  post-deployment:
+    needs: call-shared-workflow
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Deployment Results
+        run: |
+          echo "## 🚀 Deployment Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version**: ${{ needs.call-shared-workflow.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -n "${{ needs.call-shared-workflow.outputs.dev-url }}" ]; then
+            echo "🔗 **Development**: [${{ needs.call-shared-workflow.outputs.dev-url }}](${{ needs.call-shared-workflow.outputs.dev-url }})" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ -n "${{ needs.call-shared-workflow.outputs.staging-url }}" ]; then
+            echo "🔗 **Staging**: [${{ needs.call-shared-workflow.outputs.staging-url }}](${{ needs.call-shared-workflow.outputs.staging-url }})" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ -n "${{ needs.call-shared-workflow.outputs.preprod-url }}" ]; then
+            echo "🔗 **Pre-Production**: [${{ needs.call-shared-workflow.outputs.preprod-url }}](${{ needs.call-shared-workflow.outputs.preprod-url }})" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ -n "${{ needs.call-shared-workflow.outputs.prod-url }}" ]; then
+            echo "🔗 **Production**: [${{ needs.call-shared-workflow.outputs.prod-url }}](${{ needs.call-shared-workflow.outputs.prod-url }})" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Security Scans**:" >> $GITHUB_STEP_SUMMARY
+          echo "- SonarCloud: ${{ needs.call-shared-workflow.outputs.sonar-status }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Checkmarx: ${{ needs.call-shared-workflow.outputs.checkmarx-status }}" >> $GITHUB_STEP_SUMMARY
+
+      # Example: Send notification to Slack/Teams/etc
+      - name: Notify Deployment
+        if: needs.call-shared-workflow.outputs.prod-url != ''
+        run: |
+          echo "🎉 Production deployment successful!"
+          echo "URL: ${{ needs.call-shared-workflow.outputs.prod-url }}"
+          echo "Version: ${{ needs.call-shared-workflow.outputs.version }}"
+          # Add your notification logic here (Slack webhook, etc.)

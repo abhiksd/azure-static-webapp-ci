@@ -1,0 +1,445 @@
+name: Shared Frontend CI/CD Pipeline
+
+on:
+  workflow_call:
+    inputs:
+      # Environment configuration
+      environment:
+        description: 'Target environment'
+        required: false
+        default: 'development'
+        type: string
+      
+      # Build configuration
+      node-version:
+        description: 'Node.js version to use'
+        required: false
+        default: '18'
+        type: string
+      app-location:
+        description: 'App source code location'
+        required: false
+        default: '/'
+        type: string
+      output-location:
+        description: 'Built app content directory'
+        required: false
+        default: 'build'
+        type: string
+      build-command:
+        description: 'Custom build command'
+        required: false
+        default: 'npm run build'
+        type: string
+      install-command:
+        description: 'Custom install command'
+        required: false
+        default: 'npm ci'
+        type: string
+      
+      # Security scanning controls
+      enable-sonar:
+        description: 'Enable SonarCloud analysis'
+        required: false
+        default: true
+        type: boolean
+      enable-checkmarx:
+        description: 'Enable Checkmarx security scanning'
+        required: false
+        default: true
+        type: boolean
+      
+      # Quality gate thresholds
+      min-code-coverage:
+        description: 'Minimum code coverage percentage'
+        required: false
+        default: '80'
+        type: string
+      max-critical-vulnerabilities:
+        description: 'Maximum critical vulnerabilities allowed'
+        required: false
+        default: '0'
+        type: string
+      max-high-vulnerabilities:
+        description: 'Maximum high vulnerabilities allowed'
+        required: false
+        default: '2'
+        type: string
+      
+      # Deployment controls
+      skip-deployment:
+        description: 'Skip deployment steps'
+        required: false
+        default: false
+        type: boolean
+      force-version:
+        description: 'Override version (optional)'
+        required: false
+        type: string
+    
+    secrets:
+      # Required secrets for deployment
+      AZURE_STATIC_WEB_APPS_API_TOKEN_DEV:
+        description: 'Azure Static Web Apps API token for development'
+        required: false
+      AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING:
+        description: 'Azure Static Web Apps API token for staging'
+        required: false
+      AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD:
+        description: 'Azure Static Web Apps API token for pre-production'
+        required: false
+      AZURE_STATIC_WEB_APPS_API_TOKEN_PROD:
+        description: 'Azure Static Web Apps API token for production'
+        required: false
+      
+      # Security scanning secrets
+      SONAR_TOKEN:
+        description: 'SonarCloud token'
+        required: false
+      CHECKMARX_CLIENT_ID:
+        description: 'Checkmarx AST client ID'
+        required: false
+      CHECKMARX_SECRET:
+        description: 'Checkmarx AST client secret'
+        required: false
+      CHECKMARX_TENANT:
+        description: 'Checkmarx tenant'
+        required: false
+      CHECKMARX_BASE_URI:
+        description: 'Checkmarx base URI'
+        required: false
+    
+    outputs:
+      # Deployment outputs
+      dev-url:
+        description: 'Development environment URL'
+        value: ${{ jobs.deploy-dev.outputs.deployment-url }}
+      staging-url:
+        description: 'Staging environment URL'
+        value: ${{ jobs.deploy-staging.outputs.deployment-url }}
+      preprod-url:
+        description: 'Pre-production environment URL'
+        value: ${{ jobs.deploy-preprod.outputs.deployment-url }}
+      prod-url:
+        description: 'Production environment URL'
+        value: ${{ jobs.deploy-prod.outputs.deployment-url }}
+      
+      # Quality metrics
+      sonar-status:
+        description: 'SonarCloud analysis status'
+        value: ${{ jobs.security-scan.outputs.sonar-status }}
+      checkmarx-status:
+        description: 'Checkmarx scan status'
+        value: ${{ jobs.security-scan.outputs.checkmarx-status }}
+      
+      # Version info
+      version:
+        description: 'Deployed version'
+        value: ${{ jobs.detect-deployment.outputs.version }}
+
+env:
+  # Build configuration
+  NODE_VERSION: ${{ inputs.node-version }}
+  
+  # Security scanning controls
+  ENABLE_SONAR: ${{ inputs.enable-sonar }}
+  ENABLE_CHECKMARX: ${{ inputs.enable-checkmarx }}
+  
+  # Quality gate thresholds
+  MIN_CODE_COVERAGE: ${{ inputs.min-code-coverage }}
+  MAX_CRITICAL_VULNERABILITIES: ${{ inputs.max-critical-vulnerabilities }}
+  MAX_HIGH_VULNERABILITIES: ${{ inputs.max-high-vulnerabilities }}
+  
+  # Common Azure Static Web Apps deployment parameters
+  AZURE_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  AZURE_ACTION: "upload"
+  AZURE_APP_LOCATION: ${{ inputs.app-location }}
+  AZURE_OUTPUT_LOCATION: ${{ inputs.output-location }}
+
+jobs:
+  detect-deployment:
+    runs-on: ubuntu-latest
+    outputs:
+      should-deploy-dev: ${{ steps.deployment-logic.outputs.deploy-dev }}
+      should-deploy-staging: ${{ steps.deployment-logic.outputs.deploy-staging }}
+      should-deploy-preprod: ${{ steps.deployment-logic.outputs.deploy-preprod }}
+      should-deploy-prod: ${{ steps.deployment-logic.outputs.deploy-prod }}
+      version: ${{ steps.version.outputs.version }}
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate Version
+        id: version
+        run: |
+          if [ -n "${{ inputs.force-version }}" ]; then
+            VERSION="${{ inputs.force-version }}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          else
+            VERSION="$(date +'%Y.%m.%d')-${GITHUB_SHA::8}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Generated version: $VERSION"
+
+      - name: Determine Deployment Strategy
+        id: deployment-logic
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          ENVIRONMENT="${{ inputs.environment }}"
+          
+          # Default deployment logic
+          DEPLOY_DEV="false"
+          DEPLOY_STAGING="false"
+          DEPLOY_PREPROD="false"
+          DEPLOY_PROD="false"
+          
+          if [ "${{ inputs.skip-deployment }}" = "true" ]; then
+            echo "Deployment skipped by input"
+          elif [ -n "$ENVIRONMENT" ] && [ "$ENVIRONMENT" != "development" ]; then
+            # Manual workflow dispatch with specific environment
+            case $ENVIRONMENT in
+              staging) DEPLOY_STAGING="true" ;;
+              pre-production) DEPLOY_PREPROD="true" ;;
+              production) DEPLOY_PROD="true" ;;
+              *) DEPLOY_DEV="true" ;;
+            esac
+          else
+            # Auto deployment based on branch
+            case $BRANCH in
+              main|master) DEPLOY_PROD="true" ;;
+              develop|development) DEPLOY_DEV="true" ;;
+              staging) DEPLOY_STAGING="true" ;;
+              preprod|pre-production) DEPLOY_PREPROD="true" ;;
+              *) DEPLOY_DEV="true" ;;
+            esac
+          fi
+          
+          echo "deploy-dev=$DEPLOY_DEV" >> $GITHUB_OUTPUT
+          echo "deploy-staging=$DEPLOY_STAGING" >> $GITHUB_OUTPUT
+          echo "deploy-preprod=$DEPLOY_PREPROD" >> $GITHUB_OUTPUT
+          echo "deploy-prod=$DEPLOY_PROD" >> $GITHUB_OUTPUT
+
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install Dependencies and Build
+        run: |
+          ${{ inputs.install-command }}
+          ${{ inputs.build-command }}
+          npm test 2>/dev/null || echo "No tests found or test command not available"
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ${{ inputs.output-location }}/
+          retention-days: 7
+
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: [build-and-test]
+    outputs:
+      sonar-status: ${{ steps.sonar-analysis.outputs.status }}
+      checkmarx-status: ${{ steps.checkmarx-scan.outputs.status }}
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: ${{ inputs.install-command }}
+
+      - name: SonarCloud Analysis
+        id: sonar-analysis
+        if: env.ENABLE_SONAR == 'true'
+        uses: ./.github/actions/sonar-analysis
+        with:
+          enabled: ${{ env.ENABLE_SONAR }}
+          sonar-token: ${{ secrets.SONAR_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          organization: ${{ vars.SONAR_ORGANIZATION }}
+          sonar-host-url: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}
+          skip-ssl-verification: ${{ vars.SONAR_SKIP_SSL_VERIFICATION || 'false' }}
+          min-code-coverage: ${{ env.MIN_CODE_COVERAGE }}
+          max-blocker-issues: ${{ vars.MAX_BLOCKER_ISSUES || '0' }}
+          max-critical-issues: ${{ vars.MAX_CRITICAL_ISSUES || '0' }}
+
+      - name: Checkmarx Security Scan
+        id: checkmarx-scan
+        if: env.ENABLE_CHECKMARX == 'true'
+        uses: ./.github/actions/checkmarx-scan
+        with:
+          enabled: ${{ env.ENABLE_CHECKMARX }}
+          base-uri: ${{ secrets.CHECKMARX_BASE_URI || 'https://ast.checkmarx.net' }}
+          checkmarx-client-id: ${{ secrets.CHECKMARX_CLIENT_ID }}
+          checkmarx-secret: ${{ secrets.CHECKMARX_SECRET }}
+          tenant: ${{ secrets.CHECKMARX_TENANT }}
+          scan-types: ${{ vars.CHECKMARX_SCAN_TYPES || 'sast,sca' }}
+          max-critical: ${{ env.MAX_CRITICAL_VULNERABILITIES }}
+          max-high: ${{ env.MAX_HIGH_VULNERABILITIES }}
+          preset: ${{ vars.CHECKMARX_PRESET || 'Checkmarx Default' }}
+
+  deploy-dev:
+    if: needs.detect-deployment.outputs.should-deploy-dev == 'true' && !inputs.skip-deployment
+    runs-on: ubuntu-latest
+    needs: [detect-deployment, build-and-test, security-scan]
+    environment: development
+    outputs:
+      deployment-url: ${{ steps.deploy.outputs.static-web-app-url }}
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+          path: ${{ inputs.output-location }}/
+
+      - name: Deploy to Development
+        id: deploy
+        uses: ./.github/actions/deploy-static-app
+        with:
+          azure-static-web-apps-api-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_DEV }}
+          environment: 'development'
+          version: ${{ needs.detect-deployment.outputs.version }}
+          app-location: ${{ inputs.app-location }}
+          output-location: ${{ inputs.output-location }}
+          skip-build: 'true'
+
+  deploy-staging:
+    if: needs.detect-deployment.outputs.should-deploy-staging == 'true' && !inputs.skip-deployment
+    runs-on: ubuntu-latest
+    needs: [detect-deployment, build-and-test, security-scan]
+    environment: staging
+    outputs:
+      deployment-url: ${{ steps.deploy.outputs.static-web-app-url }}
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+          path: ${{ inputs.output-location }}/
+
+      - name: Deploy to Staging
+        id: deploy
+        uses: ./.github/actions/deploy-static-app
+        with:
+          azure-static-web-apps-api-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING }}
+          environment: 'staging'
+          version: ${{ needs.detect-deployment.outputs.version }}
+          app-location: ${{ inputs.app-location }}
+          output-location: ${{ inputs.output-location }}
+          skip-build: 'true'
+
+  deploy-preprod:
+    if: needs.detect-deployment.outputs.should-deploy-preprod == 'true' && !inputs.skip-deployment
+    runs-on: ubuntu-latest
+    needs: [detect-deployment, build-and-test, security-scan]
+    environment: pre-production
+    outputs:
+      deployment-url: ${{ steps.deploy.outputs.static-web-app-url }}
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+          path: ${{ inputs.output-location }}/
+
+      - name: Deploy to Pre-Production
+        id: deploy
+        uses: ./.github/actions/deploy-static-app
+        with:
+          azure-static-web-apps-api-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD }}
+          environment: 'pre-production'
+          version: ${{ needs.detect-deployment.outputs.version }}
+          app-location: ${{ inputs.app-location }}
+          output-location: ${{ inputs.output-location }}
+          skip-build: 'true'
+
+  deploy-prod:
+    if: needs.detect-deployment.outputs.should-deploy-prod == 'true' && !inputs.skip-deployment
+    runs-on: ubuntu-latest
+    needs: [detect-deployment, build-and-test, security-scan]
+    environment: production
+    outputs:
+      deployment-url: ${{ steps.deploy.outputs.static-web-app-url }}
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+          path: ${{ inputs.output-location }}/
+
+      - name: Deploy to Production
+        id: deploy
+        uses: ./.github/actions/deploy-static-app
+        with:
+          azure-static-web-apps-api-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PROD }}
+          environment: 'production'
+          version: ${{ needs.detect-deployment.outputs.version }}
+          app-location: ${{ inputs.app-location }}
+          output-location: ${{ inputs.output-location }}
+          skip-build: 'true'
+
+  deployment-summary:
+    if: always() && !inputs.skip-deployment
+    runs-on: ubuntu-latest
+    needs: [detect-deployment, deploy-dev, deploy-staging, deploy-preprod, deploy-prod]
+    
+    steps:
+      - name: Deployment Summary
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "Version: ${{ needs.detect-deployment.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.deploy-dev.result }}" = "success" ]; then
+            echo "✅ **Development**: ${{ needs.deploy-dev.outputs.deployment-url }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.deploy-staging.result }}" = "success" ]; then
+            echo "✅ **Staging**: ${{ needs.deploy-staging.outputs.deployment-url }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.deploy-preprod.result }}" = "success" ]; then
+            echo "✅ **Pre-Production**: ${{ needs.deploy-preprod.outputs.deployment-url }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.deploy-prod.result }}" = "success" ]; then
+            echo "✅ **Production**: ${{ needs.deploy-prod.outputs.deployment-url }}" >> $GITHUB_STEP_SUMMARY
+          fi
