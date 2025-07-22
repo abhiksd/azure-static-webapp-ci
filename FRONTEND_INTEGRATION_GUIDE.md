@@ -104,7 +104,7 @@ Copy the PR security check workflow to `.github/workflows/pr-security-check.yml`
 ```bash
 # Download from shared repository
 curl -o .github/workflows/pr-security-check.yml \
-**https://raw.githubusercontent.com/YOUR_ORG/shared-ci-cd-workflows/main/pr-security-check.yml
+  https://raw.githubusercontent.com/YOUR_ORG/shared-ci-cd-workflows/main/pr-security-check-caller.yml
 ```
 
 ### Step 3: Configure Repository Secrets

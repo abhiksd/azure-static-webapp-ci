@@ -17,13 +17,14 @@ A **production-ready, enterprise-grade CI/CD solution** for frontend application
 ```
 Shared CI/CD Repository (THIS REPO)
 ├── .github/workflows/
-│    ├── shared-ci-cd.yml**************# Main reusable workflow
-│    └── manual-rollback.yml********** # Manual rollback workflow
+│    ├── shared-ci-cd.yml             # Main reusable workflow
+│    ├── shared-pr-security.yml       # Shared PR security workflow
+│    └── manual-rollback.yml          # Manual rollback workflow
 ├── .github/actions/******************# Composite actions
 │    ├── sonar-analysis/************** # SonarCloud quality scanning
 │    ├── checkmarx-scan/************** # Security vulnerability scanning
 │    └── deploy-static-app/************# Azure Static Web Apps deployment
-├── pr-security-check.yml************# PR security validation (copy to frontend apps)
+├── pr-security-check-caller.yml     # PR security caller workflow (copy to frontend apps)
 ├── frontend-ci-cd.yml************** # Ready-to-use workflow (copy to frontend apps)
 └── docs/                  * # Documentation
 ```
@@ -33,7 +34,7 @@ Shared CI/CD Repository (THIS REPO)
 Frontend App Repository
 ├── .github/workflows/
 │    ├── ci-cd.yml******************** # Copied from frontend-ci-cd.yml
-│    ├── pr-security-check.yml********# Copied from shared repo
+│    ├── pr-security-check.yml        # Copied from shared repo (calls shared-pr-security.yml)
 │    └── manual-rollback.yml**********# Copied from manual-rollback-caller.yml
 ├── src/                  ***# Application code
 ├── package.json**********************# Build scripts required
@@ -110,7 +111,7 @@ FORCE_VERSION=******************** # No version overrides allowed
 cp frontend-ci-cd.yml .github/workflows/ci-cd.yml
 
 # Copy PR security check workflow
-cp pr-security-check.yml .github/workflows/pr-security-check.yml
+cp pr-security-check-caller.yml .github/workflows/pr-security-check.yml
 
 # Copy manual rollback caller workflow
 cp manual-rollback-caller.yml .github/workflows/manual-rollback.yml
@@ -158,6 +159,13 @@ CHECKMARX_TENANT************************ # Checkmarx tenant
 - **Consistent standards** across all applications
 - **Automatic failure** on security threshold violations
 - **Complete audit trail** for compliance
+
+### PR Security Architecture
+- **Shared workflow** for all PR security checks
+- **Centralized configuration** in shared repository
+- **Composite actions** for SonarCloud and Checkmarx
+- **Automated PR comments** with security results
+- **No frontend overrides** allowed for security settings
 
 ### Quality Gate Enforcement
 - **Minimum code coverage** requirements
@@ -267,7 +275,7 @@ CHECKMARX_TENANT************************ # Checkmarx tenant
 
 ### Ready-to-Use Files
 - **[frontend-ci-cd.yml](frontend-ci-cd.yml)** - Copy to frontend apps as `.github/workflows/ci-cd.yml`
-- **[pr-security-check.yml](pr-security-check.yml)** - Copy to frontend apps for PR validation
+- **[pr-security-check-caller.yml](pr-security-check-caller.yml)** - Copy to frontend apps for PR validation
 - **[manual-rollback-caller.yml](manual-rollback-caller.yml)** - Copy to frontend apps as `.github/workflows/manual-rollback.yml`
 - **[setup-shared-repository.sh](setup-shared-repository.sh)** - Automated setup script
 

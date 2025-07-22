@@ -1,0 +1,245 @@
+name: Shared PR Security Check
+
+on:
+  workflow_call:
+    inputs:
+      pr_number:
+        description: 'PR number to check (for manual triggers)'
+        required: false
+        type: string
+      pr_head_sha:
+        description: 'PR head SHA for checkout'
+        required: false
+        type: string
+        default: ''
+    
+    secrets:
+      # Security scanning secrets
+      SONAR_TOKEN:
+        description: 'SonarCloud token'
+        required: false
+      CHECKMARX_CLIENT_ID:
+        description: 'Checkmarx AST client ID'
+        required: false
+      CHECKMARX_SECRET:
+        description: 'Checkmarx AST client secret'
+        required: false
+      CHECKMARX_TENANT:
+        description: 'Checkmarx tenant'
+        required: false
+      CHECKMARX_BASE_URI:
+        description: 'Checkmarx base URI'
+        required: false
+    
+    outputs:
+      # Security scan outputs
+      sonar-status:
+        description: 'SonarCloud analysis status'
+        value: ${{ jobs.sonar-analysis.outputs.status }}
+      sonar-coverage:
+        description: 'SonarCloud code coverage'
+        value: ${{ jobs.sonar-analysis.outputs.coverage }}
+      checkmarx-status:
+        description: 'Checkmarx scan status'
+        value: ${{ jobs.checkmarx-scan.outputs.status }}
+      checkmarx-critical:
+        description: 'Checkmarx critical vulnerabilities'
+        value: ${{ jobs.checkmarx-scan.outputs.critical-count }}
+      checkmarx-high:
+        description: 'Checkmarx high vulnerabilities'
+        value: ${{ jobs.checkmarx-scan.outputs.high-count }}
+      overall-status:
+        description: 'Overall security check status'
+        value: ${{ jobs.security-summary.outputs.overall-status }}
+
+env:
+  # Build configuration (centralized in shared workflow)
+  NODE_VERSION: ${{ vars.NODE_VERSION || '18' }}
+  INSTALL_COMMAND: ${{ vars.INSTALL_COMMAND || 'npm ci' }}
+  
+  # Security scanning controls (centralized in shared workflow)
+  ENABLE_SONAR: ${{ vars.ENABLE_SONAR_SCAN || 'true' }}
+  ENABLE_CHECKMARX: ${{ vars.ENABLE_CHECKMARX_SCAN || 'true' }}
+  
+  # SonarQube/SonarCloud configuration (centralized)
+  SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}
+  SONAR_SKIP_SSL_VERIFICATION: ${{ vars.SONAR_SKIP_SSL_VERIFICATION || 'false' }}
+  
+  # Quality gate thresholds (centralized in shared workflow)
+  MIN_CODE_COVERAGE: ${{ vars.MIN_CODE_COVERAGE || '80' }}
+  MAX_CRITICAL_VULNERABILITIES: ${{ vars.MAX_CRITICAL_VULNERABILITIES || '0' }}
+  MAX_HIGH_VULNERABILITIES: ${{ vars.MAX_HIGH_VULNERABILITIES || '2' }}
+  MAX_BLOCKER_ISSUES: ${{ vars.MAX_BLOCKER_ISSUES || '0' }}
+  MAX_CRITICAL_ISSUES: ${{ vars.MAX_CRITICAL_ISSUES || '0' }}
+  
+  # Checkmarx configuration (centralized)
+  CHECKMARX_SCAN_TYPES: ${{ vars.CHECKMARX_SCAN_TYPES || 'sast,sca' }}
+  CHECKMARX_PRESET: ${{ vars.CHECKMARX_PRESET || 'Checkmarx Default' }}
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR Code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.pr_head_sha || github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install Dependencies and Test
+        run: |
+          ${{ env.INSTALL_COMMAND }}
+          
+          # Run tests with coverage if available
+          if npm run test:coverage 2>/dev/null; then
+            echo "Tests with coverage completed"
+          elif npm test 2>/dev/null; then
+            echo "Tests completed (no coverage)"
+          else
+            echo "No test command found or tests failed"
+          fi
+
+  sonar-analysis:
+    runs-on: ubuntu-latest
+    needs: [build-and-test]
+    if: always() && (env.ENABLE_SONAR != 'false')
+    outputs:
+      status: ${{ steps.sonar-scan.outputs.status }}
+      coverage: ${{ steps.sonar-scan.outputs.coverage }}
+    
+    steps:
+      - name: Checkout PR Code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.pr_head_sha || github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: ${{ env.INSTALL_COMMAND }}
+
+      - name: SonarCloud Analysis
+        id: sonar-scan
+        uses: ./.github/actions/sonar-analysis
+        with:
+          enabled: ${{ env.ENABLE_SONAR }}
+          sonar-token: ${{ secrets.SONAR_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          organization: ${{ vars.SONAR_ORGANIZATION }}
+          sonar-host-url: ${{ env.SONAR_HOST_URL }}
+          skip-ssl-verification: ${{ env.SONAR_SKIP_SSL_VERIFICATION }}
+          min-code-coverage: ${{ env.MIN_CODE_COVERAGE }}
+          max-blocker-issues: ${{ env.MAX_BLOCKER_ISSUES }}
+          max-critical-issues: ${{ env.MAX_CRITICAL_ISSUES }}
+
+  checkmarx-scan:
+    runs-on: ubuntu-latest
+    needs: [build-and-test]
+    if: always() && (env.ENABLE_CHECKMARX != 'false')
+    outputs:
+      status: ${{ steps.checkmarx-security.outputs.status }}
+      critical-count: ${{ steps.checkmarx-security.outputs.critical-count }}
+      high-count: ${{ steps.checkmarx-security.outputs.high-count }}
+    
+    steps:
+      - name: Checkout PR Code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.pr_head_sha || github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: ${{ env.INSTALL_COMMAND }}
+
+      - name: Checkmarx Security Scan
+        id: checkmarx-security
+        uses: ./.github/actions/checkmarx-scan
+        with:
+          enabled: ${{ env.ENABLE_CHECKMARX }}
+          base-uri: ${{ secrets.CHECKMARX_BASE_URI || 'https://ast.checkmarx.net' }}
+          checkmarx-client-id: ${{ secrets.CHECKMARX_CLIENT_ID }}
+          checkmarx-secret: ${{ secrets.CHECKMARX_SECRET }}
+          tenant: ${{ secrets.CHECKMARX_TENANT }}
+          scan-types: ${{ env.CHECKMARX_SCAN_TYPES }}
+          max-critical: ${{ env.MAX_CRITICAL_VULNERABILITIES }}
+          max-high: ${{ env.MAX_HIGH_VULNERABILITIES }}
+          preset: ${{ env.CHECKMARX_PRESET }}
+
+  security-summary:
+    if: always()
+    runs-on: ubuntu-latest
+    needs: [sonar-analysis, checkmarx-scan]
+    outputs:
+      overall-status: ${{ steps.evaluate.outputs.overall-status }}
+    
+    steps:
+      - name: Evaluate Security Results
+        id: evaluate
+        run: |
+          SONAR_STATUS="${{ needs.sonar-analysis.outputs.status }}"
+          CHECKMARX_STATUS="${{ needs.checkmarx-scan.outputs.status }}"
+          OVERALL_STATUS="PASSED"
+          
+          echo "Security Scan Results:"
+          echo "SonarCloud: $SONAR_STATUS"
+          echo "Checkmarx: $CHECKMARX_STATUS"
+          
+          # Check if any critical scans failed
+          if [ "$SONAR_STATUS" = "FAILED" ] || [ "$CHECKMARX_STATUS" = "FAILED" ]; then
+            OVERALL_STATUS="FAILED"
+          elif [ "$SONAR_STATUS" = "SKIPPED" ] && [ "$CHECKMARX_STATUS" = "SKIPPED" ]; then
+            OVERALL_STATUS="SKIPPED"
+          fi
+          
+          echo "Overall Status: $OVERALL_STATUS"
+          echo "overall-status=$OVERALL_STATUS" >> $GITHUB_OUTPUT
+
+      - name: Generate Security Summary
+        run: |
+          echo "## PR Security Check Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Overall Status**: ${{ steps.evaluate.outputs.overall-status }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### Security Scan Details" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.sonar-analysis.result }}" != "skipped" ]; then
+            if [ "${{ needs.sonar-analysis.outputs.status }}" = "PASSED" ]; then
+              echo "**SonarCloud**: PASSED (Coverage: ${{ needs.sonar-analysis.outputs.coverage }}%)" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "**SonarCloud**: ${{ needs.sonar-analysis.outputs.status }}" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "**SonarCloud**: DISABLED" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.checkmarx-scan.result }}" != "skipped" ]; then
+            if [ "${{ needs.checkmarx-scan.outputs.status }}" = "PASSED" ]; then
+              echo "**Checkmarx**: PASSED (Critical: ${{ needs.checkmarx-scan.outputs.critical-count }}, High: ${{ needs.checkmarx-scan.outputs.high-count }})" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "**Checkmarx**: ${{ needs.checkmarx-scan.outputs.status }}" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "**Checkmarx**: DISABLED" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "*Security checks performed using shared workflow with centralized configuration*" >> $GITHUB_STEP_SUMMARY

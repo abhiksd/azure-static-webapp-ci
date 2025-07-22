@@ -6,7 +6,7 @@
 ```bash
 # Copy workflow files to your frontend app
 cp frontend-ci-cd.yml .github/workflows/ci-cd.yml
-cp pr-security-check.yml .github/workflows/pr-security-check.yml
+cp pr-security-check-caller.yml .github/workflows/pr-security-check.yml
 cp manual-rollback-caller.yml .github/workflows/manual-rollback.yml
 ```
 

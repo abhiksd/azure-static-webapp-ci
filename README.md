@@ -23,7 +23,7 @@ Enterprise-grade, centralized CI/CD solution for frontend applications with comp
 │   ├── sonar-analysis/               # SonarCloud scanning
 │   ├── checkmarx-scan/               # Checkmarx security scanning
 │   └── deploy-static-app/            # Azure Static Web Apps deployment
-├── pr-security-check.yml            # PR security validation (copy to frontend apps)
+├── pr-security-check-caller.yml     # PR security caller workflow (copy to frontend apps)
 ├── frontend-ci-cd.yml               # Ready-to-use workflow (copy to frontend apps)
 ├── manual-rollback-caller.yml       # Manual rollback caller (copy to frontend apps)
 └── setup-shared-repository.sh       # Automated migration script
@@ -37,7 +37,7 @@ Enterprise-grade, centralized CI/CD solution for frontend applications with comp
 cp frontend-ci-cd.yml .github/workflows/ci-cd.yml
 
 # Copy PR security check
-cp pr-security-check.yml .github/workflows/pr-security-check.yml
+cp pr-security-check-caller.yml .github/workflows/pr-security-check.yml
 
 # Copy manual rollback caller
 cp manual-rollback-caller.yml .github/workflows/manual-rollback.yml
