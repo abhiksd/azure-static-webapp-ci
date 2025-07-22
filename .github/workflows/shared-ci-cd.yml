@@ -135,8 +135,8 @@ jobs:
       - name: Generate Version
         id: version
         run: |
-                  if [ -n "${{ env.FORCE_VERSION }}" ]; then
-          VERSION="${{ env.FORCE_VERSION }}"
+          if [ -n "${{ env.FORCE_VERSION }}" ]; then
+            VERSION="${{ env.FORCE_VERSION }}"
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             VERSION=${GITHUB_REF#refs/tags/}
           else

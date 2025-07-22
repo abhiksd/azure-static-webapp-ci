@@ -202,12 +202,7 @@ jobs:
         id: deploy
         uses: ./.github/actions/deploy-static-app
         with:
-          azure-static-web-apps-api-token: ${{ 
-            inputs.environment == 'development' && secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_DEV ||
-            inputs.environment == 'staging' && secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING ||
-            inputs.environment == 'pre-production' && secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD ||
-            inputs.environment == 'production' && secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PROD
-          }}
+          azure-static-web-apps-api-token: ${{ inputs.environment == 'development' && secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_DEV || inputs.environment == 'staging' && secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING || inputs.environment == 'pre-production' && secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD || inputs.environment == 'production' && secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PROD }}
           environment: ${{ inputs.environment }}
           version: ${{ needs.validate-rollback.outputs.target-version }}
           app-location: ${{ env.APP_LOCATION }}
@@ -239,7 +234,7 @@ jobs:
               \"environment\": \"${{ inputs.environment }}\",
               \"description\": \"Manual rollback - ${{ inputs.reason }}\",
               \"auto_merge\": false
-                         }" || echo "Failed to update deployment status (non-critical)"
+            }" || echo "Failed to update deployment status (non-critical)"
 
   rollback-summary:
     if: always()
@@ -249,7 +244,7 @@ jobs:
     steps:
       - name: Generate Rollback Summary
         run: |
-                     echo "## Manual Rollback Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## Manual Rollback Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Environment**: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
           echo "**Reason**: ${{ inputs.reason }}" >> $GITHUB_STEP_SUMMARY
