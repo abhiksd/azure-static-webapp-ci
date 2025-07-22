@@ -82,7 +82,7 @@ on:
 env:
   # Build configuration (standardized)
   NODE_VERSION: '18'
-  APP_LOCATION: ${{ vars.APP_LOCATION || '/' }}
+  APP_LOCATION: '/'
   OUTPUT_LOCATION: 'build'
   BUILD_COMMAND: 'npm run build'
   INSTALL_COMMAND: 'npm ci'
