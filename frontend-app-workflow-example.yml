@@ -45,14 +45,14 @@ jobs:
       build-command: 'npm run build'    # customize as needed
       install-command: 'npm ci'         # or 'npm install' if needed
       
-      # Security scanning controls
-      enable-sonar: ${{ github.event.inputs.enable_sonar || true }}
-      enable-checkmarx: ${{ github.event.inputs.enable_checkmarx || true }}
+      # Security scanning controls (optional overrides - centralized in shared repo)
+      enable-sonar: ${{ github.event.inputs.enable_sonar }}
+      enable-checkmarx: ${{ github.event.inputs.enable_checkmarx }}
       
-      # Quality gate thresholds (customize for your app)
-      min-code-coverage: '75'           # adjust as needed
-      max-critical-vulnerabilities: '0'
-      max-high-vulnerabilities: '5'     # adjust as needed
+      # Quality gate thresholds (optional overrides - centralized in shared repo)
+      min-code-coverage: '75'           # override shared repo default if needed
+      max-critical-vulnerabilities: '0' # override shared repo default if needed
+      max-high-vulnerabilities: '5'     # override shared repo default if needed
       
       # Deployment controls
       skip-deployment: false
@@ -104,8 +104,8 @@ jobs:
           
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Security Scans**:" >> $GITHUB_STEP_SUMMARY
-          echo "- SonarCloud: ${{ needs.call-shared-workflow.outputs.sonar-status }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Checkmarx: ${{ needs.call-shared-workflow.outputs.checkmarx-status }}" >> $GITHUB_STEP_SUMMARY
+          echo "- SonarCloud: ${{ needs.call-shared-workflow.outputs.sonar-status }} (Coverage: ${{ needs.call-shared-workflow.outputs.sonar-coverage }}%)" >> $GITHUB_STEP_SUMMARY
+          echo "- Checkmarx: ${{ needs.call-shared-workflow.outputs.checkmarx-status }} (Critical: ${{ needs.call-shared-workflow.outputs.checkmarx-critical }}, High: ${{ needs.call-shared-workflow.outputs.checkmarx-high }})" >> $GITHUB_STEP_SUMMARY
 
       # Example: Send notification to Slack/Teams/etc
       - name: Notify Deployment

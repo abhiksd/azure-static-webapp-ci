@@ -127,10 +127,19 @@ on:
       # Quality metrics
       sonar-status:
         description: 'SonarCloud analysis status'
-        value: ${{ jobs.security-scan.outputs.sonar-status }}
+        value: ${{ jobs.sonar-analysis.outputs.status }}
+      sonar-coverage:
+        description: 'SonarCloud code coverage'
+        value: ${{ jobs.sonar-analysis.outputs.coverage }}
       checkmarx-status:
         description: 'Checkmarx scan status'
-        value: ${{ jobs.security-scan.outputs.checkmarx-status }}
+        value: ${{ jobs.checkmarx-scan.outputs.status }}
+      checkmarx-critical:
+        description: 'Checkmarx critical vulnerabilities'
+        value: ${{ jobs.checkmarx-scan.outputs.critical-count }}
+      checkmarx-high:
+        description: 'Checkmarx high vulnerabilities'
+        value: ${{ jobs.checkmarx-scan.outputs.high-count }}
       
       # Version info
       version:
@@ -141,14 +150,24 @@ env:
   # Build configuration
   NODE_VERSION: ${{ inputs.node-version }}
   
-  # Security scanning controls
-  ENABLE_SONAR: ${{ inputs.enable-sonar }}
-  ENABLE_CHECKMARX: ${{ inputs.enable-checkmarx }}
+  # Security scanning controls (centralized in shared workflow)
+  ENABLE_SONAR: ${{ inputs.enable-sonar || vars.ENABLE_SONAR_SCAN || 'true' }}
+  ENABLE_CHECKMARX: ${{ inputs.enable-checkmarx || vars.ENABLE_CHECKMARX_SCAN || 'true' }}
   
-  # Quality gate thresholds
-  MIN_CODE_COVERAGE: ${{ inputs.min-code-coverage }}
-  MAX_CRITICAL_VULNERABILITIES: ${{ inputs.max-critical-vulnerabilities }}
-  MAX_HIGH_VULNERABILITIES: ${{ inputs.max-high-vulnerabilities }}
+  # SonarQube/SonarCloud configuration (centralized)
+  SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}
+  SONAR_SKIP_SSL_VERIFICATION: ${{ vars.SONAR_SKIP_SSL_VERIFICATION || 'false' }}
+  
+  # Quality gate thresholds (centralized with caller override capability)
+  MIN_CODE_COVERAGE: ${{ inputs.min-code-coverage || vars.MIN_CODE_COVERAGE || '80' }}
+  MAX_CRITICAL_VULNERABILITIES: ${{ inputs.max-critical-vulnerabilities || vars.MAX_CRITICAL_VULNERABILITIES || '0' }}
+  MAX_HIGH_VULNERABILITIES: ${{ inputs.max-high-vulnerabilities || vars.MAX_HIGH_VULNERABILITIES || '2' }}
+  MAX_BLOCKER_ISSUES: ${{ vars.MAX_BLOCKER_ISSUES || '0' }}
+  MAX_CRITICAL_ISSUES: ${{ vars.MAX_CRITICAL_ISSUES || '0' }}
+  
+  # Checkmarx configuration (centralized)
+  CHECKMARX_SCAN_TYPES: ${{ vars.CHECKMARX_SCAN_TYPES || 'sast,sca' }}
+  CHECKMARX_PRESET: ${{ vars.CHECKMARX_PRESET || 'Checkmarx Default' }}
   
   # Common Azure Static Web Apps deployment parameters
   AZURE_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -248,12 +267,13 @@ jobs:
           path: ${{ inputs.output-location }}/
           retention-days: 7
 
-  security-scan:
+  sonar-analysis:
     runs-on: ubuntu-latest
     needs: [build-and-test]
+    if: always() && (vars.ENABLE_SONAR_SCAN != 'false' && inputs.enable-sonar != false)
     outputs:
-      sonar-status: ${{ steps.sonar-analysis.outputs.status }}
-      checkmarx-status: ${{ steps.checkmarx-scan.outputs.status }}
+      status: ${{ steps.sonar-scan.outputs.status }}
+      coverage: ${{ steps.sonar-scan.outputs.coverage }}
     
     steps:
       - name: Checkout Code
@@ -271,23 +291,45 @@ jobs:
         run: ${{ inputs.install-command }}
 
       - name: SonarCloud Analysis
-        id: sonar-analysis
-        if: env.ENABLE_SONAR == 'true'
+        id: sonar-scan
         uses: ./.github/actions/sonar-analysis
         with:
           enabled: ${{ env.ENABLE_SONAR }}
           sonar-token: ${{ secrets.SONAR_TOKEN }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           organization: ${{ vars.SONAR_ORGANIZATION }}
-          sonar-host-url: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}
-          skip-ssl-verification: ${{ vars.SONAR_SKIP_SSL_VERIFICATION || 'false' }}
+          sonar-host-url: ${{ env.SONAR_HOST_URL }}
+          skip-ssl-verification: ${{ env.SONAR_SKIP_SSL_VERIFICATION }}
           min-code-coverage: ${{ env.MIN_CODE_COVERAGE }}
-          max-blocker-issues: ${{ vars.MAX_BLOCKER_ISSUES || '0' }}
-          max-critical-issues: ${{ vars.MAX_CRITICAL_ISSUES || '0' }}
+          max-blocker-issues: ${{ env.MAX_BLOCKER_ISSUES }}
+          max-critical-issues: ${{ env.MAX_CRITICAL_ISSUES }}
+
+  checkmarx-scan:
+    runs-on: ubuntu-latest
+    needs: [build-and-test]
+    if: always() && (vars.ENABLE_CHECKMARX_SCAN != 'false' && inputs.enable-checkmarx != false)
+    outputs:
+      status: ${{ steps.checkmarx-security.outputs.status }}
+      critical-count: ${{ steps.checkmarx-security.outputs.critical-count }}
+      high-count: ${{ steps.checkmarx-security.outputs.high-count }}
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: ${{ inputs.install-command }}
 
       - name: Checkmarx Security Scan
-        id: checkmarx-scan
-        if: env.ENABLE_CHECKMARX == 'true'
+        id: checkmarx-security
         uses: ./.github/actions/checkmarx-scan
         with:
           enabled: ${{ env.ENABLE_CHECKMARX }}
@@ -295,15 +337,15 @@ jobs:
           checkmarx-client-id: ${{ secrets.CHECKMARX_CLIENT_ID }}
           checkmarx-secret: ${{ secrets.CHECKMARX_SECRET }}
           tenant: ${{ secrets.CHECKMARX_TENANT }}
-          scan-types: ${{ vars.CHECKMARX_SCAN_TYPES || 'sast,sca' }}
+          scan-types: ${{ env.CHECKMARX_SCAN_TYPES }}
           max-critical: ${{ env.MAX_CRITICAL_VULNERABILITIES }}
           max-high: ${{ env.MAX_HIGH_VULNERABILITIES }}
-          preset: ${{ vars.CHECKMARX_PRESET || 'Checkmarx Default' }}
+          preset: ${{ env.CHECKMARX_PRESET }}
 
   deploy-dev:
-    if: needs.detect-deployment.outputs.should-deploy-dev == 'true' && !inputs.skip-deployment
+    if: always() && needs.detect-deployment.outputs.should-deploy-dev == 'true' && !inputs.skip-deployment
     runs-on: ubuntu-latest
-    needs: [detect-deployment, build-and-test, security-scan]
+    needs: [detect-deployment, build-and-test, sonar-analysis, checkmarx-scan]
     environment: development
     outputs:
       deployment-url: ${{ steps.deploy.outputs.static-web-app-url }}
@@ -330,9 +372,9 @@ jobs:
           skip-build: 'true'
 
   deploy-staging:
-    if: needs.detect-deployment.outputs.should-deploy-staging == 'true' && !inputs.skip-deployment
+    if: always() && needs.detect-deployment.outputs.should-deploy-staging == 'true' && !inputs.skip-deployment
     runs-on: ubuntu-latest
-    needs: [detect-deployment, build-and-test, security-scan]
+    needs: [detect-deployment, build-and-test, sonar-analysis, checkmarx-scan]
     environment: staging
     outputs:
       deployment-url: ${{ steps.deploy.outputs.static-web-app-url }}
@@ -359,9 +401,9 @@ jobs:
           skip-build: 'true'
 
   deploy-preprod:
-    if: needs.detect-deployment.outputs.should-deploy-preprod == 'true' && !inputs.skip-deployment
+    if: always() && needs.detect-deployment.outputs.should-deploy-preprod == 'true' && !inputs.skip-deployment
     runs-on: ubuntu-latest
-    needs: [detect-deployment, build-and-test, security-scan]
+    needs: [detect-deployment, build-and-test, sonar-analysis, checkmarx-scan]
     environment: pre-production
     outputs:
       deployment-url: ${{ steps.deploy.outputs.static-web-app-url }}
@@ -388,9 +430,9 @@ jobs:
           skip-build: 'true'
 
   deploy-prod:
-    if: needs.detect-deployment.outputs.should-deploy-prod == 'true' && !inputs.skip-deployment
+    if: always() && needs.detect-deployment.outputs.should-deploy-prod == 'true' && !inputs.skip-deployment
     runs-on: ubuntu-latest
-    needs: [detect-deployment, build-and-test, security-scan]
+    needs: [detect-deployment, build-and-test, sonar-analysis, checkmarx-scan]
     environment: production
     outputs:
       deployment-url: ${{ steps.deploy.outputs.static-web-app-url }}
@@ -419,7 +461,7 @@ jobs:
   deployment-summary:
     if: always() && !inputs.skip-deployment
     runs-on: ubuntu-latest
-    needs: [detect-deployment, deploy-dev, deploy-staging, deploy-preprod, deploy-prod]
+    needs: [detect-deployment, sonar-analysis, checkmarx-scan, deploy-dev, deploy-staging, deploy-preprod, deploy-prod]
     
     steps:
       - name: Deployment Summary
@@ -442,4 +484,19 @@ jobs:
           
           if [ "${{ needs.deploy-prod.result }}" = "success" ]; then
             echo "✅ **Production**: ${{ needs.deploy-prod.outputs.deployment-url }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Security Scan Results" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.sonar-analysis.result }}" = "success" ]; then
+            echo "✅ **SonarCloud**: ${{ needs.sonar-analysis.outputs.status }} (Coverage: ${{ needs.sonar-analysis.outputs.coverage }}%)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **SonarCloud**: ${{ needs.sonar-analysis.result }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.checkmarx-scan.result }}" = "success" ]; then
+            echo "✅ **Checkmarx**: ${{ needs.checkmarx-scan.outputs.status }} (Critical: ${{ needs.checkmarx-scan.outputs.critical-count }}, High: ${{ needs.checkmarx-scan.outputs.high-count }})" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Checkmarx**: ${{ needs.checkmarx-scan.result }}" >> $GITHUB_STEP_SUMMARY
           fi
