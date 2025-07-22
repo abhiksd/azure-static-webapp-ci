@@ -15,6 +15,18 @@ on:
         description: 'Reason for rollback'
         required: true
         type: string
+      
+      # App-specific configuration (varies per frontend app)
+      app-location:
+        description: 'Source code location relative to repository root'
+        required: false
+        default: '/'
+        type: string
+      output-location:
+        description: 'Built application output directory'
+        required: false
+        default: 'build'
+        type: string
     
     secrets:
       # Azure Static Web Apps API tokens
@@ -39,8 +51,8 @@ on:
 env:
   # Build configuration (standardized)
   NODE_VERSION: '18'
-  APP_LOCATION: '/'
-  OUTPUT_LOCATION: 'build'
+  APP_LOCATION: ${{ inputs.app-location }}
+  OUTPUT_LOCATION: ${{ inputs.output-location }}
   BUILD_COMMAND: 'npm run build'
   INSTALL_COMMAND: 'npm ci'
 

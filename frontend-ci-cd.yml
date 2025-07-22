@@ -24,11 +24,14 @@ jobs:
   call-shared-workflow:
     uses: YOUR_ORG/shared-ci-cd-workflows/.github/workflows/shared-ci-cd.yml@main
     with:
-      # Environment configuration (only runtime parameter needed)
+      # Environment configuration
       environment: ${{ github.event.inputs.environment || 'development' }}
       
-      # All other configuration (build, security, quality gates) is centralized in the shared workflow
-      # Modify variables in the shared repository to change behavior across all frontend applications
+      # App-specific configuration (customize for your frontend app)
+      app-location: '/'                    # Change to your source code location (e.g., 'frontend', 'client', 'app')
+      output-location: 'build'             # Change to your build output directory (e.g., 'dist', 'public', 'www')
+      
+      # All other configuration (security, quality gates) is centralized in the shared workflow
     
     secrets:
       # Azure Static Web Apps API tokens (set these in your frontend repo)
