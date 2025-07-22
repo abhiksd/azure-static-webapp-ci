@@ -18,15 +18,15 @@ Enterprise-grade, centralized CI/CD solution for frontend applications with comp
 ```
 ├── .github/workflows/
 │   ├── shared-ci-cd.yml              # Main reusable workflow
-│    └── manual-rollback.yml********** # Manual rollback workflow
-├── .github/actions/******************# Composite actions
-│    ├── sonar-analysis/************** # SonarCloud scanning
-│    ├── checkmarx-scan/************** # Checkmarx security scanning
-│    └── deploy-static-app/************# Azure Static Web Apps deployment
-├── pr-security-check.yml************# PR security validation (copy to frontend apps)
-├── frontend-ci-cd.yml************** # Ready-to-use workflow (copy to frontend apps)
-├── manual-rollback-caller.yml****** # Manual rollback caller (copy to frontend apps)
-└── setup-shared-repository.sh****** # Automated migration script
+│   └── manual-rollback.yml           # Manual rollback workflow
+├── .github/actions/                  # Composite actions
+│   ├── sonar-analysis/               # SonarCloud scanning
+│   ├── checkmarx-scan/               # Checkmarx security scanning
+│   └── deploy-static-app/            # Azure Static Web Apps deployment
+├── pr-security-check.yml            # PR security validation (copy to frontend apps)
+├── frontend-ci-cd.yml               # Ready-to-use workflow (copy to frontend apps)
+├── manual-rollback-caller.yml       # Manual rollback caller (copy to frontend apps)
+└── setup-shared-repository.sh       # Automated migration script
 ```
 
 ## Quick Start
