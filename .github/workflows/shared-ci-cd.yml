@@ -93,8 +93,20 @@ on:
       
       # Version info
       version:
-        description: 'Deployed version'
+        description: 'Default version (backward compatibility)'
         value: ${{ jobs.detect-deployment.outputs.version }}
+      dev-version:
+        description: 'Development version (short SHA)'
+        value: ${{ jobs.detect-deployment.outputs.dev-version }}
+      staging-version:
+        description: 'Staging version (short SHA)'
+        value: ${{ jobs.detect-deployment.outputs.staging-version }}
+      preprod-version:
+        description: 'Pre-production version (short SHA)'
+        value: ${{ jobs.detect-deployment.outputs.preprod-version }}
+      prod-version:
+        description: 'Production version (semantic or short SHA)'
+        value: ${{ jobs.detect-deployment.outputs.prod-version }}
 
 env:
   # Build configuration (standardized)
@@ -150,15 +162,39 @@ jobs:
       - name: Generate Version
         id: version
         run: |
+          SHORT_SHA="${GITHUB_SHA::8}"
+          
+          # Generate environment-specific versions
+          DEV_VERSION="$SHORT_SHA"
+          STAGING_VERSION="$SHORT_SHA"
+          PREPROD_VERSION="$SHORT_SHA"
+          
+          # Production version logic
           if [ -n "${{ env.FORCE_VERSION }}" ]; then
-            VERSION="${{ env.FORCE_VERSION }}"
+            PROD_VERSION="${{ env.FORCE_VERSION }}"
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/}
+            PROD_VERSION=${GITHUB_REF#refs/tags/}
           else
-            VERSION="$(date +'%Y.%m.%d')-${GITHUB_SHA::8}"
+            # Fallback to short SHA for production if no tag
+            PROD_VERSION="$SHORT_SHA"
           fi
+          
+          # Default version (for backward compatibility)
+          VERSION="$SHORT_SHA"
+          
+          # Output all versions
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Generated version: $VERSION"
+          echo "dev-version=$DEV_VERSION" >> $GITHUB_OUTPUT
+          echo "staging-version=$STAGING_VERSION" >> $GITHUB_OUTPUT
+          echo "preprod-version=$PREPROD_VERSION" >> $GITHUB_OUTPUT
+          echo "prod-version=$PROD_VERSION" >> $GITHUB_OUTPUT
+          
+          echo "Generated versions:"
+          echo "  Default: $VERSION"
+          echo "  Dev: $DEV_VERSION"
+          echo "  Staging: $STAGING_VERSION"
+          echo "  Pre-prod: $PREPROD_VERSION"
+          echo "  Production: $PROD_VERSION"
 
       - name: Determine Deployment Strategy
         id: deployment-logic
@@ -376,7 +412,7 @@ jobs:
         with:
           azure-static-web-apps-api-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_DEV }}
           environment: 'development'
-          version: ${{ needs.detect-deployment.outputs.version }}
+          version: ${{ needs.detect-deployment.outputs.dev-version }}
           app-location: ${{ env.APP_LOCATION }}
           output-location: ${{ env.OUTPUT_LOCATION }}
           skip-build: 'true'  # Using pre-built artifacts from build-and-test job
@@ -417,7 +453,7 @@ jobs:
         with:
           azure-static-web-apps-api-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING }}
           environment: 'staging'
-          version: ${{ needs.detect-deployment.outputs.version }}
+          version: ${{ needs.detect-deployment.outputs.staging-version }}
           app-location: ${{ env.APP_LOCATION }}
           output-location: ${{ env.OUTPUT_LOCATION }}
           skip-build: 'true'  # Using pre-built artifacts from build-and-test job
@@ -458,7 +494,7 @@ jobs:
         with:
           azure-static-web-apps-api-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD }}
           environment: 'pre-production'
-          version: ${{ needs.detect-deployment.outputs.version }}
+          version: ${{ needs.detect-deployment.outputs.preprod-version }}
           app-location: ${{ env.APP_LOCATION }}
           output-location: ${{ env.OUTPUT_LOCATION }}
           skip-build: 'true'  # Using pre-built artifacts from build-and-test job
@@ -499,7 +535,7 @@ jobs:
         with:
           azure-static-web-apps-api-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PROD }}
           environment: 'production'
-          version: ${{ needs.detect-deployment.outputs.version }}
+          version: ${{ needs.detect-deployment.outputs.prod-version }}
           app-location: ${{ env.APP_LOCATION }}
           output-location: ${{ env.OUTPUT_LOCATION }}
           skip-build: 'true'  # Using pre-built artifacts from build-and-test job
@@ -514,23 +550,22 @@ jobs:
       - name: Deployment Summary
         run: |
           echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
-          echo "Version: ${{ needs.detect-deployment.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           if [ "${{ needs.deploy-dev.result }}" = "success" ]; then
-            echo "**Development**: ${{ needs.deploy-dev.outputs.deployment-url }}" >> $GITHUB_STEP_SUMMARY
+            echo "**Development** (v${{ needs.detect-deployment.outputs.dev-version }}): ${{ needs.deploy-dev.outputs.deployment-url }}" >> $GITHUB_STEP_SUMMARY
           fi
           
           if [ "${{ needs.deploy-staging.result }}" = "success" ]; then
-            echo "**Staging**: ${{ needs.deploy-staging.outputs.deployment-url }}" >> $GITHUB_STEP_SUMMARY
+            echo "**Staging** (v${{ needs.detect-deployment.outputs.staging-version }}): ${{ needs.deploy-staging.outputs.deployment-url }}" >> $GITHUB_STEP_SUMMARY
           fi
           
           if [ "${{ needs.deploy-preprod.result }}" = "success" ]; then
-            echo "**Pre-Production**: ${{ needs.deploy-preprod.outputs.deployment-url }}" >> $GITHUB_STEP_SUMMARY
+            echo "**Pre-Production** (v${{ needs.detect-deployment.outputs.preprod-version }}): ${{ needs.deploy-preprod.outputs.deployment-url }}" >> $GITHUB_STEP_SUMMARY
           fi
           
           if [ "${{ needs.deploy-prod.result }}" = "success" ]; then
-            echo "**Production**: ${{ needs.deploy-prod.outputs.deployment-url }}" >> $GITHUB_STEP_SUMMARY
+            echo "**Production** (v${{ needs.detect-deployment.outputs.prod-version }}): ${{ needs.deploy-prod.outputs.deployment-url }}" >> $GITHUB_STEP_SUMMARY
           fi
           
           echo "" >> $GITHUB_STEP_SUMMARY
