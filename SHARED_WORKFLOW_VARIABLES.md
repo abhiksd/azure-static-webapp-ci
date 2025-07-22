@@ -1,8 +1,8 @@
-# 🎛️ Shared Workflow Variables Configuration
+#**Shared Workflow Variables Configuration
 
 This document outlines all the centralized variables that control the behavior of the shared CI/CD workflow. These variables are configured at the shared repository level, providing consistent configuration across all frontend applications.
 
-## 🏗️ Build Configuration Variables
+## Build Configuration Variables
 
 Configure these variables in your shared CI/CD repository under **Settings > Secrets and variables > Actions > Variables**:
 
@@ -18,7 +18,7 @@ Configure these variables in your shared CI/CD repository under **Settings > Sec
 
 ### Example Build Configurations
 
-**React Applications:**
+**React Applications:
 ```bash
 NODE_VERSION=18
 APP_LOCATION=/
@@ -27,7 +27,7 @@ BUILD_COMMAND=npm run build
 INSTALL_COMMAND=npm ci
 ```
 
-**Vue/Vite Applications:**
+**Vue/Vite Applications:
 ```bash
 NODE_VERSION=18
 APP_LOCATION=/
@@ -36,7 +36,7 @@ BUILD_COMMAND=npm run build
 INSTALL_COMMAND=npm ci
 ```
 
-**Angular Applications:**
+**Angular Applications:
 ```bash
 NODE_VERSION=18
 APP_LOCATION=/
@@ -45,7 +45,7 @@ BUILD_COMMAND=npm run build:prod
 INSTALL_COMMAND=npm ci
 ```
 
-## 🔒 Security Scanning Configuration
+## Security Scanning Configuration
 
 ### Security Scan Controls
 
@@ -79,7 +79,7 @@ INSTALL_COMMAND=npm ci
 | `MAX_CRITICAL_VULNERABILITIES` | `0` | Maximum critical vulnerabilities allowed |
 | `MAX_HIGH_VULNERABILITIES` | `5` | Maximum high vulnerabilities allowed |
 
-## 🚀 Deployment Configuration
+## Deployment Configuration
 
 ### Deployment Controls
 
@@ -88,12 +88,12 @@ INSTALL_COMMAND=npm ci
 | `SKIP_DEPLOYMENT` | `false` | Skip all deployment steps |
 | `FORCE_VERSION` | *(empty)* | Override version for all deployments |
 
-## 📋 Variable Configuration Steps
+## Variable Configuration Steps
 
 ### 1. Configure Variables in Shared Repository
 
 1. Go to your shared CI/CD repository
-2. Navigate to **Settings > Secrets and variables > Actions**
+2. Navigate to **Settings > Secrets and variables > Actions
 3. Click on the **Variables** tab
 4. Add each variable with its desired value
 
@@ -123,24 +123,24 @@ SONAR_HOST_URL=https://sonarcloud.io
 
 For different application types, create separate shared repositories or use environment-specific configurations:
 
-**For Multiple Framework Support:**
+**For Multiple Framework Support:
 - Create separate shared workflow repositories for React, Vue, Angular
 - Each repository can have framework-specific defaults
 - Teams choose the appropriate shared workflow repository
 
-**For Environment-Specific Configuration:**
+**For Environment-Specific Configuration:
 - Use different variable values for development vs. production environments
 - Consider using GitHub Environments for environment-specific variables
 
-## 🔄 Updating Configuration
+## Updating Configuration
 
 ### Impact of Changes
 
 When you update variables in the shared repository:
-- ✅ **Immediate effect** on new workflow runs
-- ✅ **Applies to all** frontend applications using the shared workflow
-- ✅ **No changes needed** in individual frontend repositories
-- ⚠️ **Test thoroughly** before updating production variables
+- **Immediate effect** on new workflow runs
+- **Applies to all** frontend applications using the shared workflow
+- **No changes needed** in individual frontend repositories
+- **Test thoroughly** before updating production variables
 
 ### Best Practices
 
@@ -150,24 +150,24 @@ When you update variables in the shared repository:
 4. **Monitoring**: Monitor deployments after variable changes
 5. **Rollback**: Keep track of previous values for quick rollback if needed
 
-## 🎯 Benefits of Centralized Configuration
+## Benefits of Centralized Configuration
 
-### ✅ Consistency
+### Consistency
 - All applications use the same Node.js version
 - Consistent quality standards across projects
 - Uniform security scanning configuration
 
-### ✅ Efficiency
+### Efficiency
 - No need to update multiple repositories for configuration changes
 - Single point of control for organizational standards
 - Simplified onboarding for new projects
 
-### ✅ Governance
+### Governance
 - Centralized control over security and quality requirements
 - Easy to enforce organizational policies
 - Audit trail for configuration changes
 
-### ✅ Maintenance
+### Maintenance
 - Reduce configuration drift between projects
 - Easy to update all applications simultaneously
 - Simplified troubleshooting and support
@@ -181,7 +181,7 @@ When you update variables in the shared repository:
 
 ---
 
-## 📞 Support
+## Support
 
 For questions about variable configuration:
 1. Check this documentation first

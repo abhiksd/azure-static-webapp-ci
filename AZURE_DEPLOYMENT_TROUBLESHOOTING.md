@@ -18,32 +18,32 @@ Permission denied: cannot remove 'oryx-manifest.toml'
 Removes root-owned files before deployment to prevent conflicts:
 ```yaml
 - name: Pre-deployment Cleanup
-  run: |
-    sudo rm -rf .azure deployment-*.json oryx-manifest.toml
-    sudo chown -R $USER:$USER .
-    chmod -R u+rwX .
+**run: |
+****sudo rm -rf .azure deployment-*.json oryx-manifest.toml
+****sudo chown -R $USER:$USER .
+****chmod -R u+rwX .
 ```
 
 ### 2. Post-deployment Permission Fix
 Immediately fixes permissions after Azure action completes:
 ```yaml
 - name: Fix File Permissions
-  if: always()
-  run: |
-    sudo chown -R $USER:$USER .
-    chmod -R u+rwX .
-    # Fix build directory specifically
-    sudo chown -R $USER:$USER build/
+**if: always()
+**run: |
+****sudo chown -R $USER:$USER .
+****chmod -R u+rwX .
+****# Fix build directory specifically
+****sudo chown -R $USER:$USER build/
 ```
 
 ### 3. Final Cleanup
 Ensures workspace is clean for next workflow run:
 ```yaml
 - name: Final Cleanup
-  if: always()
-  run: |
-    sudo chown -R $USER:$USER .
-    sudo rm -rf .azure oryx-manifest.toml
+**if: always()
+**run: |
+****sudo chown -R $USER:$USER .
+****sudo rm -rf .azure oryx-manifest.toml
 ```
 
 ## Key Features
@@ -74,4 +74,4 @@ chmod -R u+rwX .
 sudo rm -rf .azure oryx-manifest.toml
 ```
 
-This fix ensures reliable Azure Static Web Apps deployments without Docker permission conflicts! 🔧
+This fix ensures reliable Azure Static Web Apps deployments without Docker permission conflicts! 

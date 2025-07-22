@@ -2,7 +2,7 @@
 
 This guide provides step-by-step instructions for integrating the shared CI/CD workflow into your frontend application repository.
 
-## 📋 Prerequisites
+## Prerequisites
 
 ### Required Resources
 - **Frontend application repository** (React, Vue, Angular, Next.js, etc.)
@@ -17,7 +17,7 @@ This guide provides step-by-step instructions for integrating the shared CI/CD w
 - **SonarCloud admin access** for token generation
 - **Checkmarx admin access** for client credentials
 
-## 🚀 Integration Steps
+## Integration Steps
 
 ### Step 1: Create CI/CD Workflow
 
@@ -27,74 +27,74 @@ Create `.github/workflows/ci-cd.yml` in your frontend repository:
 name: Frontend Application CI/CD
 
 on:
-  push:
-    branches: [main, develop, staging, preprod]
-    tags: ['v*']
-  pull_request:
-    branches: [main, develop]
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Target environment'
-        required: true
-        default: 'development'
-        type: choice
-        options:
-        - development
-        - staging
-        - pre-production
-        - production
+**push:
+****branches: [main, develop, staging, preprod]
+****tags: ['v*']
+**pull_request:
+****branches: [main, develop]
+**workflow_dispatch:
+****inputs:
+******environment:
+********description: 'Target environment'
+********required: true
+********default: 'development'
+********type: choice
+********options:
+********- development
+********- staging
+********- pre-production
+********- production
 
 jobs:
-  call-shared-workflow:
-    uses: YOUR_ORG/shared-ci-cd-workflows/.github/workflows/shared-ci-cd.yml@main
-    with:
-      # Build configuration (customize for your app)
-      node-version: '18'                # Node.js version
-      app-location: '/'                 # Source code location
-      output-location: 'build'          # Build output directory (use 'dist' for Vite/Vue)
-      build-command: 'npm run build'    # Build command
-      install-command: 'npm ci'         # Install command
-      
-      # Environment
-      environment: ${{ github.event.inputs.environment || 'development' }}
-      
-      # All configuration is now centralized in the shared workflow repository
-      # No overrides needed - everything controlled via repository variables
-    
-    secrets:
-      # Azure Static Web Apps API tokens
-      AZURE_STATIC_WEB_APPS_API_TOKEN_DEV: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_DEV }}
-      AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING }}
-      AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD }}
-      AZURE_STATIC_WEB_APPS_API_TOKEN_PROD: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PROD }}
-      
-      # Security scanning secrets
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      CHECKMARX_CLIENT_ID: ${{ secrets.CHECKMARX_CLIENT_ID }}
-      CHECKMARX_SECRET: ${{ secrets.CHECKMARX_SECRET }}
-      CHECKMARX_TENANT: ${{ secrets.CHECKMARX_TENANT }}
-      CHECKMARX_BASE_URI: ${{ secrets.CHECKMARX_BASE_URI }}
+**call-shared-workflow:
+****uses: YOUR_ORG/shared-ci-cd-workflows/.github/workflows/shared-ci-cd.yml@main
+****with:
+******# Build configuration (customize for your app)
+******node-version: '18'****************# Node.js version
+******app-location: '/'**************** # Source code location
+******output-location: 'build'**********# Build output directory (use 'dist' for Vite/Vue)
+******build-command: 'npm run build'****# Build command
+******install-command: 'npm ci'******** # Install command
+****
+******# Environment
+******environment: ${{ github.event.inputs.environment || 'development' }}
+****
+******# All configuration is now centralized in the shared workflow repository
+******# No overrides needed - everything controlled via repository variables
+**
+****secrets:
+******# Azure Static Web Apps API tokens
+******AZURE_STATIC_WEB_APPS_API_TOKEN_DEV: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_DEV }}
+******AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING }}
+******AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD }}
+******AZURE_STATIC_WEB_APPS_API_TOKEN_PROD: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PROD }}
+****
+******# Security scanning secrets
+******SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+******CHECKMARX_CLIENT_ID: ${{ secrets.CHECKMARX_CLIENT_ID }}
+******CHECKMARX_SECRET: ${{ secrets.CHECKMARX_SECRET }}
+******CHECKMARX_TENANT: ${{ secrets.CHECKMARX_TENANT }}
+******CHECKMARX_BASE_URI: ${{ secrets.CHECKMARX_BASE_URI }}
 
-  # Optional: Add post-deployment steps specific to your app
-  post-deployment:
-    needs: call-shared-workflow
-    runs-on: ubuntu-latest
-    if: always()
-    
-    steps:
-      - name: Deployment Results
-        run: |
-          echo "## 🚀 Deployment Results" >> $GITHUB_STEP_SUMMARY
-          echo "**Version**: ${{ needs.call-shared-workflow.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          
-          if [ -n "${{ needs.call-shared-workflow.outputs.dev-url }}" ]; then
-            echo "🔗 **Development**: [${{ needs.call-shared-workflow.outputs.dev-url }}](${{ needs.call-shared-workflow.outputs.dev-url }})" >> $GITHUB_STEP_SUMMARY
-          fi
-          
-          if [ -n "${{ needs.call-shared-workflow.outputs.prod-url }}" ]; then
-            echo "🔗 **Production**: [${{ needs.call-shared-workflow.outputs.prod-url }}](${{ needs.call-shared-workflow.outputs.prod-url }})" >> $GITHUB_STEP_SUMMARY
-          fi
+**# Optional: Add post-deployment steps specific to your app
+**post-deployment:
+****needs: call-shared-workflow
+****runs-on: ubuntu-latest
+****if: always()
+**
+****steps:
+******- name: Deployment Results
+********run: |
+**********echo "## Deployment Results" >> $GITHUB_STEP_SUMMARY
+**********echo "**Version**: ${{ needs.call-shared-workflow.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+********
+**********if [ -n "${{ needs.call-shared-workflow.outputs.dev-url }}" ]; then
+************echo "🔗 **Development**: [${{ needs.call-shared-workflow.outputs.dev-url }}](${{ needs.call-shared-workflow.outputs.dev-url }})" >> $GITHUB_STEP_SUMMARY
+**********fi
+********
+**********if [ -n "${{ needs.call-shared-workflow.outputs.prod-url }}" ]; then
+************echo "🔗 **Production**: [${{ needs.call-shared-workflow.outputs.prod-url }}](${{ needs.call-shared-workflow.outputs.prod-url }})" >> $GITHUB_STEP_SUMMARY
+**********fi
 ```
 
 ### Step 2: Add PR Security Check
@@ -104,7 +104,7 @@ Copy the PR security check workflow to `.github/workflows/pr-security-check.yml`
 ```bash
 # Download from shared repository
 curl -o .github/workflows/pr-security-check.yml \
-  https://raw.githubusercontent.com/YOUR_ORG/shared-ci-cd-workflows/main/pr-security-check.yml
+**https://raw.githubusercontent.com/YOUR_ORG/shared-ci-cd-workflows/main/pr-security-check.yml
 ```
 
 ### Step 3: Configure Repository Secrets
@@ -114,26 +114,26 @@ curl -o .github/workflows/pr-security-check.yml \
 For each environment, get the API token from Azure portal:
 
 1. **Go to Azure Portal** → Static Web Apps
-2. **Select your Static Web App**
+2. **Select your Static Web App
 3. **Go to Overview** → Manage deployment token
-4. **Copy the deployment token**
+4. **Copy the deployment token
 
 Set these secrets in your frontend repository:
 
 ```
 Repository Settings → Secrets and variables → Actions → Secrets
 
-AZURE_STATIC_WEB_APPS_API_TOKEN_DEV      = "deployment-token-for-dev"
-AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING  = "deployment-token-for-staging"
-AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD  = "deployment-token-for-preprod"
-AZURE_STATIC_WEB_APPS_API_TOKEN_PROD     = "deployment-token-for-production"
+AZURE_STATIC_WEB_APPS_API_TOKEN_DEV******= "deployment-token-for-dev"
+AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING**= "deployment-token-for-staging"
+AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD**= "deployment-token-for-preprod"
+AZURE_STATIC_WEB_APPS_API_TOKEN_PROD**** = "deployment-token-for-production"
 ```
 
 #### SonarCloud Secrets
 
 1. **Go to SonarCloud** → My Account → Security
 2. **Generate a token** with appropriate permissions
-3. **Note your organization name**
+3. **Note your organization name
 
 Set these secrets:
 
@@ -153,15 +153,15 @@ SONAR_ORGANIZATION = "your-sonarcloud-org"
 
 1. **Go to Checkmarx AST Portal** → Settings → API Keys
 2. **Create new API key/client** with scanning permissions
-3. **Note your tenant name**
+3. **Note your tenant name
 
 Set these secrets:
 
 ```
-CHECKMARX_CLIENT_ID  = "your-client-id"
-CHECKMARX_SECRET     = "your-client-secret"
-CHECKMARX_TENANT     = "your-tenant-name"
-CHECKMARX_BASE_URI   = "https://ast.checkmarx.net"  # (optional)
+CHECKMARX_CLIENT_ID**= "your-client-id"
+CHECKMARX_SECRET**** = "your-client-secret"
+CHECKMARX_TENANT**** = "your-tenant-name"
+CHECKMARX_BASE_URI** = "https://ast.checkmarx.net"**# (optional)
 ```
 
 ### Step 4: Framework-Specific Configuration
@@ -170,36 +170,36 @@ CHECKMARX_BASE_URI   = "https://ast.checkmarx.net"  # (optional)
 
 ```yaml
 with:
-  output-location: 'build'
-  build-command: 'npm run build'
-  install-command: 'npm ci'
+**output-location: 'build'
+**build-command: 'npm run build'
+**install-command: 'npm ci'
 ```
 
 #### Vue.js Applications
 
 ```yaml
 with:
-  output-location: 'dist'
-  build-command: 'npm run build'
-  install-command: 'npm install'
+**output-location: 'dist'
+**build-command: 'npm run build'
+**install-command: 'npm install'
 ```
 
 #### Next.js Applications
 
 ```yaml
 with:
-  output-location: 'out'
-  build-command: 'npm run build && npm run export'
-  install-command: 'npm ci'
+**output-location: 'out'
+**build-command: 'npm run build && npm run export'
+**install-command: 'npm ci'
 ```
 
 #### Angular Applications
 
 ```yaml
 with:
-  output-location: 'dist/your-app-name'
-  build-command: 'npm run build -- --prod'
-  install-command: 'npm ci'
+**output-location: 'dist/your-app-name'
+**build-command: 'npm run build -- --prod'
+**install-command: 'npm ci'
 ```
 
 ### Step 5: Configure SonarCloud Project
@@ -234,22 +234,22 @@ Ensure your `package.json` includes required scripts:
 
 ```json
 {
-  "scripts": {
-    "build": "react-scripts build",
-    "test": "react-scripts test --watchAll=false",
-    "test:coverage": "react-scripts test --coverage --watchAll=false",
-    "sonar": "sonar-scanner"
-  },
-  "jest": {
-    "collectCoverageFrom": [
-      "src/**/*.{js,jsx,ts,tsx}",
-      "!src/index.js",
-      "!src/index.tsx",
-      "!src/reportWebVitals.js",
-      "!src/**/*.test.{js,jsx,ts,tsx}",
-      "!src/**/*.spec.{js,jsx,ts,tsx}"
-    ]
-  }
+**"scripts": {
+****"build": "react-scripts build",
+****"test": "react-scripts test --watchAll=false",
+****"test:coverage": "react-scripts test --coverage --watchAll=false",
+****"sonar": "sonar-scanner"
+**},
+**"jest": {
+****"collectCoverageFrom": [
+******"src/**/*.{js,jsx,ts,tsx}",
+******"!src/index.js",
+******"!src/index.tsx",
+******"!src/reportWebVitals.js",
+******"!src/**/*.test.{js,jsx,ts,tsx}",
+******"!src/**/*.spec.{js,jsx,ts,tsx}"
+****]
+**}
 }
 ```
 
@@ -259,24 +259,24 @@ If you need custom routing or configuration, create `staticwebapp.config.json` i
 
 ```json
 {
-  "routes": [
-    {
-      "route": "/*",
-      "serve": "/index.html",
-      "statusCode": 200
-    }
-  ],
-  "globalHeaders": {
-    "X-Content-Type-Options": "nosniff",
-    "X-Frame-Options": "DENY",
-    "X-XSS-Protection": "1; mode=block"
-  }
+**"routes": [
+****{
+******"route": "/*",
+******"serve": "/index.html",
+******"statusCode": 200
+****}
+**],
+**"globalHeaders": {
+****"X-Content-Type-Options": "nosniff",
+****"X-Frame-Options": "DENY",
+****"X-XSS-Protection": "1; mode=block"
+**}
 }
 ```
 
 **Note**: This step is optional. Azure Static Web Apps will work with default configuration for most frontend applications.
 
-## 🔧 Environment Configuration
+## Environment Configuration
 
 ### Development Environment
 - **Branch**: `develop` or `development`
@@ -298,7 +298,7 @@ If you need custom routing or configuration, create `staticwebapp.config.json` i
 - **Auto-deploy**: On push to main branch or tag creation
 - **URL**: Will be provided in deployment summary
 
-## ✅ Validation Steps
+## Validation Steps
 
 ### Step 1: Test Build Locally
 ```bash
@@ -308,22 +308,22 @@ npm test
 ```
 
 ### Step 2: Test First Deployment
-1. **Push to develop branch**
+1. **Push to develop branch
 2. **Check GitHub Actions** for workflow execution
 3. **Verify deployment** in Azure Static Web Apps
 4. **Check security scans** in SonarCloud and Checkmarx
 
 ### Step 3: Test PR Security Check
-1. **Create a test PR**
+1. **Create a test PR
 2. **Check PR security scan** execution
 3. **Verify PR comments** with security results
 
 ### Step 4: Test Production Deployment
 1. **Create a release tag** or push to main
-2. **Check production deployment**
+2. **Check production deployment
 3. **Verify all environments** are working
 
-## 🔍 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
@@ -345,53 +345,53 @@ npm test
 #### 4. Permission Errors
 - **Check repository secrets** are properly set
 - **Verify API token permissions** in Azure and SonarCloud
-- **Ensure workflow has necessary permissions**
+- **Ensure workflow has necessary permissions
 
 ### Getting Help
 
 1. **Check workflow logs** in GitHub Actions
 2. **Review troubleshooting documentation**:
-   - `AZURE_DEPLOYMENT_TROUBLESHOOTING.md`
-   - `CHECKMARX_TROUBLESHOOTING.md`
+** - `AZURE_DEPLOYMENT_TROUBLESHOOTING.md`
+** - `CHECKMARX_TROUBLESHOOTING.md`
 3. **Validate configuration** against examples
 4. **Create issue** in shared workflow repository
 
-## 📊 Monitoring and Maintenance
+## Monitoring and Maintenance
 
 ### Regular Tasks
 - **Monitor deployment success** rates
-- **Review security scan results**
+- **Review security scan results
 - **Update dependencies** regularly
 - **Rotate API tokens** as needed
 
 ### Performance Monitoring
 - **Check build times** and optimize if needed
-- **Monitor deployment performance**
-- **Review security scan duration**
+- **Monitor deployment performance
+- **Review security scan duration
 
 ### Updates
 - **Pin shared workflow version** for stability: `@v1.0.0`
 - **Test updates** in non-production environments first
 - **Follow semantic versioning** for shared workflow updates
 
-## 🎯 Best Practices
+## Best Practices
 
 ### Security
 - **Use repository secrets** for sensitive data
 - **Rotate tokens** regularly
-- **Monitor security scan results**
-- **Keep dependencies updated**
+- **Monitor security scan results
+- **Keep dependencies updated
 
 ### Performance
 - **Use npm ci** instead of npm install
 - **Enable build caching** where possible
-- **Optimize bundle size**
-- **Monitor deployment times**
+- **Optimize bundle size
+- **Monitor deployment times
 
 ### Maintenance
 - **Pin dependency versions** for consistency
 - **Use semantic versioning** for releases
-- **Document environment-specific configurations**
+- **Document environment-specific configurations
 - **Regular testing** of all deployment environments
 
-This integration guide ensures your frontend application is properly configured for the shared CI/CD workflow with comprehensive deployment and security scanning capabilities! 🚀
+This integration guide ensures your frontend application is properly configured for the shared CI/CD workflow with comprehensive deployment and security scanning capabilities! 

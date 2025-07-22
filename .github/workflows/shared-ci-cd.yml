@@ -463,11 +463,11 @@ jobs:
         if: steps.get-previous-version.outputs.previous-version != 'none'
         run: |
           if [ "${{ steps.rollback.outcome }}" = "success" ]; then
-            echo "✅ Rollback to pre-production successful"
+            echo "Rollback to pre-production successful"
             echo "status=success" >> $GITHUB_OUTPUT
             echo "previous-version=${{ steps.get-previous-version.outputs.previous-version }}" >> $GITHUB_OUTPUT
           else
-            echo "❌ Rollback to pre-production failed"
+            echo "Rollback to pre-production failed"
             echo "status=failed" >> $GITHUB_OUTPUT
             exit 1
           fi
@@ -475,7 +475,7 @@ jobs:
       - name: Notify Rollback Failure
         if: steps.get-previous-version.outputs.previous-version == 'none' || steps.rollback.outcome == 'failure'
         run: |
-          echo "❌ Pre-production rollback failed - manual intervention required"
+          echo "Pre-production rollback failed - manual intervention required"
           echo "status=manual-required" >> $GITHUB_OUTPUT
 
   rollback-prod:
@@ -533,11 +533,11 @@ jobs:
         if: steps.get-previous-version.outputs.previous-version != 'none'
         run: |
           if [ "${{ steps.rollback.outcome }}" = "success" ]; then
-            echo "✅ Rollback to production successful"
+            echo "Rollback to production successful"
             echo "status=success" >> $GITHUB_OUTPUT
             echo "previous-version=${{ steps.get-previous-version.outputs.previous-version }}" >> $GITHUB_OUTPUT
           else
-            echo "❌ Rollback to production failed"
+            echo "Rollback to production failed"
             echo "status=failed" >> $GITHUB_OUTPUT
             exit 1
           fi
@@ -545,7 +545,7 @@ jobs:
       - name: Notify Rollback Failure
         if: steps.get-previous-version.outputs.previous-version == 'none' || steps.rollback.outcome == 'failure'
         run: |
-          echo "❌ Production rollback failed - manual intervention required"
+          echo "Production rollback failed - manual intervention required"
           echo "status=manual-required" >> $GITHUB_OUTPUT
 
   deployment-summary:
@@ -561,59 +561,59 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           
           if [ "${{ needs.deploy-dev.result }}" = "success" ]; then
-            echo "✅ **Development**: ${{ needs.deploy-dev.outputs.deployment-url }}" >> $GITHUB_STEP_SUMMARY
+            echo "**Development**: ${{ needs.deploy-dev.outputs.deployment-url }}" >> $GITHUB_STEP_SUMMARY
           fi
           
           if [ "${{ needs.deploy-staging.result }}" = "success" ]; then
-            echo "✅ **Staging**: ${{ needs.deploy-staging.outputs.deployment-url }}" >> $GITHUB_STEP_SUMMARY
+            echo "**Staging**: ${{ needs.deploy-staging.outputs.deployment-url }}" >> $GITHUB_STEP_SUMMARY
           fi
           
           if [ "${{ needs.deploy-preprod.result }}" = "success" ]; then
-            echo "✅ **Pre-Production**: ${{ needs.deploy-preprod.outputs.deployment-url }}" >> $GITHUB_STEP_SUMMARY
+            echo "**Pre-Production**: ${{ needs.deploy-preprod.outputs.deployment-url }}" >> $GITHUB_STEP_SUMMARY
           fi
           
           if [ "${{ needs.deploy-prod.result }}" = "success" ]; then
-            echo "✅ **Production**: ${{ needs.deploy-prod.outputs.deployment-url }}" >> $GITHUB_STEP_SUMMARY
+            echo "**Production**: ${{ needs.deploy-prod.outputs.deployment-url }}" >> $GITHUB_STEP_SUMMARY
           fi
           
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## Security Scan Results" >> $GITHUB_STEP_SUMMARY
           
           if [ "${{ needs.sonar-analysis.result }}" = "success" ]; then
-            echo "✅ **SonarCloud**: ${{ needs.sonar-analysis.outputs.status }} (Coverage: ${{ needs.sonar-analysis.outputs.coverage }}%)" >> $GITHUB_STEP_SUMMARY
+            echo "**SonarCloud**: ${{ needs.sonar-analysis.outputs.status }} (Coverage: ${{ needs.sonar-analysis.outputs.coverage }}%)" >> $GITHUB_STEP_SUMMARY
           else
-            echo "❌ **SonarCloud**: ${{ needs.sonar-analysis.result }}" >> $GITHUB_STEP_SUMMARY
+            echo "**SonarCloud**: ${{ needs.sonar-analysis.result }}" >> $GITHUB_STEP_SUMMARY
           fi
           
           if [ "${{ needs.checkmarx-scan.result }}" = "success" ]; then
-            echo "✅ **Checkmarx**: ${{ needs.checkmarx-scan.outputs.status }} (Critical: ${{ needs.checkmarx-scan.outputs.critical-count }}, High: ${{ needs.checkmarx-scan.outputs.high-count }})" >> $GITHUB_STEP_SUMMARY
+            echo "**Checkmarx**: ${{ needs.checkmarx-scan.outputs.status }} (Critical: ${{ needs.checkmarx-scan.outputs.critical-count }}, High: ${{ needs.checkmarx-scan.outputs.high-count }})" >> $GITHUB_STEP_SUMMARY
           else
-            echo "❌ **Checkmarx**: ${{ needs.checkmarx-scan.result }}" >> $GITHUB_STEP_SUMMARY
+            echo "**Checkmarx**: ${{ needs.checkmarx-scan.result }}" >> $GITHUB_STEP_SUMMARY
           fi
           
           # Add rollback information if any rollbacks occurred
           if [ "${{ needs.rollback-preprod.result }}" = "success" ] || [ "${{ needs.rollback-prod.result }}" = "success" ]; then
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "## 🔄 Rollback Information" >> $GITHUB_STEP_SUMMARY
+            echo "##Rollback Information" >> $GITHUB_STEP_SUMMARY
             
             if [ "${{ needs.rollback-preprod.result }}" = "success" ]; then
-              echo "✅ **Pre-Production Rollback**: Completed successfully" >> $GITHUB_STEP_SUMMARY
-              echo "📍 **Rollback Version**: ${{ needs.rollback-preprod.outputs.previous-version }}" >> $GITHUB_STEP_SUMMARY
+              echo "**Pre-Production Rollback**: Completed successfully" >> $GITHUB_STEP_SUMMARY
+              echo "**Rollback Version**: ${{ needs.rollback-preprod.outputs.previous-version }}" >> $GITHUB_STEP_SUMMARY
             fi
             
             if [ "${{ needs.rollback-prod.result }}" = "success" ]; then
-              echo "✅ **Production Rollback**: Completed successfully" >> $GITHUB_STEP_SUMMARY
-              echo "📍 **Rollback Version**: ${{ needs.rollback-prod.outputs.previous-version }}" >> $GITHUB_STEP_SUMMARY
+              echo "**Production Rollback**: Completed successfully" >> $GITHUB_STEP_SUMMARY
+              echo "**Rollback Version**: ${{ needs.rollback-prod.outputs.previous-version }}" >> $GITHUB_STEP_SUMMARY
             fi
           elif [ "${{ needs.rollback-preprod.result }}" = "failure" ] || [ "${{ needs.rollback-prod.result }}" = "failure" ]; then
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "## ⚠️ Rollback Issues" >> $GITHUB_STEP_SUMMARY
+            echo "## Rollback Issues" >> $GITHUB_STEP_SUMMARY
             
             if [ "${{ needs.rollback-preprod.result }}" = "failure" ]; then
-              echo "❌ **Pre-Production Rollback**: Failed - manual intervention required" >> $GITHUB_STEP_SUMMARY
+              echo "**Pre-Production Rollback**: Failed - manual intervention required" >> $GITHUB_STEP_SUMMARY
             fi
             
             if [ "${{ needs.rollback-prod.result }}" = "failure" ]; then
-              echo "❌ **Production Rollback**: Failed - manual intervention required" >> $GITHUB_STEP_SUMMARY
+              echo "**Production Rollback**: Failed - manual intervention required" >> $GITHUB_STEP_SUMMARY
             fi
           fi

@@ -10,31 +10,31 @@ This guide explains how to migrate from the current intermediate CI/CD workflow 
 ```
 Frontend App Repository
 ├── .github/
-│   ├── workflows/
-│   │   ├── intermediate-ci-cd.yml        # Full CI/CD pipeline
-│   │   └── pr-protection.yml             # PR security checks
-│   └── actions/                          # Composite actions
-│       ├── sonar-analysis/
-│       ├── checkmarx-scan/
-│       └── deploy-static-app/
+│    ├── workflows/
+│    │    ├── intermediate-ci-cd.yml********# Full CI/CD pipeline
+│    │    └── pr-protection.yml************ # PR security checks
+│    └── actions/**************************# Composite actions
+│   **** ├── sonar-analysis/
+│   **** ├── checkmarx-scan/
+│   **** └── deploy-static-app/
 ```
 
 ### New Shared Architecture (After)
 ```
 Shared CI/CD Repository (NEW)
 ├── .github/
-│   ├── workflows/
-│   │   └── shared-ci-cd.yml              # Reusable workflow
-│   └── actions/                          # Composite actions
-│       ├── sonar-analysis/
-│       ├── checkmarx-scan/
-│       └── deploy-static-app/
+│    ├── workflows/
+│    │    └── shared-ci-cd.yml**************# Reusable workflow
+│    └── actions/**************************# Composite actions
+│   **** ├── sonar-analysis/
+│   **** ├── checkmarx-scan/
+│   **** └── deploy-static-app/
 
 Frontend App Repository (UPDATED)
 ├── .github/
-│   └── workflows/
-│       ├── ci-cd.yml                     # Calls shared workflow
-│       └── pr-security-check.yml         # Standalone PR checks
+│    └── workflows/
+│   **** ├── ci-cd.yml******************** # Calls shared workflow
+│   **** └── pr-security-check.yml******** # Standalone PR checks
 ```
 
 ## Migration Steps
@@ -42,15 +42,15 @@ Frontend App Repository (UPDATED)
 ### Step 1: Create Shared CI/CD Repository
 
 1. **Create a new repository** for shared workflows:
-   ```bash
-   # Example repository name
-   your-org/shared-ci-cd-workflows
-   ```
+** ```bash
+** # Example repository name
+** your-org/shared-ci-cd-workflows
+** ```
 
 2. **Move files to shared repository**:
-   - `.github/workflows/shared-ci-cd.yml` (the reusable workflow)
-   - `.github/actions/` (all composite actions)
-   - Documentation files
+** - `.github/workflows/shared-ci-cd.yml` (the reusable workflow)
+** - `.github/actions/` (all composite actions)
+** - Documentation files
 
 ### Step 2: Set Up Shared Repository
 
@@ -72,16 +72,16 @@ cp *.md shared-repo/
 In your frontend application repository:
 
 1. **Remove old workflows and actions**:
-   ```bash
-   rm .github/workflows/intermediate-ci-cd.yml
-   rm -rf .github/actions/
-   ```
+** ```bash
+** rm .github/workflows/intermediate-ci-cd.yml
+** rm -rf .github/actions/
+** ```
 
 2. **Add new workflows**:
-   - `ci-cd.yml` (calls shared workflow)
-   - `pr-security-check.yml` (standalone)
+** - `ci-cd.yml` (calls shared workflow)
+** - `pr-security-check.yml` (standalone)
 
-3. **Update repository settings**
+3. **Update repository settings
 
 ## File Structure Details
 
@@ -89,33 +89,33 @@ In your frontend application repository:
 ```
 shared-ci-cd-workflows/
 ├── .github/
-│   ├── workflows/
-│   │   └── shared-ci-cd.yml              # Main reusable workflow
-│   └── actions/
-│       ├── sonar-analysis/
-│       │   └── action.yml
-│       ├── checkmarx-scan/
-│       │   └── action.yml
-│       └── deploy-static-app/
-│           └── action.yml
+│    ├── workflows/
+│    │    └── shared-ci-cd.yml**************# Main reusable workflow
+│    └── actions/
+│   **** ├── sonar-analysis/
+│   **** │    └── action.yml
+│   **** ├── checkmarx-scan/
+│   **** │    └── action.yml
+│   **** └── deploy-static-app/
+│   ******** └── action.yml
 ├── AZURE_DEPLOYMENT_TROUBLESHOOTING.md
 ├── CHECKMARX_TROUBLESHOOTING.md
 ├── FRONTEND_CHECKMARX_OPTIMIZATION.md
 ├── INTEGRATION_GUIDE.md
 ├── README.md
 └── configs/
-    ├── sonar-project.properties
-    ├── staticwebapp.config.json
-    └── frontend.gitignore
+****├── sonar-project.properties
+****├── staticwebapp.config.json
+****└── frontend.gitignore
 ```
 
 ### Frontend Application Structure
 ```
 your-frontend-app/
 ├── .github/
-│   └── workflows/
-│       ├── ci-cd.yml                     # Calls shared workflow
-│       └── pr-security-check.yml         # Standalone PR checks
+│    └── workflows/
+│   **** ├── ci-cd.yml******************** # Calls shared workflow
+│   **** └── pr-security-check.yml******** # Standalone PR checks
 ├── src/
 ├── public/
 ├── package.json
@@ -130,33 +130,33 @@ your-frontend-app/
 name: Frontend Application CI/CD
 
 on:
-  push:
-    branches: [main, develop, staging, preprod]
-  workflow_dispatch:
-    inputs:
-      environment:
-        type: choice
-        options: [development, staging, pre-production, production]
+**push:
+****branches: [main, develop, staging, preprod]
+**workflow_dispatch:
+****inputs:
+******environment:
+********type: choice
+********options: [development, staging, pre-production, production]
 
 jobs:
-  call-shared-workflow:
-    uses: your-org/shared-ci-cd-workflows/.github/workflows/shared-ci-cd.yml@main
-    with:
-      # Customize for your app
-      node-version: '18'
-      output-location: 'build'        # or 'dist' for Vite
-      build-command: 'npm run build'
-      min-code-coverage: '75'
-      max-high-vulnerabilities: '5'
-    secrets:
-      AZURE_STATIC_WEB_APPS_API_TOKEN_DEV: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_DEV }}
-      AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING }}
-      AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD }}
-      AZURE_STATIC_WEB_APPS_API_TOKEN_PROD: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PROD }}
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      CHECKMARX_CLIENT_ID: ${{ secrets.CHECKMARX_CLIENT_ID }}
-      CHECKMARX_SECRET: ${{ secrets.CHECKMARX_SECRET }}
-      CHECKMARX_TENANT: ${{ secrets.CHECKMARX_TENANT }}
+**call-shared-workflow:
+****uses: your-org/shared-ci-cd-workflows/.github/workflows/shared-ci-cd.yml@main
+****with:
+******# Customize for your app
+******node-version: '18'
+******output-location: 'build'********# or 'dist' for Vite
+******build-command: 'npm run build'
+******min-code-coverage: '75'
+******max-high-vulnerabilities: '5'
+****secrets:
+******AZURE_STATIC_WEB_APPS_API_TOKEN_DEV: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_DEV }}
+******AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING }}
+******AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD }}
+******AZURE_STATIC_WEB_APPS_API_TOKEN_PROD: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PROD }}
+******SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+******CHECKMARX_CLIENT_ID: ${{ secrets.CHECKMARX_CLIENT_ID }}
+******CHECKMARX_SECRET: ${{ secrets.CHECKMARX_SECRET }}
+******CHECKMARX_TENANT: ${{ secrets.CHECKMARX_TENANT }}
 ```
 
 ### PR Security Check (`pr-security-check.yml`)
@@ -167,15 +167,15 @@ This stays in the frontend application for PR-specific security validation:
 name: PR Security Check
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+**pull_request:
+****types: [opened, synchronize, reopened]
 
 jobs:
-  pr-security-scan:
-    runs-on: ubuntu-latest
-    steps:
-      # Standalone security scanning for PRs
-      # Does not require shared workflows
+**pr-security-scan:
+****runs-on: ubuntu-latest
+****steps:
+******# Standalone security scanning for PRs
+******# Does not require shared workflows
 ```
 
 ## Repository Secrets Configuration
@@ -226,27 +226,27 @@ ENABLE_CHECKMARX_SCAN (optional, defaults to true)
 
 ## Benefits of Shared Workflow Architecture
 
-### ✅ **Centralized Maintenance**
+### Centralized Maintenance
 - Update CI/CD logic in one place
 - Bug fixes apply to all frontend applications
 - Consistent deployment patterns across projects
 
-### ✅ **Reduced Duplication**
+### Reduced Duplication
 - No need to copy workflow files across repositories
 - Composite actions maintained centrally
 - Single source of truth for CI/CD best practices
 
-### ✅ **Easier Updates**
+### Easier Updates
 - Version-controlled shared workflows (`@main`, `@v1.2.3`)
 - Gradual rollout of changes
 - Easy rollback if issues occur
 
-### ✅ **Improved Security**
+### Improved Security
 - Centralized security scanning logic
 - Consistent vulnerability thresholds
 - Easier to audit and update security practices
 
-### ✅ **Flexible Configuration**
+### Flexible Configuration
 - Each frontend app can customize build settings
 - Environment-specific configurations
 - Optional features (enable/disable scans)
@@ -259,21 +259,21 @@ Each frontend application can customize:
 
 ```yaml
 with:
-  # Build settings
-  node-version: '18'                    # Node.js version
-  output-location: 'build'              # Build output directory
-  build-command: 'npm run build'       # Custom build command
-  install-command: 'npm ci'            # Custom install command
-  
-  # Quality thresholds
-  min-code-coverage: '75'               # Coverage requirement
-  max-critical-vulnerabilities: '0'     # Critical vuln limit
-  max-high-vulnerabilities: '5'         # High vuln limit
-  
-  # Feature toggles
-  enable-sonar: true                    # Enable SonarCloud
-  enable-checkmarx: true                # Enable Checkmarx
-  skip-deployment: false                # Skip deployment
+**# Build settings
+**node-version: '18'********************# Node.js version
+**output-location: 'build'**************# Build output directory
+**build-command: 'npm run build'****** # Custom build command
+**install-command: 'npm ci'************# Custom install command
+
+**# Quality thresholds
+**min-code-coverage: '75'************** # Coverage requirement
+**max-critical-vulnerabilities: '0'**** # Critical vuln limit
+**max-high-vulnerabilities: '5'******** # High vuln limit
+
+**# Feature toggles
+**enable-sonar: true********************# Enable SonarCloud
+**enable-checkmarx: true****************# Enable Checkmarx
+**skip-deployment: false****************# Skip deployment
 ```
 
 ### Framework-Specific Examples
@@ -281,48 +281,48 @@ with:
 #### React Application:
 ```yaml
 with:
-  output-location: 'build'
-  build-command: 'npm run build'
-  install-command: 'npm ci'
+**output-location: 'build'
+**build-command: 'npm run build'
+**install-command: 'npm ci'
 ```
 
 #### Vue/Vite Application:
 ```yaml
 with:
-  output-location: 'dist'
-  build-command: 'npm run build'
-  install-command: 'npm install'
+**output-location: 'dist'
+**build-command: 'npm run build'
+**install-command: 'npm install'
 ```
 
 #### Next.js Application:
 ```yaml
 with:
-  output-location: 'out'
-  build-command: 'npm run build && npm run export'
-  install-command: 'npm ci'
+**output-location: 'out'
+**build-command: 'npm run build && npm run export'
+**install-command: 'npm ci'
 ```
 
 ## Migration Checklist
 
-### ✅ **Pre-Migration**
+### Pre-Migration
 - [ ] Create shared CI/CD repository
-- [ ] Move composite actions to shared repository  
+- [ ] Move composite actions to shared repository
 - [ ] Test shared workflow with one frontend application
 - [ ] Document any custom configurations needed
 
-### ✅ **Migration**
+### Migration
 - [ ] Update frontend application workflow files
 - [ ] Configure repository secrets and variables
 - [ ] Remove old workflow files and actions
 - [ ] Update documentation and README files
 
-### ✅ **Post-Migration**
+### Post-Migration
 - [ ] Test all deployment environments
 - [ ] Verify security scanning works correctly
 - [ ] Validate PR security checks function properly
 - [ ] Monitor first few deployments for issues
 
-### ✅ **Validation**
+### Validation
 - [ ] All environments deploy successfully
 - [ ] SonarCloud analysis runs and reports results
 - [ ] Checkmarx scans complete without errors
@@ -333,7 +333,7 @@ with:
 
 ### Common Issues
 
-#### 1. **Shared workflow not found**
+#### 1. **Shared workflow not found
 ```
 Error: Workflow file not found in repository
 ```
@@ -342,19 +342,19 @@ Error: Workflow file not found in repository
 uses: your-org/shared-ci-cd-workflows/.github/workflows/shared-ci-cd.yml@main
 ```
 
-#### 2. **Secrets not available**
+#### 2. **Secrets not available
 ```
 Error: Required secret not provided
 ```
 **Solution**: Verify all required secrets are set in the frontend repository.
 
-#### 3. **Composite action not found**
+#### 3. **Composite action not found
 ```
 Error: Action 'sonar-analysis' not found
 ```
 **Solution**: Ensure composite actions are properly copied to the shared repository.
 
-#### 4. **Permission denied**
+#### 4. **Permission denied
 ```
 Error: Repository not accessible
 ```
@@ -372,14 +372,14 @@ uses: your-org/shared-ci-cd-workflows/.github/workflows/shared-ci-cd.yml@v1.2.3
 Skip deployment based on conditions:
 ```yaml
 with:
-  skip-deployment: ${{ github.event_name == 'pull_request' }}
+**skip-deployment: ${{ github.event_name == 'pull_request' }}
 ```
 
 ### Multiple Environments
 Deploy to multiple environments:
 ```yaml
 with:
-  environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
+**environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
 ```
 
 ## Support and Maintenance
@@ -397,4 +397,4 @@ with:
 - Validate repository secrets and variables configuration
 - Test with minimal configuration first
 
-The shared workflow architecture provides a robust, maintainable, and scalable solution for frontend CI/CD pipelines! 🚀
+The shared workflow architecture provides a robust, maintainable, and scalable solution for frontend CI/CD pipelines! 

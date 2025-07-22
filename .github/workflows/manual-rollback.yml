@@ -73,9 +73,9 @@ jobs:
           ENVIRONMENT="${{ inputs.environment }}"
           TARGET_VERSION="${{ inputs.target_version }}"
           
-          echo "🔄 Validating rollback request for $ENVIRONMENT environment"
-          echo "📋 Reason: ${{ inputs.reason }}"
-          echo "👤 Requested by: ${{ github.actor }}"
+          echo "Validating rollback request for $ENVIRONMENT environment"
+          echo "Reason: ${{ inputs.reason }}"
+          echo "Requested by: ${{ github.actor }}"
           
           # Determine Azure token environment variable name
           case "$ENVIRONMENT" in
@@ -92,7 +92,7 @@ jobs:
               AZURE_TOKEN_VAR="AZURE_STATIC_WEB_APPS_API_TOKEN_PROD"
               ;;
             *)
-              echo "❌ Invalid environment: $ENVIRONMENT"
+              echo "Invalid environment: $ENVIRONMENT"
               exit 1
               ;;
           esac
@@ -106,16 +106,16 @@ jobs:
             jq -r --arg env "$ENVIRONMENT" '.[] | select(.environment == $env and .statuses_url != null) | .ref' | head -n 1)
           
           if [ -z "$CURRENT_VERSION" ] || [ "$CURRENT_VERSION" = "null" ]; then
-            echo "⚠️ No current deployment found for $ENVIRONMENT, proceeding with rollback"
+            echo "No current deployment found for $ENVIRONMENT, proceeding with rollback"
             CURRENT_VERSION="unknown"
           fi
           
-          echo "📍 Current version in $ENVIRONMENT: $CURRENT_VERSION"
+          echo "Current version in $ENVIRONMENT: $CURRENT_VERSION"
           echo "current-version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
           
           # Determine target version for rollback
           if [ -n "$TARGET_VERSION" ]; then
-            echo "🎯 Using specified target version: $TARGET_VERSION"
+            echo "Using specified target version: $TARGET_VERSION"
             ROLLBACK_VERSION="$TARGET_VERSION"
           else
             # Get the previous successful deployment or latest tag
@@ -131,23 +131,23 @@ jobs:
           fi
           
           if [ -z "$ROLLBACK_VERSION" ] || [ "$ROLLBACK_VERSION" = "null" ]; then
-            echo "❌ No valid rollback version found for $ENVIRONMENT"
+            echo "No valid rollback version found for $ENVIRONMENT"
             echo "can-rollback=false" >> $GITHUB_OUTPUT
             exit 1
           fi
           
           # Verify target version exists
           if ! git rev-parse --verify "$ROLLBACK_VERSION" >/dev/null 2>&1; then
-            echo "❌ Target version '$ROLLBACK_VERSION' does not exist in repository"
+            echo "Target version '$ROLLBACK_VERSION' does not exist in repository"
             echo "can-rollback=false" >> $GITHUB_OUTPUT
             exit 1
           fi
           
-          echo "📍 Target rollback version: $ROLLBACK_VERSION"
+          echo "Target rollback version: $ROLLBACK_VERSION"
           echo "target-version=$ROLLBACK_VERSION" >> $GITHUB_OUTPUT
           echo "can-rollback=true" >> $GITHUB_OUTPUT
           
-          echo "✅ Rollback validation successful"
+          echo "Rollback validation successful"
 
   rollback-deployment:
     if: needs.validate-rollback.outputs.can-rollback == 'true'
@@ -168,10 +168,10 @@ jobs:
 
       - name: Checkout Target Version
         run: |
-          echo "🔄 Checking out target version: ${{ needs.validate-rollback.outputs.target-version }}"
+          echo "Checking out target version: ${{ needs.validate-rollback.outputs.target-version }}"
           git checkout ${{ needs.validate-rollback.outputs.target-version }}
-          echo "📍 Current commit: $(git rev-parse HEAD)"
-          echo "📝 Commit message: $(git log -1 --pretty=format:'%s')"
+          echo "Current commit: $(git rev-parse HEAD)"
+          echo "Commit message: $(git log -1 --pretty=format:'%s')"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -181,20 +181,20 @@ jobs:
 
       - name: Install Dependencies and Build
         run: |
-          echo "📦 Installing dependencies with: ${{ env.INSTALL_COMMAND }}"
+          echo "Installing dependencies with: ${{ env.INSTALL_COMMAND }}"
           ${{ env.INSTALL_COMMAND }}
           
-          echo "🔨 Building application with: ${{ env.BUILD_COMMAND }}"
+          echo "Building application with: ${{ env.BUILD_COMMAND }}"
           ${{ env.BUILD_COMMAND }}
           
-          echo "✅ Build completed for rollback"
+          echo "Build completed for rollback"
           
           # Verify build output
           if [ -d "${{ env.OUTPUT_LOCATION }}" ]; then
-            echo "📁 Build output verified in: ${{ env.OUTPUT_LOCATION }}"
+            echo "Build output verified in: ${{ env.OUTPUT_LOCATION }}"
             ls -la ${{ env.OUTPUT_LOCATION }}
           else
-            echo "❌ Build output directory not found: ${{ env.OUTPUT_LOCATION }}"
+            echo "Build output directory not found: ${{ env.OUTPUT_LOCATION }}"
             exit 1
           fi
 
@@ -217,13 +217,13 @@ jobs:
       - name: Verify Rollback Success
         run: |
           if [ "${{ steps.deploy.outcome }}" = "success" ]; then
-            echo "✅ ${{ inputs.environment }} rollback completed successfully"
-            echo "🔄 Rolled back from: ${{ needs.validate-rollback.outputs.current-version }}"
-            echo "📍 Rolled back to: ${{ needs.validate-rollback.outputs.target-version }}"
-            echo "🌐 URL: ${{ steps.deploy.outputs.static-web-app-url }}"
-            echo "📋 Reason: ${{ inputs.reason }}"
+            echo "${{ inputs.environment }} rollback completed successfully"
+            echo "Rolled back from: ${{ needs.validate-rollback.outputs.current-version }}"
+            echo "Rolled back to: ${{ needs.validate-rollback.outputs.target-version }}"
+            echo "URL: ${{ steps.deploy.outputs.static-web-app-url }}"
+            echo "Reason: ${{ inputs.reason }}"
           else
-            echo "❌ ${{ inputs.environment }} rollback failed"
+            echo "${{ inputs.environment }} rollback failed"
             exit 1
           fi
 
@@ -239,7 +239,7 @@ jobs:
               \"environment\": \"${{ inputs.environment }}\",
               \"description\": \"Manual rollback - ${{ inputs.reason }}\",
               \"auto_merge\": false
-            }" || echo "⚠️ Failed to update deployment status (non-critical)"
+                         }" || echo "Failed to update deployment status (non-critical)"
 
   rollback-summary:
     if: always()
@@ -249,7 +249,7 @@ jobs:
     steps:
       - name: Generate Rollback Summary
         run: |
-          echo "## 🔄 Manual Rollback Summary" >> $GITHUB_STEP_SUMMARY
+                     echo "## Manual Rollback Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Environment**: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
           echo "**Reason**: ${{ inputs.reason }}" >> $GITHUB_STEP_SUMMARY
@@ -263,15 +263,15 @@ jobs:
             echo "" >> $GITHUB_STEP_SUMMARY
             
             if [ "${{ needs.rollback-deployment.result }}" = "success" ]; then
-              echo "✅ **Rollback Status**: Completed successfully" >> $GITHUB_STEP_SUMMARY
-              echo "🌐 **URL**: ${{ needs.rollback-deployment.outputs.rollback-url }}" >> $GITHUB_STEP_SUMMARY
+              echo "**Rollback Status**: Completed successfully" >> $GITHUB_STEP_SUMMARY
+              echo "**URL**: ${{ needs.rollback-deployment.outputs.rollback-url }}" >> $GITHUB_STEP_SUMMARY
             else
-              echo "❌ **Rollback Status**: Failed" >> $GITHUB_STEP_SUMMARY
-              echo "🚨 **Action Required**: Manual intervention needed" >> $GITHUB_STEP_SUMMARY
+              echo "**Rollback Status**: Failed" >> $GITHUB_STEP_SUMMARY
+              echo "**Action Required**: Manual intervention needed" >> $GITHUB_STEP_SUMMARY
             fi
           else
-            echo "❌ **Rollback Status**: Validation failed" >> $GITHUB_STEP_SUMMARY
-            echo "📋 **Details**: Unable to perform rollback - check validation step for details" >> $GITHUB_STEP_SUMMARY
+            echo "**Rollback Status**: Validation failed" >> $GITHUB_STEP_SUMMARY
+            echo "**Details**: Unable to perform rollback - check validation step for details" >> $GITHUB_STEP_SUMMARY
           fi
           
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -282,17 +282,17 @@ jobs:
         if: always()
         run: |
           if [ "${{ needs.rollback-deployment.result }}" = "success" ]; then
-            echo "🔔 Manual rollback completed successfully"
-            echo "📍 Environment: ${{ inputs.environment }}"
-            echo "📝 Version: ${{ needs.validate-rollback.outputs.target-version }}"
-            echo "👤 Requested by: ${{ github.actor }}"
-            echo "📋 Reason: ${{ inputs.reason }}"
+            echo "Manual rollback completed successfully"
+            echo "Environment: ${{ inputs.environment }}"
+            echo "Version: ${{ needs.validate-rollback.outputs.target-version }}"
+            echo "Requested by: ${{ github.actor }}"
+            echo "Reason: ${{ inputs.reason }}"
             # Add notification logic here (Slack, Teams, email, etc.)
           else
-            echo "🚨 Manual rollback failed - immediate attention required"
-            echo "📍 Environment: ${{ inputs.environment }}"
-            echo "🎯 Target version: ${{ needs.validate-rollback.outputs.target-version }}"
-            echo "👤 Requested by: ${{ github.actor }}"
-            echo "📋 Reason: ${{ inputs.reason }}"
+            echo "Manual rollback failed - immediate attention required"
+            echo "Environment: ${{ inputs.environment }}"
+            echo "Target version: ${{ needs.validate-rollback.outputs.target-version }}"
+            echo "Requested by: ${{ github.actor }}"
+            echo "Reason: ${{ inputs.reason }}"
             # Add urgent notification logic here
           fi

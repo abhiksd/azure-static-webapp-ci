@@ -151,13 +151,13 @@ jobs:
             // SonarCloud results
             if (process.env.ENABLE_SONAR === 'true') {
               if (sonarStatus === 'COMPLETED') {
-                comment += '✅ **SonarCloud Analysis**: Completed\n';
+                comment += '**SonarCloud Analysis**: Completed\n';
                 comment += `- View detailed results: [SonarCloud Dashboard](https://sonarcloud.io/project/overview?id=${{ github.repository }})\n`;
               } else {
-                comment += '❌ **SonarCloud Analysis**: Failed or not configured\n';
+                comment += '**SonarCloud Analysis**: Failed or not configured\n';
               }
             } else {
-              comment += '⏭️ **SonarCloud Analysis**: Disabled\n';
+              comment += '⏭**SonarCloud Analysis**: Disabled\n';
             }
             
             comment += '\n';
@@ -165,17 +165,17 @@ jobs:
             // Checkmarx results
             if (process.env.ENABLE_CHECKMARX === 'true') {
               if (checkmarxStatus === 'PASSED') {
-                comment += '✅ **Checkmarx Security Scan**: Passed\n';
+                comment += '**Checkmarx Security Scan**: Passed\n';
                 comment += `- Critical: ${checkmarxCritical}, High: ${checkmarxHigh}\n`;
               } else if (checkmarxStatus === 'FAILED') {
-                comment += '❌ **Checkmarx Security Scan**: Failed\n';
+                comment += '**Checkmarx Security Scan**: Failed\n';
                 comment += `- Critical: ${checkmarxCritical} (max: ${{ env.MAX_CRITICAL_VULNERABILITIES }})\n`;
                 comment += `- High: ${checkmarxHigh} (max: ${{ env.MAX_HIGH_VULNERABILITIES }})\n`;
               } else {
-                comment += '❌ **Checkmarx Security Scan**: Failed or not configured\n';
+                comment += '**Checkmarx Security Scan**: Failed or not configured\n';
               }
             } else {
-              comment += '⏭️ **Checkmarx Security Scan**: Disabled\n';
+              comment += '⏭**Checkmarx Security Scan**: Disabled\n';
             }
             
             comment += '\n---\n';
@@ -225,13 +225,13 @@ jobs:
           
           # Check SonarCloud status
           if [ "${{ env.ENABLE_SONAR }}" = "true" ] && [ "${{ steps.sonar-analysis.outputs.status }}" != "COMPLETED" ]; then
-            echo "❌ SonarCloud analysis failed"
+            echo "SonarCloud analysis failed"
             OVERALL_STATUS="FAILED"
           fi
           
           # Check Checkmarx status
           if [ "${{ env.ENABLE_CHECKMARX }}" = "true" ] && [ "${{ steps.checkmarx-scan.outputs.status }}" = "FAILED" ]; then
-            echo "❌ Checkmarx security scan failed quality gates"
+            echo "Checkmarx security scan failed quality gates"
             OVERALL_STATUS="FAILED"
           fi
           
@@ -239,5 +239,5 @@ jobs:
             echo "🚫 Security gate check failed. Please fix the issues above."
             exit 1
           else
-            echo "✅ Security gate check passed"
+            echo "Security gate check passed"
           fi

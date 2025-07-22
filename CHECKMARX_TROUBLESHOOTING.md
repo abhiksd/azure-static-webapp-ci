@@ -31,12 +31,12 @@ Set these **4 required secrets**:
 
 ### Step 1: Access Checkmarx AST Portal
 1. Log into your Checkmarx AST portal
-2. Go to **Settings** → **API Keys** or **Access Management**
+2. Go to **Settings** → **API Keys** or **Access Management
 
 ### Step 2: Create API Key/Client
-1. Click **Create New API Key** or **Create Client**
+1. Click **Create New API Key** or **Create Client
 2. Set appropriate permissions for scanning
-3. Copy the **Client ID** and **Client Secret**
+3. Copy the **Client ID** and **Client Secret
 
 ### Step 3: Find Your Tenant
 - Your tenant is usually your organization/company name in Checkmarx
@@ -59,7 +59,7 @@ You can also set these **Repository Variables** for customization:
 ```bash
 # In GitHub: Repository → Settings → Secrets and variables → Actions → Secrets
 CHECKMARX_CLIENT_ID = "your-actual-client-id"
-CHECKMARX_SECRET = "your-actual-client-secret"  
+CHECKMARX_SECRET = "your-actual-client-secret"
 CHECKMARX_TENANT = "your-tenant-name"
 ```
 
@@ -80,7 +80,7 @@ Instead of:
 
 If you want to disable Checkmarx scanning:
 
-**Set Repository Variable in Shared Workflow Repository:**
+**Set Repository Variable in Shared Workflow Repository:
 ```bash
 ENABLE_CHECKMARX_SCAN = "false"
 ```
@@ -111,24 +111,24 @@ ENABLE_CHECKMARX_SCAN = "false"
 Add this debug step temporarily to verify secrets are set:
 ```yaml
 - name: Debug Checkmarx Config
-  run: |
-    echo "CHECKMARX_CLIENT_ID: ${CHECKMARX_CLIENT_ID:0:8}..." 
-    echo "CHECKMARX_SECRET: ${CHECKMARX_SECRET:0:8}..."
-    echo "CHECKMARX_TENANT: $CHECKMARX_TENANT"
-    echo "CHECKMARX_BASE_URI: $CHECKMARX_BASE_URI"
-  env:
-    CHECKMARX_CLIENT_ID: ${{ secrets.CHECKMARX_CLIENT_ID }}
-    CHECKMARX_SECRET: ${{ secrets.CHECKMARX_SECRET }}
-    CHECKMARX_TENANT: ${{ secrets.CHECKMARX_TENANT }}
-    CHECKMARX_BASE_URI: ${{ secrets.CHECKMARX_BASE_URI }}
+**run: |
+****echo "CHECKMARX_CLIENT_ID: ${CHECKMARX_CLIENT_ID:0:8}..." 
+****echo "CHECKMARX_SECRET: ${CHECKMARX_SECRET:0:8}..."
+****echo "CHECKMARX_TENANT: $CHECKMARX_TENANT"
+****echo "CHECKMARX_BASE_URI: $CHECKMARX_BASE_URI"
+**env:
+****CHECKMARX_CLIENT_ID: ${{ secrets.CHECKMARX_CLIENT_ID }}
+****CHECKMARX_SECRET: ${{ secrets.CHECKMARX_SECRET }}
+****CHECKMARX_TENANT: ${{ secrets.CHECKMARX_TENANT }}
+****CHECKMARX_BASE_URI: ${{ secrets.CHECKMARX_BASE_URI }}
 ```
 
 ### Test Authentication Manually
 ```bash
 # Test Checkmarx authentication
 curl -X POST "https://ast.checkmarx.net/auth/realms/YOUR_TENANT/protocol/openid-connect/token" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "grant_type=client_credentials&client_id=YOUR_CLIENT_ID&client_secret=YOUR_CLIENT_SECRET"
+**-H "Content-Type: application/x-www-form-urlencoded" \
+**-d "grant_type=client_credentials&client_id=YOUR_CLIENT_ID&client_secret=YOUR_CLIENT_SECRET"
 ```
 
 ## Expected Success Output:
@@ -153,4 +153,4 @@ Checkmarx: PASSED | Vulnerabilities: 0 critical, 2 high
 3. **Check the logs** for successful authentication messages
 4. **If still failing**, verify credentials in Checkmarx portal
 
-The authentication error should be resolved once you provide the correct Checkmarx credentials! 🔐
+The authentication error should be resolved once you provide the correct Checkmarx credentials! 

@@ -1,8 +1,8 @@
-# ⚡ Quick Reference Guide
+#**Quick Reference Guide
 
-## 🚀 **New Frontend App Integration (5 Minutes)**
+## New Frontend App Integration (5 Minutes)
 
-### **Step 1: Copy Files**
+### Step 1: Copy Files
 ```bash
 # Copy workflow files to your frontend app
 cp frontend-ci-cd.yml .github/workflows/ci-cd.yml
@@ -10,17 +10,17 @@ cp pr-security-check.yml .github/workflows/pr-security-check.yml
 cp manual-rollback-caller.yml .github/workflows/manual-rollback.yml
 ```
 
-### **Step 2: Update Repository Reference**
+### Step 2: Update Repository Reference
 ```yaml
 # In .github/workflows/ci-cd.yml
 uses: YOUR_ORG/shared-ci-cd-workflows/.github/workflows/shared-ci-cd.yml@main
 ```
 
-### **Step 3: Set Secrets**
+### Step 3: Set Secrets
 Go to your frontend repository → Settings → Secrets → Add these:
 ```
 AZURE_STATIC_WEB_APPS_API_TOKEN_DEV
-AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING  
+AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING
 AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD
 AZURE_STATIC_WEB_APPS_API_TOKEN_PROD
 SONAR_TOKEN
@@ -29,16 +29,16 @@ CHECKMARX_SECRET
 CHECKMARX_TENANT
 ```
 
-### **Step 4: Deploy**
+### Step 4: Deploy
 - Push to main → development deployment
 - Create tag `v1.0.0` → pre-production deployment
 - Manual approval → production deployment
 
 ---
 
-## 🎛️ **DevOps Configuration (Centralized Control)**
+## DevOps Configuration (Centralized Control)
 
-### **Essential Repository Variables**
+### Essential Repository Variables
 Set in shared repository → Settings → Variables:
 ```bash
 # Core Build Configuration
@@ -55,7 +55,7 @@ MAX_CRITICAL_VULNERABILITIES=0
 MAX_HIGH_VULNERABILITIES=5
 ```
 
-### **Framework-Specific Configurations**
+### Framework-Specific Configurations
 ```bash
 # React Apps
 OUTPUT_LOCATION=build
@@ -70,44 +70,44 @@ BUILD_COMMAND=npm run build:prod
 
 ---
 
-## 🔄 **Emergency Rollback (2 Minutes)**
+## Emergency Rollback (2 Minutes)
 
-### **Manual Rollback**
+### Manual Rollback
 1. Go to frontend app → Actions → Manual Rollback
 2. Select environment: `development`, `staging`, `pre-production`, or `production`
 3. Target version: Leave empty for auto-detect or specify version
 4. Reason: Required for audit (e.g., "Critical bug in payment flow")
 5. Run workflow - calls shared workflow with centralized logic
 
-### **Automatic Rollback**
+### Automatic Rollback
 - Happens automatically on deployment failures
 - No action required
 - Check deployment summary for rollback status
 
 ---
 
-## 🔧 **Common Troubleshooting**
+## Common Troubleshooting
 
-### **"Workflow not found"**
+### "Workflow not found"
 ```bash
 # Check repository reference
 uses: YOUR_ORG/shared-ci-cd-workflows/.github/workflows/shared-ci-cd.yml@main
 ```
 
-### **"Secrets not available"**
+### "Secrets not available"
 ```bash
 # Verify secrets in frontend repository Settings → Secrets
 # Required: AZURE_*, SONAR_TOKEN, CHECKMARX_*
 ```
 
-### **"Deployment failed"**
+### "Deployment failed"
 ```bash
 # Check Azure Static Web Apps tokens
 # Verify build outputs in correct location
 # Review deployment logs
 ```
 
-### **"Security scan failed"**
+### "Security scan failed"
 ```bash
 # SonarCloud: Check SONAR_TOKEN and organization
 # Checkmarx: Verify CHECKMARX_* credentials
@@ -116,19 +116,19 @@ uses: YOUR_ORG/shared-ci-cd-workflows/.github/workflows/shared-ci-cd.yml@main
 
 ---
 
-## 📋 **Package.json Requirements**
+## Package.json Requirements
 
-### **Required Scripts**
+### Required Scripts
 ```json
 {
-  "scripts": {
-    "build": "react-scripts build",              // Framework build command
-    "test": "react-scripts test --coverage --watchAll=false"
-  }
+**"scripts": {
+****"build": "react-scripts build",**************// Framework build command
+****"test": "react-scripts test --coverage --watchAll=false"
+**}
 }
 ```
 
-### **Framework Examples**
+### Framework Examples
 ```json
 // React
 "build": "react-scripts build"
@@ -136,7 +136,7 @@ uses: YOUR_ORG/shared-ci-cd-workflows/.github/workflows/shared-ci-cd.yml@main
 // Vue
 "build": "vue-cli-service build"
 
-// Angular  
+// Angular
 "build": "ng build --prod"
 
 // Next.js
@@ -148,52 +148,52 @@ uses: YOUR_ORG/shared-ci-cd-workflows/.github/workflows/shared-ci-cd.yml@main
 
 ---
 
-## 📚 **Quick Documentation Access**
+## Quick Documentation Access
 
-### **Essential Reading**
+### Essential Reading
 - **[OVERVIEW.md](OVERVIEW.md)** - Complete system overview (START HERE)
 - **[FRONTEND_INTEGRATION_GUIDE.md](FRONTEND_INTEGRATION_GUIDE.md)** - Detailed integration steps
 - **[ROLLBACK_GUIDE.md](ROLLBACK_GUIDE.md)** - Emergency procedures
 
-### **Configuration**
+### Configuration
 - **[SHARED_WORKFLOW_VARIABLES.md](SHARED_WORKFLOW_VARIABLES.md)** - All variable options
 - **[DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md)** - Pre-deployment validation
 
-### **Troubleshooting**
+### Troubleshooting
 - **[AZURE_DEPLOYMENT_TROUBLESHOOTING.md](AZURE_DEPLOYMENT_TROUBLESHOOTING.md)** - Azure issues
 - **[CHECKMARX_TROUBLESHOOTING.md](CHECKMARX_TROUBLESHOOTING.md)** - Checkmarx authentication
 
 ---
 
-## 🚨 **Emergency Contacts**
+## 🚨 **Emergency Contacts
 
-### **Support Escalation**
+### Support Escalation
 1. **Self-Service**: Check documentation and workflow logs
 2. **DevOps Team**: Create issue with workflow run URL
 3. **Emergency**: Use manual rollback + contact on-call engineer
 
-### **Critical Issues**
+### Critical Issues
 - Use manual rollback workflow immediately
 - Document issue for post-incident review
 - Contact DevOps team with business impact details
 
 ---
 
-## ✅ **What Frontend Teams Cannot Control**
+## What Frontend Teams Cannot Control
 
-- ❌ Security scan enable/disable
-- ❌ Quality gate thresholds
-- ❌ Build configuration (Node.js version, commands)
-- ❌ Deployment process
-- ❌ Organizational standards
+- Security scan enable/disable
+- Quality gate thresholds
+- Build configuration (Node.js version, commands)
+- Deployment process
+- Organizational standards
 
-## ✅ **What Frontend Teams Can Control**
+## What Frontend Teams Can Control
 
-- ✅ Environment selection for deployment
-- ✅ Repository secrets (tokens and credentials)
-- ✅ Package.json scripts and dependencies
-- ✅ Application code and configuration
+- Environment selection for deployment
+- Repository secrets (tokens and credentials)
+- Package.json scripts and dependencies
+- Application code and configuration
 
 ---
 
-**Need more details? Start with [OVERVIEW.md](OVERVIEW.md) for complete documentation.**
+**Need more details? Start with [OVERVIEW.md](OVERVIEW.md) for complete documentation.
