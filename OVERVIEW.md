@@ -7,7 +7,7 @@ A **production-ready, enterprise-grade CI/CD solution** for frontend application
 - **Complete centralized control** - DevOps controls everything via repository variables
 - **Mandatory security scanning** - No way to bypass SonarCloud or Checkmarx
 - **Automatic deployment** to development, staging, pre-production, and production
-- **Intelligent rollback** - Automatic and manual rollback capabilities
+- **Manual rollback** - On-demand rollback capabilities via dedicated workflow
 - **Quality gates enforcement** - Consistent standards across all applications
 - **Zero configuration** for frontend teams - just copy workflow and set secrets
 
@@ -97,8 +97,8 @@ FORCE_VERSION=******************** # No version overrides allowed
 - **Azure Static Web Apps**: Full integration with environment-specific tokens
 
 ###  Rollback Capabilities
-- **Automatic Rollback**: Triggers on deployment failures
-- **Manual Rollback**: Emergency rollback workflow for critical issues
+- **Manual Rollback**: On-demand rollback to any previous version
+
 - **Version History**: Complete audit trail of deployments
 - **Validation**: Prevents invalid rollback attempts
 
@@ -173,12 +173,7 @@ CHECKMARX_TENANT************************ # Checkmarx tenant
 
 ## Emergency & Rollback Procedures
 
-### Automatic Rollback (No Action Required)
-- Triggers when deployment fails
-- Uses last successful deployment version
-- Updates deployment summary with rollback status
-
-### Manual Emergency Rollback
+### Manual Rollback
 1. Go to frontend app → Actions → Manual Rollback
 2. Select environment (development, staging, pre-production, or production)
 3. Optionally specify target version (or leave empty for auto-detect)
@@ -221,7 +216,7 @@ CHECKMARX_TENANT************************ # Checkmarx tenant
 
 ###  Operational Efficiency
 - **Standardized deployments** reduce support burden
-- **Automatic rollback** minimizes downtime
+- **Manual rollback** provides controlled recovery
 - **Simplified troubleshooting** with consistent setup
 - **Faster onboarding** with zero configuration
 

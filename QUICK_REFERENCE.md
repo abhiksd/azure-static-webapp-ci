@@ -79,10 +79,10 @@ BUILD_COMMAND=npm run build:prod
 4. Reason: Required for audit (e.g., "Critical bug in payment flow")
 5. Run workflow - calls shared workflow with centralized logic
 
-### Automatic Rollback
-- Happens automatically on deployment failures
-- No action required
-- Check deployment summary for rollback status
+### Manual Rollback
+- Triggered manually via workflow dispatch
+- Requires target environment and reason
+- Performs fresh build of target version
 
 ---
 

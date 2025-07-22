@@ -299,18 +299,6 @@ runs:
         echo "URL: $DEPLOYMENT_URL"
         echo "Time: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
 
-    - name: Upload Deployment Artifacts
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: deployment-artifacts-${{ inputs.environment }}
-        path: |
-          deployment-summary.json
-          deployment-config.json
-          staticwebapp.config.json
-          build/
-        retention-days: 30
-
     - name: Final Cleanup
       if: always()
       shell: bash

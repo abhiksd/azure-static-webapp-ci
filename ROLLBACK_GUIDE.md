@@ -4,16 +4,11 @@ This guide explains the rollback capabilities for pre-production and production 
 
 ## Rollback Features
 
-### Automatic Rollback
-- Triggers automatically when pre-production or production deployments fail
-- Uses the last successful deployment version
-- Maintains deployment history and audit trail
-
 ### Manual Rollback
 - On-demand rollback via manual workflow dispatch
 - Can specify target version or use last successful deployment
 - Requires reason for rollback (audit purposes)
-- Available for pre-production and production environments only
+- Available for all environments (development, staging, pre-production, production)
 
 ## How to Perform Manual Rollback
 
@@ -48,19 +43,14 @@ graph TD
 ****J --> K[ Rollback Complete]
 ```
 
-## Automatic Rollback Behavior
+## Manual Rollback Process
 
-### Trigger Conditions
-- Pre-production deployment fails
-- Production deployment fails
-- Quality gates fail after deployment
-
-### Rollback Process
-1. **Detect Failure**: Monitors deployment job outcomes
-2. **Find Previous Version**: Queries GitHub deployment API for last successful deployment
-3. **Download Artifacts**: Retrieves build artifacts from previous successful build
-4. **Perform Rollback**: Deploys previous version to failed environment
-5. **Verify Success**: Confirms rollback deployment completed successfully
+### Execution Steps
+1. **Validate Request**: Checks environment and target version
+2. **Version Resolution**: Determines exact version to rollback to
+3. **Fresh Checkout**: Retrieves source code for target version
+4. **Build Process**: Performs fresh build of target version
+5. **Deploy Rollback**: Deploys new build to specified environment
 6. **Update Status**: Records rollback in deployment history
 
 ## Rollback Validation
@@ -70,7 +60,7 @@ graph TD
 - Previous successful deployment exists
 - Target version is different from current version
 - Required secrets and tokens are available
-- Build artifacts are accessible
+- Source code for target version is available
 
 ### Validation Failures
 - No deployment history found

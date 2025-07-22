@@ -209,15 +209,7 @@ jobs:
               });
             }
 
-      - name: Upload Security Results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: security-scan-results
-          path: |
-            checkmarx-results/
-            coverage/
-          retention-days: 30
+
 
       - name: Security Gate Check
         run: |

@@ -9,7 +9,7 @@ Enterprise-grade, centralized CI/CD solution for frontend applications with comp
 - **Complete centralized control** - DevOps controls everything via repository variables
 - **Mandatory security scanning** - No way to bypass SonarCloud or Checkmarx
 - **Automatic deployment** to development, staging, pre-production, and production
-- **Intelligent rollback** - Automatic and manual rollback capabilities
+- **Manual rollback** - On-demand rollback capabilities via dedicated workflow
 - **Quality gates enforcement** - Consistent standards across all applications
 - **Zero configuration** for frontend teams - just copy workflow and set secrets
 
@@ -87,12 +87,7 @@ MAX_CRITICAL_VULNERABILITIES=0**** # Security gates
 
 ## Rollback Capabilities
 
-### Automatic Rollback
-- Triggers on deployment failures
-- Uses last successful deployment
-- No manual intervention required
-
-### Manual Emergency Rollback
+### Manual Rollback
 1. Go to frontend app → Actions → Manual Rollback
 2. Select environment (development/staging/pre-production/production)
 3. Specify version (optional - auto-detects if empty)
@@ -133,7 +128,7 @@ MAX_CRITICAL_VULNERABILITIES=0**** # Security gates
 
 ###  Operational Efficiency
 - Standardized deployments reduce support burden
-- Automatic rollback minimizes downtime
+- Manual rollback provides controlled recovery
 - Simplified troubleshooting with consistent setup
 - Faster onboarding with zero configuration
 
