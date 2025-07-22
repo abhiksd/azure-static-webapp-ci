@@ -7,7 +7,7 @@ name: Shared Frontend CI/CD Pipeline
 #
 # Simple Production-Grade Versioning Strategy:
 # - Development/Staging: Short SHA (e.g., a1b2c3d4) 
-# - Release branches (release/**): Semantic version from git tags (e.g., v1.2.3) or SHA fallback
+# - Release branches (release/**): Auto-tagged semantic version (e.g., v1.2.3) extracted from branch name
 # - Pre-Production/Production: Semantic version from git tags (e.g., v1.2.3) or SHA fallback
 
 on:
@@ -155,6 +155,23 @@ jobs:
           BRANCH="${{ github.ref_name }}"
           ENVIRONMENT="${{ inputs.environment }}"
           
+          # Auto-tagging for release branches
+          AUTO_TAGGED_VERSION=""
+          if [[ "$BRANCH" == release/* ]] && [[ "${{ github.ref }}" != refs/tags/* ]]; then
+            RELEASE_VERSION="${BRANCH#release/}"
+            if [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "Auto-tagging release branch: $BRANCH → v$RELEASE_VERSION"
+              git config user.name "github-actions[bot]"
+              git config user.email "github-actions[bot]@users.noreply.github.com"
+              git tag "v$RELEASE_VERSION"
+              git push origin "v$RELEASE_VERSION"
+              AUTO_TAGGED_VERSION="v$RELEASE_VERSION"
+              echo "Created and pushed tag: v$RELEASE_VERSION"
+            else
+              echo "Warning: Release branch name '$BRANCH' doesn't follow semver pattern (x.y.z)"
+            fi
+          fi
+          
           # Determine if this is a pre-prod/prod deployment
           IS_PREPROD_OR_PROD="false"
           
@@ -174,7 +191,10 @@ jobs:
           # Version strategy
           if [ "$IS_PREPROD_OR_PROD" = "true" ]; then
             # Release branches, Pre-production and Production: Use semantic version from tags
-            if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            if [ -n "$AUTO_TAGGED_VERSION" ]; then
+              VERSION="$AUTO_TAGGED_VERSION"
+              echo "Using auto-tagged version: $VERSION"
+            elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
               VERSION=${GITHUB_REF#refs/tags/}
               echo "Using semantic version from tag: $VERSION"
             else
