@@ -1,394 +1,194 @@
-# Production-Grade GitHub Actions Workflow for Azure Static Web Apps
+# Shared CI/CD Workflows for Frontend Applications
 
-This repository contains a comprehensive, production-ready GitHub Actions workflow system for deploying Node.js frontend applications to Azure Static Web Apps with multi-environment support, automated security scanning, and semantic versioning.
+A centralized repository containing reusable GitHub Actions workflows and composite actions for frontend CI/CD pipelines with Azure Static Web Apps deployment and security scanning.
 
-## 🚀 Features
+## 🏗️ Repository Structure
 
-- **Multi-Environment Deployment**: Development, Staging, and Production environments
-- **Semantic Versioning**: Automated version management with semantic-release
-- **Security Scanning**: Integrated SonarCloud and Checkmarx scanning
-- **Branch Protection**: Automated PR validation and branch protection rules
-- **Azure Key Vault Integration**: Secure secrets management
-- **Composite Actions**: Reusable, modular GitHub Actions components
-- **Comprehensive Testing**: Unit, integration, and E2E testing support
-- **Automated Notifications**: Slack and Teams integration
-- **Quality Gates**: Mandatory security and quality checks
-
-## 📋 Requirements
-
-### Prerequisites
-- Node.js 18+ application
-- Azure subscription with Static Web Apps service
-- Azure Key Vault for secrets management
-- SonarCloud account for code quality analysis
-- Checkmarx account for security scanning
-
-### Repository Secrets
-
-Configure the following secrets in your GitHub repository:
-
-#### Azure Configuration
 ```
-# Note: Using Azure Managed Identity - no service principal credentials needed
-# Key Vault names are stored as repository variables (not secrets)
-# These can be found in Repository Settings > Secrets and variables > Actions > Variables
+├── .github/
+│   ├── workflows/
+│   │   └── shared-ci-cd.yml              # Main reusable workflow
+│   └── actions/                          # Composite actions
+│       ├── sonar-analysis/               # SonarCloud scanning
+│       ├── checkmarx-scan/               # Checkmarx security scanning
+│       └── deploy-static-app/            # Azure Static Web Apps deployment
+├── pr-security-check.yml                # Standalone PR security validation
+├── frontend-app-workflow-example.yml    # Example frontend app workflow
+├── setup-shared-repository.sh           # Automated migration script
+└── docs/                                 # Documentation
 ```
 
-#### 🎛️ Configurable Security & Quality Parameters
+## 🚀 Quick Start
 
-The following repository variables control security scanning and quality gates:
+### For Frontend Applications
 
-**Scan Control:**
-```
-ENABLE_SONAR_SCAN=true          # Enable/disable SonarCloud analysis
-ENABLE_CHECKMARX_SCAN=true      # Enable/disable Checkmarx security scanning
-ENABLE_DEPENDENCY_SCAN=true     # Enable/disable dependency vulnerability scanning
-ENABLE_LICENSE_SCAN=false       # Enable/disable license compliance checking
-SECURITY_GATE_ENABLED=true      # Enable/disable overall security gate
-```
+Create `.github/workflows/ci-cd.yml` in your frontend app:
 
-**Checkmarx Configuration:**
-```
-CHECKMARX_SCAN_TYPES=sca,sast,kics    # Scan types (comma-separated)
-CHECKMARX_PRESET=Checkmarx Default    # Security scan preset
-CHECKMARX_INCREMENTAL=true            # Use incremental scanning
-MAX_CRITICAL_VULNERABILITIES=0        # Maximum critical vulnerabilities
-MAX_HIGH_VULNERABILITIES=2            # Maximum high vulnerabilities  
-MAX_MEDIUM_VULNERABILITIES=10         # Maximum medium vulnerabilities
-```
+```yaml
+name: Frontend CI/CD
 
-**SonarCloud Configuration:**
-```
-MIN_CODE_COVERAGE=80                  # Minimum code coverage (%)
-MIN_BRANCH_COVERAGE=70                # Minimum branch coverage (%)
-SONAR_MAINTAINABILITY_RATING=A        # Target maintainability rating
-SONAR_RELIABILITY_RATING=A            # Target reliability rating
-SONAR_SECURITY_RATING=A               # Target security rating
-MAX_BLOCKER_ISSUES=0                  # Maximum blocker issues
-MAX_CRITICAL_ISSUES=0                 # Maximum critical issues
-MAX_MAJOR_ISSUES=5                    # Maximum major issues
+on:
+  push:
+    branches: [main, develop, staging]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    uses: YOUR_ORG/shared-ci-cd-workflows/.github/workflows/shared-ci-cd.yml@main
+    with:
+      node-version: '18'
+      output-location: 'build'        # or 'dist' for Vite/Vue
+      build-command: 'npm run build'
+    secrets:
+      AZURE_STATIC_WEB_APPS_API_TOKEN_DEV: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_DEV }}
+      AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING }}
+      AZURE_STATIC_WEB_APPS_API_TOKEN_PROD: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PROD }}
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      CHECKMARX_CLIENT_ID: ${{ secrets.CHECKMARX_CLIENT_ID }}
+      CHECKMARX_SECRET: ${{ secrets.CHECKMARX_SECRET }}
+      CHECKMARX_TENANT: ${{ secrets.CHECKMARX_TENANT }}
 ```
 
-> 📖 **Complete Configuration Guide**: See [Configurable Thresholds](docs/12-CONFIGURABLE-THRESHOLDS.md) for detailed configuration options and examples.
+### For PR Security Checks
 
-#### Azure Static Web Apps
-```
-AZURE_STATIC_WEB_APPS_API_TOKEN_DEV      # Development deployment token
-AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING  # Staging deployment token
-AZURE_STATIC_WEB_APPS_API_TOKEN_PROD     # Production deployment token
-```
+Copy `pr-security-check.yml` to your frontend app at `.github/workflows/pr-security-check.yml`.
 
-#### Security Scanning
-```
-SONAR_TOKEN                   # SonarCloud authentication token
-CHECKMARX_CLIENT             # Checkmarx client ID
-CHECKMARX_SECRET             # Checkmarx client secret
-CHECKMARX_SERVER             # Checkmarx server URL
-```
+## ⚙️ Configuration
 
-#### Notifications (Optional)
+### Shared Repository Variables
+
+Set these variables in this shared repository for organization-wide defaults:
+
+#### Security Scanning Controls:
 ```
-SLACK_WEBHOOK_URL            # Slack webhook for notifications
-TEAMS_WEBHOOK_URL            # Microsoft Teams webhook
+ENABLE_SONAR_SCAN = "true"
+ENABLE_CHECKMARX_SCAN = "true"
 ```
 
-## 🚀 Deployment Strategies
-
-Choose the deployment approach that fits your team's needs:
-
-### 🏭 Enterprise-Grade (Maximum Features)
-For large teams requiring comprehensive security and compliance controls.
-
-### 🎯 Intermediate (Recommended)
-Production-grade features with manageable complexity - **best of both worlds**.
-
-**Intermediate Deployment Features:**
-- ✅ **All deployment features you requested** (dev/staging short SHA, pre-prod/prod semantic tags)
-- ✅ **Production-grade security** (configurable thresholds, risk assessment, quality gates)
-- ✅ **Manageable complexity** (single workflow file, clear logic, easy to understand)
-- ✅ **Comprehensive controls** (manual overrides, approval workflows, emergency deployments)
-- ✅ **Risk-based strategies** (automatic risk assessment, approval requirements)
-- ✅ **Enterprise features** (without overwhelming complexity)
-
-**Perfect for:** Most teams wanting production-grade CI/CD without enterprise complexity.
-
-> 📖 **Intermediate Guide**: See [Intermediate Deployment Guide](docs/INTERMEDIATE-DEPLOYMENT-GUIDE.md) for complete setup.
-
-### 🚀 Simplified (Easy to Maintain)  
-For smaller teams wanting essential features without complexity.
-
-**Simple Deployment Features:**
-- ✅ **Easy to understand** deployment logic (3 environments, simple rules)
-- ✅ **Minimal configuration** required (just Azure Static Web Apps tokens)
-- ✅ **Essential features only** (build, test, deploy, version tracking)
-- ✅ **Optional security scanning** (SonarCloud, Checkmarx - easily disabled)
-- ✅ **Standard workflows** (branch → dev/staging, tags → production)
-- ✅ **Quick setup** (works with any React/Node.js/static site project)
-
-**Perfect for:** Small teams, personal projects, startups, or teams that want CI/CD without complexity.
-
-> 📖 **Simple Guide**: See [Simple Deployment Guide](docs/SIMPLE-DEPLOYMENT-GUIDE.md) for easy setup instructions.
-
----
-
-## 🏭 Enterprise-Grade Deployment Strategy
-
-Our enterprise-level deployment pipeline implements comprehensive security controls and risk management:
-
-### Environment Promotion Flow
+#### Quality Gate Thresholds:
 ```
-🔧 Development → 🧪 Staging → 🎯 Pre-Production → 🏭 Production
-     ↓              ↓              ↓              ↓
- Short SHA      Short SHA     Semantic Ver   Semantic Ver
- Basic Tests    Integration   Full Testing   Enterprise
- Fast Feedback  User Testing  Security       Validation
+MIN_CODE_COVERAGE = "80"
+MAX_CRITICAL_VULNERABILITIES = "0"
+MAX_HIGH_VULNERABILITIES = "2"
 ```
 
-### Deployment Triggers & Versioning
-
-| Environment | Trigger | Version Format | Security Level | Approval |
-|-------------|---------|----------------|----------------|----------|
-| **Development** | Branches (feature/*, develop) | `dev-{sha}-{timestamp}` | Basic | None |
-| **Staging** | Branches (main, staging) | `staging-{sha}-{timestamp}` | Standard | Optional |
-| **Pre-Production** | Tags (v1.2.3-rc.1) | `v1.2.3-rc.1` | Enhanced | Required for RC |
-| **Production** | Tags (v1.2.3) | `v1.2.3` | Maximum | Mandatory |
-
-### Production-Grade Controls
-
-- ✅ **GPG-signed tag verification** for production releases
-- ✅ **Deployment time windows** (business hours enforcement)
-- ✅ **Risk-based approval workflows** (major/minor/patch releases)
-- ✅ **Comprehensive security scanning** (SAST, SCA, KICS)
-- ✅ **Documentation requirements** (CHANGELOG.md validation)
-- ✅ **Emergency deployment overrides** for critical fixes
-- ✅ **Automated rollback capabilities** with health checks
-
-> 📖 **Enterprise Guide**: See [Production-Grade Deployment](docs/14-PRODUCTION-GRADE-DEPLOYMENT.md) for complete implementation details.
-
-## 🏗️ Architecture
-
-### Workflow Structure
+#### SonarCloud Configuration:
 ```
-.github/
-├── workflows/
-│   ├── ci-cd.yml              # Main CI/CD pipeline
-│   ├── branch-protection.yml  # Branch protection enforcement
-│   └── semantic-release.yml   # Automated versioning
-├── actions/
-│   ├── setup-node/           # Node.js setup with caching
-│   ├── security-scan/        # Security scanning composite action
-│   ├── azure-keyvault/       # Azure Key Vault integration
-│   └── deploy-static-app/    # Azure Static Web Apps deployment
-├── ISSUE_TEMPLATE/           # Issue templates
-├── PULL_REQUEST_TEMPLATE/    # PR templates
-└── CODEOWNERS               # Code review assignments
+SONAR_HOST_URL = "https://sonarcloud.io"
+SONAR_SKIP_SSL_VERIFICATION = "false"
 ```
 
-### Environment Strategy
+#### Checkmarx Configuration:
+```
+CHECKMARX_SCAN_TYPES = "sast,sca"
+CHECKMARX_PRESET = "Checkmarx Default"
+```
 
-| Environment | Branch | Trigger | Version Format | URL |
-|-------------|---------|---------|----------------|-----|
-| Development | `develop` | Push to develop | Short SHA | `https://dev-app.azurestaticapps.net` |
-| Staging | `main` | Push to main | Short SHA | `https://staging-app.azurestaticapps.net` |
-| Pre-Production | `release/**` | Push to release branch | Release version | `https://preprod-app.azurestaticapps.net` |
-| Production | `main` | Semantic release tag | Semantic version | `https://prod-app.azurestaticapps.net` |
+### Frontend Application Secrets
 
-## 🔄 CI/CD Pipeline
+Set these secrets in each frontend application repository:
 
-### Pull Request Validation
-When a PR is opened against `main` or `develop`:
-1. **Code Quality**: Linting and formatting checks
-2. **Testing**: Unit and integration tests
-3. **Security Scanning**: SonarCloud and Checkmarx scans
-4. **Regression Testing**: E2E tests
-5. **Branch Protection**: Enforce protection rules
+#### Required Azure Secrets:
+- `AZURE_STATIC_WEB_APPS_API_TOKEN_DEV`
+- `AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING`
+- `AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD`
+- `AZURE_STATIC_WEB_APPS_API_TOKEN_PROD`
 
-### Development Deployment
-On push to `develop` branch:
-1. **Build**: Compile application for development
-2. **Secrets**: Retrieve from Azure Key Vault
-3. **Deploy**: Deploy to development environment
-4. **Verify**: Health check and smoke tests
+#### Required Security Scanning Secrets:
+- `SONAR_TOKEN`
+- `CHECKMARX_CLIENT_ID`
+- `CHECKMARX_SECRET`
+- `CHECKMARX_TENANT`
 
-### Staging Deployment
-On push to `main` branch:
-1. **Build**: Compile application for staging
-2. **Testing**: Full test suite including E2E
-3. **Secrets**: Retrieve from Azure Key Vault
-4. **Deploy**: Deploy to staging environment
-5. **Verify**: Health check and integration tests
+#### Optional Variables in Frontend Apps:
+- `SONAR_ORGANIZATION`
 
-### Pre-Production Deployment
-On push to `release/**` branch:
-1. **Build**: Compile application for pre-production
-2. **Testing**: Complete test suite including performance
-3. **Security**: Full security scan
-4. **Secrets**: Retrieve from Azure Key Vault
-5. **Deploy**: Deploy to pre-production environment
-6. **Verify**: Health check and integration tests
+## 🔧 Features
 
-### Production Deployment
-On semantic release tag:
-1. **Build**: Compile application for production
-2. **Testing**: Complete test suite including performance
-3. **Security**: Full security scan
-4. **Secrets**: Retrieve from Azure Key Vault
-5. **Deploy**: Deploy to production environment
-6. **Verify**: Health check and monitoring setup
-7. **Notify**: Send deployment notifications
+### ✅ **Centralized CI/CD Pipeline**
+- Build, test, and deploy frontend applications
+- Multi-environment deployment (dev, staging, pre-prod, prod)
+- Automatic version generation and deployment strategy
 
-## 🔧 Configuration
+### ✅ **Security Scanning**
+- **SonarCloud Analysis** - Code quality and coverage analysis
+- **Checkmarx AST** - Security vulnerability scanning
+- Configurable quality gates and thresholds
 
-### Environment Configuration
-Each environment has its own configuration file in the `environments/` directory:
+### ✅ **Azure Static Web Apps Integration**
+- Automated deployment to Azure Static Web Apps
+- Docker permission fixes for reliable deployments
+- Health checks and deployment validation
 
-- `environments/development.json`
-- `environments/staging.json`
-- `environments/pre-production.json`
-- `environments/production.json`
+### ✅ **Flexible Configuration**
+- Centralized defaults with override capability
+- Framework-agnostic (React, Vue, Angular, Next.js)
+- Environment-specific configurations
 
-### Application Configuration
-Copy `.env.example` to `.env` and configure your environment variables:
+## 📋 Migration
+
+### Automated Migration
+
+Use the provided migration script:
 
 ```bash
-cp .env.example .env
+./setup-shared-repository.sh
 ```
 
-### Package.json Scripts
-Ensure your `package.json` includes the following scripts:
+### Manual Setup
 
-```json
-{
-  "scripts": {
-    "build": "react-scripts build",
-    "build:prod": "NODE_ENV=production npm run build",
-    "test": "react-scripts test",
-    "test:coverage": "npm test -- --coverage --watchAll=false",
-    "test:e2e": "cypress run",
-    "test:performance": "lighthouse-ci",
-    "lint": "eslint src/**/*.{js,jsx,ts,tsx}",
-    "lint:fix": "eslint src/**/*.{js,jsx,ts,tsx} --fix"
-  }
-}
-```
+1. **Copy workflows and actions** from this repository
+2. **Set up repository variables** for organization defaults
+3. **Update frontend applications** to use shared workflow
+4. **Configure secrets** in each frontend repository
 
-## 🔐 Security
+## 📚 Documentation
 
-### Branch Protection Rules
-- **Main Branch**: Requires 2 approvals, no direct pushes
-- **Develop Branch**: Requires 1 approval, allows merge after checks
-- **Required Checks**: All security scans and tests must pass
+- [`SHARED_WORKFLOW_MIGRATION_GUIDE.md`](SHARED_WORKFLOW_MIGRATION_GUIDE.md) - Complete migration guide
+- [`AZURE_DEPLOYMENT_TROUBLESHOOTING.md`](AZURE_DEPLOYMENT_TROUBLESHOOTING.md) - Azure deployment issues
+- [`CHECKMARX_TROUBLESHOOTING.md`](CHECKMARX_TROUBLESHOOTING.md) - Checkmarx authentication help
+- [`SHARED_WORKFLOW_CENTRALIZATION_UPDATE.md`](SHARED_WORKFLOW_CENTRALIZATION_UPDATE.md) - Architecture details
 
-### Security Scanning
-- **SonarCloud**: Code quality and security analysis
-- **Checkmarx**: SAST security scanning
-- **Dependency Check**: Automated dependency vulnerability scanning
+## 🎯 Benefits
 
-### Secrets Management
-- All secrets stored in Azure Key Vault
-- Environment-specific Key Vaults
-- Automatic secret rotation support
-- Secrets masked in logs
+### **Centralized Maintenance**
+- Update CI/CD logic once, applies to all frontend apps
+- Consistent deployment patterns across projects
+- Easier security updates and compliance
 
-## 📊 Monitoring and Notifications
+### **Simplified Frontend Apps**
+- Minimal workflow configuration required
+- Focus on application code, not CI/CD complexity
+- Standardized quality gates and security scanning
 
-### Deployment Tracking
-- Automatic deployment issues created
-- Deployment status tracking
-- Health check monitoring
-- Performance metrics collection
-
-### Notifications
-- Slack notifications for deployments
-- Microsoft Teams integration
-- Email notifications for failures
-- GitHub issue creation for tracking
-
-## 🛠️ Development Workflow
-
-### Feature Development
-1. Create feature branch from `develop`
-2. Implement feature with tests
-3. Create PR against `develop`
-4. Pass all quality gates
-5. Merge after approval
-
-### Release Process
-1. Create `release/vX.Y.Z` branch from `develop`
-2. Deploy to pre-production for testing
-3. Merge release branch into `main`
-4. Semantic release creates version tag
-5. Automatic production deployment
-6. Post-deployment verification
-
-### Hotfix Process
-1. Create hotfix branch from `main`
-2. Implement fix with tests
-3. Create PR against `main`
-4. Emergency deployment process
+### **Better Governance**
+- Organization-wide security standards
+- Centralized control over quality thresholds
+- Audit trail for configuration changes
 
 ## 🔍 Troubleshooting
 
 ### Common Issues
 
-#### Deployment Failures
-- Check Azure Static Web Apps logs
-- Verify Key Vault permissions
-- Ensure all secrets are configured
-- Check build output directory
+1. **Workflow not found**: Ensure repository path is correct
+2. **Secrets not available**: Verify secrets are set in frontend repository
+3. **Permission denied**: Check Azure deployment token permissions
+4. **Security scan failures**: Review troubleshooting documentation
 
-#### Security Scan Failures
-- Review SonarCloud quality gate
-- Check Checkmarx scan results
-- Update vulnerable dependencies
-- Fix code quality issues
+### Getting Help
 
-#### Test Failures
-- Run tests locally first
-- Check test environment setup
-- Verify mock data and fixtures
-- Review test coverage requirements
-
-### Debugging
-- Enable debug logging in workflows
-- Check Action outputs and artifacts
-- Review deployment summaries
-- Monitor health check results
-
-## 📚 Documentation
-
-### Additional Resources
-- [Azure Static Web Apps Documentation](https://docs.microsoft.com/en-us/azure/static-web-apps/)
-- [GitHub Actions Documentation](https://docs.github.com/en/actions)
-- [SonarCloud Documentation](https://docs.sonarcloud.io/)
-- [Semantic Release Documentation](https://semantic-release.gitbook.io/)
-
-### Team Guidelines
-- Follow conventional commit format
-- Include comprehensive PR descriptions
-- Add appropriate labels to issues
-- Update documentation with changes
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests and documentation
-5. Submit a pull request
+1. Check the troubleshooting documentation
+2. Review workflow logs in GitHub Actions
+3. Validate repository secrets and variables
+4. Create an issue in this repository
 
 ## 📝 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🆘 Support
-
-For support and questions:
-- Create an issue in this repository
-- Contact the DevOps team
-- Check the troubleshooting guide
-- Review the FAQ section
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
-**Note**: This workflow system is designed for production use and includes comprehensive security, quality, and monitoring features. Ensure all prerequisites are met before deployment.
+**Maintained by:** DevOps Team  
+**Last Updated:** 2024
+
+For questions or support, please create an issue in this repository.
