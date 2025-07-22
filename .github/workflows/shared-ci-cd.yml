@@ -7,6 +7,7 @@ name: Shared Frontend CI/CD Pipeline
 #
 # Simple Production-Grade Versioning Strategy:
 # - Development/Staging: Short SHA (e.g., a1b2c3d4) 
+# - Release branches (release/**): Semantic version from git tags (e.g., v1.2.3) or SHA fallback
 # - Pre-Production/Production: Semantic version from git tags (e.g., v1.2.3) or SHA fallback
 
 on:
@@ -166,18 +167,19 @@ jobs:
             # Auto deployment based on branch
             case $BRANCH in
               main|master|preprod|pre-production) IS_PREPROD_OR_PROD="true" ;;
+              release/*) IS_PREPROD_OR_PROD="true" ;;
             esac
           fi
           
           # Version strategy
           if [ "$IS_PREPROD_OR_PROD" = "true" ]; then
-            # Pre-production and Production: Use semantic version from tags
+            # Release branches, Pre-production and Production: Use semantic version from tags
             if [[ "${{ github.ref }}" == refs/tags/* ]]; then
               VERSION=${GITHUB_REF#refs/tags/}
               echo "Using semantic version from tag: $VERSION"
             else
               VERSION="$SHORT_SHA"
-              echo "No tag found, using SHA for pre-prod/prod: $VERSION"
+              echo "No tag found, using SHA for release/pre-prod/prod: $VERSION"
             fi
           else
             # Development and Staging: Always use SHA
@@ -217,6 +219,12 @@ jobs:
               develop|development) DEPLOY_DEV="true" ;;
               staging) DEPLOY_STAGING="true" ;;
               preprod|pre-production) DEPLOY_PREPROD="true" ;;
+              release/*) 
+                # Release branches deploy to both pre-prod and prod for release validation
+                DEPLOY_PREPROD="true"
+                DEPLOY_PROD="true"
+                echo "Release branch detected: $BRANCH - deploying to pre-prod and production"
+                ;;
               *) DEPLOY_DEV="true" ;;
             esac
           fi
@@ -225,6 +233,8 @@ jobs:
           echo "deploy-staging=$DEPLOY_STAGING" >> $GITHUB_OUTPUT
           echo "deploy-preprod=$DEPLOY_PREPROD" >> $GITHUB_OUTPUT
           echo "deploy-prod=$DEPLOY_PROD" >> $GITHUB_OUTPUT
+          
+          echo "Deployment strategy: Dev=$DEPLOY_DEV, Staging=$DEPLOY_STAGING, Pre-prod=$DEPLOY_PREPROD, Prod=$DEPLOY_PROD"
 
   build-and-test:
     runs-on: ubuntu-latest
