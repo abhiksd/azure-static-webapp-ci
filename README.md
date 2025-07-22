@@ -148,6 +148,7 @@ Use the provided migration script:
 - [`CHECKMARX_TROUBLESHOOTING.md`](CHECKMARX_TROUBLESHOOTING.md) - Checkmarx authentication help
 - [`SHARED_WORKFLOW_CENTRALIZATION_UPDATE.md`](SHARED_WORKFLOW_CENTRALIZATION_UPDATE.md) - Architecture details
 - [`SHARED_WORKFLOW_VARIABLES.md`](SHARED_WORKFLOW_VARIABLES.md) - Centralized variables configuration
+- [`COMPLETE_CENTRALIZATION_SUMMARY.md`](COMPLETE_CENTRALIZATION_SUMMARY.md) - Ultimate centralized control overview
 
 ## 🎯 Benefits
 

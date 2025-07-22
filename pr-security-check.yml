@@ -9,20 +9,13 @@ on:
         description: 'PR number to check'
         required: true
         type: string
-      enable_sonar:
-        description: 'Enable SonarCloud analysis'
-        type: boolean
-        default: true
-      enable_checkmarx:
-        description: 'Enable Checkmarx security scanning'
-        type: boolean
-        default: true
+
 
 env:
   NODE_VERSION: '18'
-  # Security scanning controls
-  ENABLE_SONAR: ${{ github.event.inputs.enable_sonar || vars.ENABLE_SONAR_SCAN || 'true' }}
-  ENABLE_CHECKMARX: ${{ github.event.inputs.enable_checkmarx || vars.ENABLE_CHECKMARX_SCAN || 'true' }}
+  # Security scanning controls (centralized in shared repository)
+  ENABLE_SONAR: ${{ vars.ENABLE_SONAR_SCAN || 'true' }}
+  ENABLE_CHECKMARX: ${{ vars.ENABLE_CHECKMARX_SCAN || 'true' }}
   
   # Quality gate thresholds (can be customized via repository variables)
   MIN_CODE_COVERAGE: ${{ vars.MIN_CODE_COVERAGE || '80' }}

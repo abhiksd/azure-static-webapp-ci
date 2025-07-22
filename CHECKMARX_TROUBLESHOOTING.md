@@ -78,18 +78,14 @@ Instead of:
 
 ## Alternative: Disable Checkmarx Temporarily
 
-If you want to disable Checkmarx scanning temporarily:
+If you want to disable Checkmarx scanning:
 
-**Set Repository Variable:**
+**Set Repository Variable in Shared Workflow Repository:**
 ```bash
 ENABLE_CHECKMARX_SCAN = "false"
 ```
 
-Or use workflow dispatch input:
-```bash
-# When running workflow manually, set:
-enable_checkmarx = false
-```
+**Note:** All security scanning controls are now centralized in the shared workflow repository. Frontend teams cannot override these settings.
 
 ## Common Issues:
 

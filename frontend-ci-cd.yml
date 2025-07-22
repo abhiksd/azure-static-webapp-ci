@@ -18,18 +18,7 @@ on:
         - staging
         - pre-production
         - production
-      enable_sonar:
-        description: 'Enable SonarCloud analysis'
-        type: boolean
-        default: true
-      enable_checkmarx:
-        description: 'Enable Checkmarx security scanning'
-        type: boolean
-        default: true
-      force_version:
-        description: 'Override version (production only)'
-        required: false
-        type: string
+
 
 jobs:
   call-shared-workflow:

@@ -44,18 +44,6 @@ on:
         - staging
         - pre-production
         - production
-      enable_sonar:
-        description: 'Enable SonarCloud analysis'
-        type: boolean
-        default: true
-      enable_checkmarx:
-        description: 'Enable Checkmarx security scanning'
-        type: boolean
-        default: true
-      force_version:
-        description: 'Override version (production only)'
-        required: false
-        type: string
 
 jobs:
   call-shared-workflow:
@@ -71,16 +59,8 @@ jobs:
       # Environment
       environment: ${{ github.event.inputs.environment || 'development' }}
       
-      # Optional overrides (only if different from shared defaults)
-      enable-sonar: ${{ github.event.inputs.enable_sonar }}
-      enable-checkmarx: ${{ github.event.inputs.enable_checkmarx }}
-      min-code-coverage: '75'           # Override if needed
-      max-critical-vulnerabilities: '0' # Override if needed
-      max-high-vulnerabilities: '5'     # Override if needed
-      
-      # Deployment controls
-      skip-deployment: false
-      force-version: ${{ github.event.inputs.force_version }}
+      # All configuration is now centralized in the shared workflow repository
+      # No overrides needed - everything controlled via repository variables
     
     secrets:
       # Azure Static Web Apps API tokens
