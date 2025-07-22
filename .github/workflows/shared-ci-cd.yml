@@ -136,6 +136,10 @@ jobs:
       should-deploy-preprod: ${{ steps.deployment-logic.outputs.deploy-preprod }}
       should-deploy-prod: ${{ steps.deployment-logic.outputs.deploy-prod }}
       version: ${{ steps.version.outputs.version }}
+      dev-version: ${{ steps.version.outputs.dev-version }}
+      staging-version: ${{ steps.version.outputs.staging-version }}
+      preprod-version: ${{ steps.version.outputs.preprod-version }}
+      prod-version: ${{ steps.version.outputs.prod-version }}
     
     steps:
       - name: Checkout Code
