@@ -307,6 +307,22 @@ jobs:
           max-blocker-issues: ${{ vars.MAX_BLOCKER_ISSUES || '0' }}
           max-critical-issues: ${{ vars.MAX_CRITICAL_ISSUES || '0' }}
 
+      - name: Debug Checkmarx Configuration
+        if: env.ENABLE_CHECKMARX == 'true'
+        run: |
+          echo "=== Checkmarx Debug Information ==="
+          echo "ENABLE_CHECKMARX: ${{ env.ENABLE_CHECKMARX }}"
+          echo "CHECKMARX_BASE_URI: ${{ secrets.CHECKMARX_BASE_URI || 'https://ast.checkmarx.net' }}"
+          echo "CHECKMARX_CLIENT_ID: ${CHECKMARX_CLIENT_ID:0:8}$([ ${#CHECKMARX_CLIENT_ID} -gt 8 ] && echo '...' || echo '')"
+          echo "CHECKMARX_SECRET: ${CHECKMARX_SECRET:0:8}$([ ${#CHECKMARX_SECRET} -gt 8 ] && echo '...' || echo '')"
+          echo "CHECKMARX_TENANT: $CHECKMARX_TENANT"
+          echo "SCAN_TYPES: ${{ vars.CHECKMARX_SCAN_TYPES || 'sca,sast,kics' }}"
+          echo "=== End Debug ==="
+        env:
+          CHECKMARX_CLIENT_ID: ${{ secrets.CHECKMARX_CLIENT_ID }}
+          CHECKMARX_SECRET: ${{ secrets.CHECKMARX_SECRET }}
+          CHECKMARX_TENANT: ${{ secrets.CHECKMARX_TENANT }}
+
       - name: Checkmarx Security Scan
         id: checkmarx-scan
         uses: ./.github/actions/checkmarx-scan
