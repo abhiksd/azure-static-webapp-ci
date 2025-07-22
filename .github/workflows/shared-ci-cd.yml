@@ -207,7 +207,10 @@ jobs:
           cache: 'npm'
 
       - name: Install Dependencies and Build
+        working-directory: ${{ env.APP_LOCATION }}
         run: |
+          echo "Working in directory: ${{ env.APP_LOCATION }}"
+          pwd
           echo "Installing dependencies..."
           ${{ env.INSTALL_COMMAND }}
           echo "Building application (single build for all deployments)..."
@@ -217,13 +220,24 @@ jobs:
 
       - name: Verify Build Output
         run: |
-          if [ -d "${{ env.OUTPUT_LOCATION }}" ]; then
-            echo "Build completed successfully"
-            echo "Build output size: $(du -sh ${{ env.OUTPUT_LOCATION }} | cut -f1)"
-            echo "Build contents:"
-            ls -la ${{ env.OUTPUT_LOCATION }}
+          # Check if OUTPUT_LOCATION is relative to APP_LOCATION or absolute
+          if [[ "${{ env.OUTPUT_LOCATION }}" == /* ]]; then
+            BUILD_PATH="${{ env.OUTPUT_LOCATION }}"
           else
-            echo "ERROR: Build output directory not found: ${{ env.OUTPUT_LOCATION }}"
+            BUILD_PATH="${{ env.APP_LOCATION }}/${{ env.OUTPUT_LOCATION }}"
+          fi
+          
+          echo "Checking build output at: $BUILD_PATH"
+          
+          if [ -d "$BUILD_PATH" ]; then
+            echo "Build completed successfully"
+            echo "Build output size: $(du -sh $BUILD_PATH | cut -f1)"
+            echo "Build contents:"
+            ls -la $BUILD_PATH
+          else
+            echo "ERROR: Build output directory not found: $BUILD_PATH"
+            echo "Available directories in APP_LOCATION:"
+            ls -la ${{ env.APP_LOCATION }}
             exit 1
           fi
 
@@ -231,7 +245,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-artifacts
-          path: ${{ env.OUTPUT_LOCATION }}/
+          path: ${{ env.APP_LOCATION }}/${{ env.OUTPUT_LOCATION }}/
           retention-days: 7
           compression-level: 6
 
@@ -258,7 +272,11 @@ jobs:
           cache: 'npm'
 
       - name: Install Dependencies
-        run: ${{ env.INSTALL_COMMAND }}
+        working-directory: ${{ env.APP_LOCATION }}
+        run: |
+          echo "Installing dependencies in: ${{ env.APP_LOCATION }}"
+          pwd
+          ${{ env.INSTALL_COMMAND }}
 
       - name: SonarCloud Analysis
         id: sonar-scan
@@ -273,6 +291,7 @@ jobs:
           min-code-coverage: ${{ env.MIN_CODE_COVERAGE }}
           max-blocker-issues: ${{ env.MAX_BLOCKER_ISSUES }}
           max-critical-issues: ${{ env.MAX_CRITICAL_ISSUES }}
+          app-location: ${{ env.APP_LOCATION }}
 
   checkmarx-scan:
     runs-on: ubuntu-latest
@@ -296,7 +315,11 @@ jobs:
           cache: 'npm'
 
       - name: Install Dependencies
-        run: ${{ env.INSTALL_COMMAND }}
+        working-directory: ${{ env.APP_LOCATION }}
+        run: |
+          echo "Installing dependencies in: ${{ env.APP_LOCATION }}"
+          pwd
+          ${{ env.INSTALL_COMMAND }}
 
       - name: Checkmarx Security Scan
         id: checkmarx-security
@@ -311,6 +334,7 @@ jobs:
           max-critical: ${{ env.MAX_CRITICAL_VULNERABILITIES }}
           max-high: ${{ env.MAX_HIGH_VULNERABILITIES }}
           preset: ${{ env.CHECKMARX_PRESET }}
+          app-location: ${{ env.APP_LOCATION }}
 
   deploy-dev:
     if: always() && needs.detect-deployment.outputs.should-deploy-dev == 'true' && env.SKIP_DEPLOYMENT != 'true'

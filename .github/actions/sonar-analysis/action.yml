@@ -38,6 +38,10 @@ inputs:
     description: 'Maximum critical issues allowed'
     required: false
     default: '0'
+  app-location:
+    description: 'Application source code location relative to repository root'
+    required: false
+    default: '/'
 
 outputs:
   status:
@@ -64,12 +68,20 @@ runs:
     - name: Run SonarCloud Scan
       if: inputs.enabled == 'true'
       shell: bash
+      working-directory: ${{ inputs.app-location }}
       run: |
+        echo "Running SonarCloud scan from directory: ${{ inputs.app-location }}"
+        
         # Handle SSL verification for self-signed certificates
         if [ "${{ inputs.skip-ssl-verification }}" = "true" ]; then
           export NODE_TLS_REJECT_UNAUTHORIZED=0
           echo "Warning: SSL certificate verification disabled"
         fi
+        
+        # Ensure we're in the correct directory and show contents
+        pwd
+        echo "Scanning files in:"
+        ls -la
         
         sonar-scanner \
           -Dsonar.projectKey=${{ inputs.project-key || github.repository }} \

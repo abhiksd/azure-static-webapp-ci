@@ -35,6 +35,10 @@ inputs:
     description: 'Maximum high vulnerabilities'
     required: false
     default: '5'
+  app-location:
+    description: 'Application source code location relative to repository root'
+    required: false
+    default: '/'
 
 outputs:
   status:
@@ -50,6 +54,16 @@ outputs:
 runs:
   using: 'composite'
   steps:
+    - name: Change to App Directory
+      if: inputs.enabled == 'true'
+      shell: bash
+      run: |
+        echo "Changing to app directory: ${{ inputs.app-location }}"
+        cd "${{ inputs.app-location }}"
+        pwd
+        echo "Scanning files in:"
+        ls -la
+
     - name: Run Checkmarx AST
       if: inputs.enabled == 'true'
       uses: checkmarx/ast-github-action@86e9ae570a811f9a1fb85903647a307aa3bf6253
@@ -59,13 +73,17 @@ runs:
         base_uri: ${{ inputs.base-uri }}
         cx_client_id: ${{ inputs.checkmarx-client-id }}
         cx_client_secret: ${{ inputs.checkmarx-secret }}
-        additional_params: --scan-types ${{ inputs.scan-types }} --report-format sarif --output-path . --sast-preset-name "${{ inputs.preset }}"
+        additional_params: --scan-types ${{ inputs.scan-types }} --report-format sarif --output-path . --sast-preset-name "${{ inputs.preset }}" --project-dir "${{ inputs.app-location }}"
 
     - name: Get Results
       id: results
       if: inputs.enabled == 'true'
       shell: bash
+      working-directory: ${{ inputs.app-location }}
       run: |
+        echo "Looking for SARIF results in: ${{ inputs.app-location }}"
+        pwd
+        
         CRITICAL=0
         HIGH=0
         
