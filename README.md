@@ -7,7 +7,8 @@ A centralized repository containing reusable GitHub Actions workflows and compos
 ```
 ├── .github/
 │   ├── workflows/
-│   │   └── shared-ci-cd.yml              # Main reusable workflow
+│   │   ├── shared-ci-cd.yml              # Main reusable workflow
+│   │   └── manual-rollback.yml           # Manual rollback workflow
 │   └── actions/                          # Composite actions
 │       ├── sonar-analysis/               # SonarCloud scanning
 │       ├── checkmarx-scan/               # Checkmarx security scanning
@@ -149,6 +150,7 @@ Use the provided migration script:
 - [`SHARED_WORKFLOW_CENTRALIZATION_UPDATE.md`](SHARED_WORKFLOW_CENTRALIZATION_UPDATE.md) - Architecture details
 - [`SHARED_WORKFLOW_VARIABLES.md`](SHARED_WORKFLOW_VARIABLES.md) - Centralized variables configuration
 - [`COMPLETE_CENTRALIZATION_SUMMARY.md`](COMPLETE_CENTRALIZATION_SUMMARY.md) - Ultimate centralized control overview
+- [`ROLLBACK_GUIDE.md`](ROLLBACK_GUIDE.md) - Comprehensive rollback procedures and troubleshooting
 
 ## 🎯 Benefits
 
@@ -166,6 +168,12 @@ Use the provided migration script:
 - Organization-wide security standards
 - Centralized control over quality thresholds
 - Audit trail for configuration changes
+
+### **Robust Rollback Capabilities**
+- Automatic rollback on deployment failures
+- Manual rollback for emergency situations
+- Version history and audit trail
+- Graceful recovery for production issues
 
 ## 🔍 Troubleshooting
 
