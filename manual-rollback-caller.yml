@@ -1,0 +1,39 @@
+name: Manual Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to rollback'
+        required: true
+        type: choice
+        options:
+        - development
+        - staging
+        - pre-production
+        - production
+      target_version:
+        description: 'Version to rollback to (optional - uses last successful if empty)'
+        required: false
+        type: string
+      reason:
+        description: 'Reason for rollback'
+        required: true
+        type: string
+
+jobs:
+  rollback:
+    uses: YOUR_ORG/shared-ci-cd-workflows/.github/workflows/manual-rollback.yml@main
+    with:
+      environment: ${{ github.event.inputs.environment }}
+      target_version: ${{ github.event.inputs.target_version }}
+      reason: ${{ github.event.inputs.reason }}
+    secrets:
+      # Azure Static Web Apps API tokens (environment-specific)
+      AZURE_STATIC_WEB_APPS_API_TOKEN_DEV: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_DEV }}
+      AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING }}
+      AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD }}
+      AZURE_STATIC_WEB_APPS_API_TOKEN_PROD: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PROD }}
+      
+      # GitHub token for repository access and deployment tracking
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -33,7 +33,8 @@ Shared CI/CD Repository (THIS REPO)
 Frontend App Repository
 ├── .github/workflows/
 │   ├── ci-cd.yml                     # Copied from frontend-ci-cd.yml
-│   └── pr-security-check.yml        # Copied from shared repo
+│   ├── pr-security-check.yml        # Copied from shared repo
+│   └── manual-rollback.yml          # Copied from manual-rollback-caller.yml
 ├── src/                              # Application code
 ├── package.json                      # Build scripts required
 └── staticwebapp.config.json         # Optional Azure config
@@ -110,6 +111,9 @@ cp frontend-ci-cd.yml .github/workflows/ci-cd.yml
 
 # Copy PR security check workflow
 cp pr-security-check.yml .github/workflows/pr-security-check.yml
+
+# Copy manual rollback caller workflow
+cp manual-rollback-caller.yml .github/workflows/manual-rollback.yml
 ```
 
 ### **Step 2: Update Repository Reference**
@@ -175,11 +179,11 @@ CHECKMARX_TENANT                         # Checkmarx tenant
 - Updates deployment summary with rollback status
 
 ### **Manual Emergency Rollback**
-1. Go to shared repository → Actions → Manual Rollback
-2. Select environment (pre-production or production)
+1. Go to frontend app → Actions → Manual Rollback
+2. Select environment (development, staging, pre-production, or production)
 3. Optionally specify target version (or leave empty for auto-detect)
 4. Provide rollback reason (required for audit)
-5. Execute rollback with full validation
+5. Execute - calls shared workflow with centralized logic and validation
 
 ### **Rollback Validation**
 - ✅ Previous successful deployment exists
@@ -269,6 +273,7 @@ CHECKMARX_TENANT                         # Checkmarx tenant
 ### **Ready-to-Use Files**
 - **[frontend-ci-cd.yml](frontend-ci-cd.yml)** - Copy to frontend apps as `.github/workflows/ci-cd.yml`
 - **[pr-security-check.yml](pr-security-check.yml)** - Copy to frontend apps for PR validation
+- **[manual-rollback-caller.yml](manual-rollback-caller.yml)** - Copy to frontend apps as `.github/workflows/manual-rollback.yml`
 - **[setup-shared-repository.sh](setup-shared-repository.sh)** - Automated setup script
 
 ---

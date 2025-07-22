@@ -1,31 +1,50 @@
-name: Manual Rollback
+name: Reusable Manual Rollback
 
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
       environment:
         description: 'Environment to rollback'
         required: true
-        type: choice
-        options:
-        - pre-production
-        - production
+        type: string
       target_version:
-        description: 'Specific version to rollback to (optional - uses last successful if empty)'
+        description: 'Version to rollback to (optional - uses last successful if empty)'
         required: false
         type: string
       reason:
         description: 'Reason for rollback'
         required: true
         type: string
+    
+    secrets:
+      # Azure Static Web Apps API tokens
+      AZURE_STATIC_WEB_APPS_API_TOKEN_DEV:
+        description: 'Azure Static Web Apps API token for development'
+        required: false
+      AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING:
+        description: 'Azure Static Web Apps API token for staging'
+        required: false
+      AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD:
+        description: 'Azure Static Web Apps API token for pre-production'
+        required: false
+      AZURE_STATIC_WEB_APPS_API_TOKEN_PROD:
+        description: 'Azure Static Web Apps API token for production'
+        required: false
+      
+      # GitHub token for API access
+      GITHUB_TOKEN:
+        description: 'GitHub token for repository access'
+        required: false
 
 env:
-  # Build configuration (centralized in shared workflow)
+  # Build configuration (centralized in shared workflow) - reuse same variables
   NODE_VERSION: ${{ vars.NODE_VERSION || '18' }}
   APP_LOCATION: ${{ vars.APP_LOCATION || '/' }}
   OUTPUT_LOCATION: ${{ vars.OUTPUT_LOCATION || 'build' }}
+  BUILD_COMMAND: ${{ vars.BUILD_COMMAND || 'npm run build' }}
+  INSTALL_COMMAND: ${{ vars.INSTALL_COMMAND || 'npm ci' }}
   
-  # Common Azure Static Web Apps deployment parameters
+  # Common Azure Static Web Apps deployment parameters - reuse same pattern
   AZURE_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   AZURE_ACTION: "upload"
   AZURE_APP_LOCATION: ${{ vars.APP_LOCATION || '/' }}
@@ -38,76 +57,121 @@ jobs:
       can-rollback: ${{ steps.validation.outputs.can-rollback }}
       target-version: ${{ steps.validation.outputs.target-version }}
       current-version: ${{ steps.validation.outputs.current-version }}
+      azure-token-env-var: ${{ steps.validation.outputs.azure-token-env-var }}
     
     steps:
-      - name: Checkout Code
+      - name: Checkout Frontend Repository
         uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          token: ${{ secrets.GITHUB_TOKEN || github.token }}
+          fetch-depth: 0
 
       - name: Validate Rollback Request
         id: validation
         run: |
-          ENVIRONMENT="${{ github.event.inputs.environment }}"
-          TARGET_VERSION="${{ github.event.inputs.target_version }}"
+          ENVIRONMENT="${{ inputs.environment }}"
+          TARGET_VERSION="${{ inputs.target_version }}"
           
-          echo "Validating rollback request for $ENVIRONMENT environment"
-          echo "Reason: ${{ github.event.inputs.reason }}"
+          echo "🔄 Validating rollback request for $ENVIRONMENT environment"
+          echo "📋 Reason: ${{ inputs.reason }}"
+          echo "👤 Requested by: ${{ github.actor }}"
           
-          # Get current deployment version
+          # Determine Azure token environment variable name
+          case "$ENVIRONMENT" in
+            "development")
+              AZURE_TOKEN_VAR="AZURE_STATIC_WEB_APPS_API_TOKEN_DEV"
+              ;;
+            "staging")
+              AZURE_TOKEN_VAR="AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING"
+              ;;
+            "pre-production")
+              AZURE_TOKEN_VAR="AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD"
+              ;;
+            "production")
+              AZURE_TOKEN_VAR="AZURE_STATIC_WEB_APPS_API_TOKEN_PROD"
+              ;;
+            *)
+              echo "❌ Invalid environment: $ENVIRONMENT"
+              exit 1
+              ;;
+          esac
+          
+          echo "azure-token-env-var=$AZURE_TOKEN_VAR" >> $GITHUB_OUTPUT
+          
+          # Get current deployment version from GitHub API
           CURRENT_VERSION=$(curl -s "https://api.github.com/repos/${{ github.repository }}/deployments" \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN || github.token }}" \
             -H "Accept: application/vnd.github.v3+json" | \
             jq -r --arg env "$ENVIRONMENT" '.[] | select(.environment == $env and .statuses_url != null) | .ref' | head -n 1)
           
           if [ -z "$CURRENT_VERSION" ] || [ "$CURRENT_VERSION" = "null" ]; then
-            echo "❌ No current deployment found for $ENVIRONMENT"
-            echo "can-rollback=false" >> $GITHUB_OUTPUT
-            exit 1
+            echo "⚠️ No current deployment found for $ENVIRONMENT, proceeding with rollback"
+            CURRENT_VERSION="unknown"
           fi
           
-          echo "Current version in $ENVIRONMENT: $CURRENT_VERSION"
+          echo "📍 Current version in $ENVIRONMENT: $CURRENT_VERSION"
           echo "current-version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
           
           # Determine target version for rollback
           if [ -n "$TARGET_VERSION" ]; then
-            echo "Using specified target version: $TARGET_VERSION"
+            echo "🎯 Using specified target version: $TARGET_VERSION"
             ROLLBACK_VERSION="$TARGET_VERSION"
           else
-            # Get the previous successful deployment
+            # Get the previous successful deployment or latest tag
             ROLLBACK_VERSION=$(curl -s "https://api.github.com/repos/${{ github.repository }}/deployments" \
-              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Authorization: token ${{ secrets.GITHUB_TOKEN || github.token }}" \
               -H "Accept: application/vnd.github.v3+json" | \
               jq -r --arg env "$ENVIRONMENT" '.[] | select(.environment == $env and .statuses_url != null) | .ref' | head -n 2 | tail -n 1)
+            
+            # Fallback to latest tag if no previous deployment
+            if [ -z "$ROLLBACK_VERSION" ] || [ "$ROLLBACK_VERSION" = "null" ] || [ "$ROLLBACK_VERSION" = "$CURRENT_VERSION" ]; then
+              ROLLBACK_VERSION=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || git rev-parse HEAD~1)
+            fi
           fi
           
-          if [ -z "$ROLLBACK_VERSION" ] || [ "$ROLLBACK_VERSION" = "null" ] || [ "$ROLLBACK_VERSION" = "$CURRENT_VERSION" ]; then
+          if [ -z "$ROLLBACK_VERSION" ] || [ "$ROLLBACK_VERSION" = "null" ]; then
             echo "❌ No valid rollback version found for $ENVIRONMENT"
             echo "can-rollback=false" >> $GITHUB_OUTPUT
             exit 1
           fi
           
-          echo "Target rollback version: $ROLLBACK_VERSION"
+          # Verify target version exists
+          if ! git rev-parse --verify "$ROLLBACK_VERSION" >/dev/null 2>&1; then
+            echo "❌ Target version '$ROLLBACK_VERSION' does not exist in repository"
+            echo "can-rollback=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          
+          echo "📍 Target rollback version: $ROLLBACK_VERSION"
           echo "target-version=$ROLLBACK_VERSION" >> $GITHUB_OUTPUT
           echo "can-rollback=true" >> $GITHUB_OUTPUT
           
           echo "✅ Rollback validation successful"
 
-  rollback-preprod:
-    if: github.event.inputs.environment == 'pre-production' && needs.validate-rollback.outputs.can-rollback == 'true'
+  rollback-deployment:
+    if: needs.validate-rollback.outputs.can-rollback == 'true'
     runs-on: ubuntu-latest
     needs: [validate-rollback]
-    environment: pre-production
+    environment: ${{ inputs.environment }}
     outputs:
-      rollback-status: ${{ steps.rollback.outputs.status }}
-      rollback-url: ${{ steps.rollback.outputs.static-web-app-url }}
+      rollback-status: ${{ steps.deploy.outputs.status }}
+      rollback-url: ${{ steps.deploy.outputs.static-web-app-url }}
     
     steps:
-      - name: Checkout Code
+      - name: Checkout Frontend Repository
         uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          token: ${{ secrets.GITHUB_TOKEN || github.token }}
+          fetch-depth: 0
 
       - name: Checkout Target Version
         run: |
-          git fetch --all --tags
+          echo "🔄 Checking out target version: ${{ needs.validate-rollback.outputs.target-version }}"
           git checkout ${{ needs.validate-rollback.outputs.target-version }}
+          echo "📍 Current commit: $(git rev-parse HEAD)"
+          echo "📝 Commit message: $(git log -1 --pretty=format:'%s')"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -117,123 +181,80 @@ jobs:
 
       - name: Install Dependencies and Build
         run: |
-          ${{ vars.INSTALL_COMMAND || 'npm ci' }}
-          ${{ vars.BUILD_COMMAND || 'npm run build' }}
+          echo "📦 Installing dependencies with: ${{ env.INSTALL_COMMAND }}"
+          ${{ env.INSTALL_COMMAND }}
+          
+          echo "🔨 Building application with: ${{ env.BUILD_COMMAND }}"
+          ${{ env.BUILD_COMMAND }}
+          
+          echo "✅ Build completed for rollback"
+          
+          # Verify build output
+          if [ -d "${{ env.OUTPUT_LOCATION }}" ]; then
+            echo "📁 Build output verified in: ${{ env.OUTPUT_LOCATION }}"
+            ls -la ${{ env.OUTPUT_LOCATION }}
+          else
+            echo "❌ Build output directory not found: ${{ env.OUTPUT_LOCATION }}"
+            exit 1
+          fi
 
-      - name: Perform Rollback to Pre-Production
-        id: rollback
+      - name: Deploy Rollback
+        id: deploy
         uses: ./.github/actions/deploy-static-app
         with:
-          azure-static-web-apps-api-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD }}
-          environment: 'pre-production'
+          azure-static-web-apps-api-token: ${{ 
+            inputs.environment == 'development' && secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_DEV ||
+            inputs.environment == 'staging' && secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING ||
+            inputs.environment == 'pre-production' && secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD ||
+            inputs.environment == 'production' && secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PROD
+          }}
+          environment: ${{ inputs.environment }}
           version: ${{ needs.validate-rollback.outputs.target-version }}
           app-location: ${{ env.APP_LOCATION }}
           output-location: ${{ env.OUTPUT_LOCATION }}
-          skip-build: 'false'
+          skip-build: 'true'
 
       - name: Verify Rollback Success
         run: |
-          if [ "${{ steps.rollback.outcome }}" = "success" ]; then
-            echo "✅ Pre-production rollback successful"
+          if [ "${{ steps.deploy.outcome }}" = "success" ]; then
+            echo "✅ ${{ inputs.environment }} rollback completed successfully"
             echo "🔄 Rolled back from: ${{ needs.validate-rollback.outputs.current-version }}"
             echo "📍 Rolled back to: ${{ needs.validate-rollback.outputs.target-version }}"
-            echo "🌐 URL: ${{ steps.rollback.outputs.static-web-app-url }}"
+            echo "🌐 URL: ${{ steps.deploy.outputs.static-web-app-url }}"
+            echo "📋 Reason: ${{ inputs.reason }}"
           else
-            echo "❌ Pre-production rollback failed"
+            echo "❌ ${{ inputs.environment }} rollback failed"
             exit 1
           fi
 
       - name: Update Deployment Status
+        if: always()
         run: |
-          # Record successful rollback in deployment history
+          # Record rollback in deployment history
           curl -X POST "https://api.github.com/repos/${{ github.repository }}/deployments" \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN || github.token }}" \
             -H "Accept: application/vnd.github.v3+json" \
-            -d '{
-              "ref": "${{ needs.validate-rollback.outputs.target-version }}",
-              "environment": "pre-production",
-              "description": "Rollback deployment",
-              "auto_merge": false
-            }'
-
-  rollback-prod:
-    if: github.event.inputs.environment == 'production' && needs.validate-rollback.outputs.can-rollback == 'true'
-    runs-on: ubuntu-latest
-    needs: [validate-rollback]
-    environment: production
-    outputs:
-      rollback-status: ${{ steps.rollback.outputs.status }}
-      rollback-url: ${{ steps.rollback.outputs.static-web-app-url }}
-    
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Checkout Target Version
-        run: |
-          git fetch --all --tags
-          git checkout ${{ needs.validate-rollback.outputs.target-version }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: Install Dependencies and Build
-        run: |
-          ${{ vars.INSTALL_COMMAND || 'npm ci' }}
-          ${{ vars.BUILD_COMMAND || 'npm run build' }}
-
-      - name: Perform Rollback to Production
-        id: rollback
-        uses: ./.github/actions/deploy-static-app
-        with:
-          azure-static-web-apps-api-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PROD }}
-          environment: 'production'
-          version: ${{ needs.validate-rollback.outputs.target-version }}
-          app-location: ${{ env.APP_LOCATION }}
-          output-location: ${{ env.OUTPUT_LOCATION }}
-          skip-build: 'false'
-
-      - name: Verify Rollback Success
-        run: |
-          if [ "${{ steps.rollback.outcome }}" = "success" ]; then
-            echo "✅ Production rollback successful"
-            echo "🔄 Rolled back from: ${{ needs.validate-rollback.outputs.current-version }}"
-            echo "📍 Rolled back to: ${{ needs.validate-rollback.outputs.target-version }}"
-            echo "🌐 URL: ${{ steps.rollback.outputs.static-web-app-url }}"
-          else
-            echo "❌ Production rollback failed"
-            exit 1
-          fi
-
-      - name: Update Deployment Status
-        run: |
-          # Record successful rollback in deployment history
-          curl -X POST "https://api.github.com/repos/${{ github.repository }}/deployments" \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            -d '{
-              "ref": "${{ needs.validate-rollback.outputs.target-version }}",
-              "environment": "production",
-              "description": "Rollback deployment",
-              "auto_merge": false
-            }'
+            -d "{
+              \"ref\": \"${{ needs.validate-rollback.outputs.target-version }}\",
+              \"environment\": \"${{ inputs.environment }}\",
+              \"description\": \"Manual rollback - ${{ inputs.reason }}\",
+              \"auto_merge\": false
+            }" || echo "⚠️ Failed to update deployment status (non-critical)"
 
   rollback-summary:
     if: always()
     runs-on: ubuntu-latest
-    needs: [validate-rollback, rollback-preprod, rollback-prod]
+    needs: [validate-rollback, rollback-deployment]
     
     steps:
-      - name: Rollback Summary
+      - name: Generate Rollback Summary
         run: |
-          echo "## 🔄 Rollback Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## 🔄 Manual Rollback Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment**: ${{ github.event.inputs.environment }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Reason**: ${{ github.event.inputs.reason }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment**: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Reason**: ${{ inputs.reason }}" >> $GITHUB_STEP_SUMMARY
           echo "**Requested by**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Repository**: ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           if [ "${{ needs.validate-rollback.outputs.can-rollback }}" = "true" ]; then
@@ -241,36 +262,37 @@ jobs:
             echo "**Rollback Version**: ${{ needs.validate-rollback.outputs.target-version }}" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             
-            if [ "${{ github.event.inputs.environment }}" = "pre-production" ]; then
-              if [ "${{ needs.rollback-preprod.result }}" = "success" ]; then
-                echo "✅ **Pre-production rollback completed successfully**" >> $GITHUB_STEP_SUMMARY
-                echo "🌐 **URL**: ${{ needs.rollback-preprod.outputs.rollback-url }}" >> $GITHUB_STEP_SUMMARY
-              else
-                echo "❌ **Pre-production rollback failed**" >> $GITHUB_STEP_SUMMARY
-              fi
-            elif [ "${{ github.event.inputs.environment }}" = "production" ]; then
-              if [ "${{ needs.rollback-prod.result }}" = "success" ]; then
-                echo "✅ **Production rollback completed successfully**" >> $GITHUB_STEP_SUMMARY
-                echo "🌐 **URL**: ${{ needs.rollback-prod.outputs.rollback-url }}" >> $GITHUB_STEP_SUMMARY
-              else
-                echo "❌ **Production rollback failed**" >> $GITHUB_STEP_SUMMARY
-              fi
+            if [ "${{ needs.rollback-deployment.result }}" = "success" ]; then
+              echo "✅ **Rollback Status**: Completed successfully" >> $GITHUB_STEP_SUMMARY
+              echo "🌐 **URL**: ${{ needs.rollback-deployment.outputs.rollback-url }}" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "❌ **Rollback Status**: Failed" >> $GITHUB_STEP_SUMMARY
+              echo "🚨 **Action Required**: Manual intervention needed" >> $GITHUB_STEP_SUMMARY
             fi
           else
-            echo "❌ **Rollback validation failed**" >> $GITHUB_STEP_SUMMARY
-            echo "Unable to perform rollback - see validation step for details" >> $GITHUB_STEP_SUMMARY
+            echo "❌ **Rollback Status**: Validation failed" >> $GITHUB_STEP_SUMMARY
+            echo "📋 **Details**: Unable to perform rollback - check validation step for details" >> $GITHUB_STEP_SUMMARY
           fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "*Rollback performed using shared workflow with centralized configuration*" >> $GITHUB_STEP_SUMMARY
 
       - name: Notify Teams
         if: always()
         run: |
-          if [ "${{ needs.rollback-preprod.result }}" = "success" ] || [ "${{ needs.rollback-prod.result }}" = "success" ]; then
-            echo "🔔 Rollback completed - notify relevant teams"
-            echo "Environment: ${{ github.event.inputs.environment }}"
-            echo "Version: ${{ needs.validate-rollback.outputs.target-version }}"
+          if [ "${{ needs.rollback-deployment.result }}" = "success" ]; then
+            echo "🔔 Manual rollback completed successfully"
+            echo "📍 Environment: ${{ inputs.environment }}"
+            echo "📝 Version: ${{ needs.validate-rollback.outputs.target-version }}"
+            echo "👤 Requested by: ${{ github.actor }}"
+            echo "📋 Reason: ${{ inputs.reason }}"
             # Add notification logic here (Slack, Teams, email, etc.)
           else
-            echo "🚨 Rollback failed - immediate attention required"
-            echo "Environment: ${{ github.event.inputs.environment }}"
+            echo "🚨 Manual rollback failed - immediate attention required"
+            echo "📍 Environment: ${{ inputs.environment }}"
+            echo "🎯 Target version: ${{ needs.validate-rollback.outputs.target-version }}"
+            echo "👤 Requested by: ${{ github.actor }}"
+            echo "📋 Reason: ${{ inputs.reason }}"
             # Add urgent notification logic here
           fi

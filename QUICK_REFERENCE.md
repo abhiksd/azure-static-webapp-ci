@@ -7,6 +7,7 @@
 # Copy workflow files to your frontend app
 cp frontend-ci-cd.yml .github/workflows/ci-cd.yml
 cp pr-security-check.yml .github/workflows/pr-security-check.yml
+cp manual-rollback-caller.yml .github/workflows/manual-rollback.yml
 ```
 
 ### **Step 2: Update Repository Reference**
@@ -72,11 +73,11 @@ BUILD_COMMAND=npm run build:prod
 ## 🔄 **Emergency Rollback (2 Minutes)**
 
 ### **Manual Rollback**
-1. Go to shared repository → Actions → Manual Rollback
-2. Select environment: `pre-production` or `production`
+1. Go to frontend app → Actions → Manual Rollback
+2. Select environment: `development`, `staging`, `pre-production`, or `production`
 3. Target version: Leave empty for auto-detect or specify version
 4. Reason: Required for audit (e.g., "Critical bug in payment flow")
-5. Run workflow
+5. Run workflow - calls shared workflow with centralized logic
 
 ### **Automatic Rollback**
 - Happens automatically on deployment failures

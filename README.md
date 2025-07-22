@@ -25,18 +25,22 @@ Enterprise-grade, centralized CI/CD solution for frontend applications with comp
 │   └── deploy-static-app/            # Azure Static Web Apps deployment
 ├── pr-security-check.yml            # PR security validation (copy to frontend apps)
 ├── frontend-ci-cd.yml               # Ready-to-use workflow (copy to frontend apps)
+├── manual-rollback-caller.yml       # Manual rollback caller (copy to frontend apps)
 └── setup-shared-repository.sh       # Automated migration script
 ```
 
 ## ⚡ **Quick Start**
 
-### **1. Copy Workflow to Frontend App**
+### **1. Copy Workflows to Frontend App**
 ```bash
 # Copy ready-to-use workflow
 cp frontend-ci-cd.yml .github/workflows/ci-cd.yml
 
 # Copy PR security check
 cp pr-security-check.yml .github/workflows/pr-security-check.yml
+
+# Copy manual rollback caller
+cp manual-rollback-caller.yml .github/workflows/manual-rollback.yml
 ```
 
 ### **2. Update Repository Reference**
@@ -89,11 +93,11 @@ MAX_CRITICAL_VULNERABILITIES=0     # Security gates
 - No manual intervention required
 
 ### **Manual Emergency Rollback**
-1. Actions → Manual Rollback
-2. Select environment  
-3. Specify version (optional)
-4. Provide reason
-5. Execute with validation
+1. Go to frontend app → Actions → Manual Rollback
+2. Select environment (development/staging/pre-production/production)
+3. Specify version (optional - auto-detects if empty)
+4. Provide rollback reason (required for audit)
+5. Execute - calls shared workflow with centralized logic
 
 ## 📚 **Documentation Index**
 
