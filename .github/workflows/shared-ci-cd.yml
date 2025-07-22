@@ -109,12 +109,6 @@ env:
   # Deployment controls (centralized)
   SKIP_DEPLOYMENT: ${{ vars.SKIP_DEPLOYMENT || 'false' }}
   FORCE_VERSION: ${{ vars.FORCE_VERSION || '' }}
-  
-  # Common Azure Static Web Apps deployment parameters
-  AZURE_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  AZURE_ACTION: "upload"
-  AZURE_APP_LOCATION: ${{ vars.APP_LOCATION || '/' }}
-  AZURE_OUTPUT_LOCATION: ${{ vars.OUTPUT_LOCATION || 'build' }}
 
 jobs:
   detect-deployment:
