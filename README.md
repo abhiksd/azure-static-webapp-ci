@@ -36,9 +36,8 @@ jobs:
   deploy:
     uses: YOUR_ORG/shared-ci-cd-workflows/.github/workflows/shared-ci-cd.yml@main
     with:
-      node-version: '18'
-      output-location: 'build'        # or 'dist' for Vite/Vue
-      build-command: 'npm run build'
+      # Only runtime environment selection needed - all other config is centralized
+      environment: ${{ github.event.inputs.environment || 'development' }}
     secrets:
       AZURE_STATIC_WEB_APPS_API_TOKEN_DEV: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_DEV }}
       AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING }}
@@ -148,6 +147,7 @@ Use the provided migration script:
 - [`AZURE_DEPLOYMENT_TROUBLESHOOTING.md`](AZURE_DEPLOYMENT_TROUBLESHOOTING.md) - Azure deployment issues
 - [`CHECKMARX_TROUBLESHOOTING.md`](CHECKMARX_TROUBLESHOOTING.md) - Checkmarx authentication help
 - [`SHARED_WORKFLOW_CENTRALIZATION_UPDATE.md`](SHARED_WORKFLOW_CENTRALIZATION_UPDATE.md) - Architecture details
+- [`SHARED_WORKFLOW_VARIABLES.md`](SHARED_WORKFLOW_VARIABLES.md) - Centralized variables configuration
 
 ## 🎯 Benefits
 

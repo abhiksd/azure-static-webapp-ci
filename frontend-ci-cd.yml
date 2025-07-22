@@ -35,28 +35,11 @@ jobs:
   call-shared-workflow:
     uses: YOUR_ORG/shared-ci-cd-workflows/.github/workflows/shared-ci-cd.yml@main
     with:
-      # Environment configuration
+      # Environment configuration (only runtime parameter needed)
       environment: ${{ github.event.inputs.environment || 'development' }}
       
-      # Build configuration (customize for your frontend app)
-      node-version: '18'
-      app-location: '/'
-      output-location: 'build'          # or 'dist' for Vite/Vue apps
-      build-command: 'npm run build'    # customize as needed
-      install-command: 'npm ci'         # or 'npm install' if needed
-      
-      # Security scanning controls (optional overrides - centralized in shared repo)
-      enable-sonar: ${{ github.event.inputs.enable_sonar }}
-      enable-checkmarx: ${{ github.event.inputs.enable_checkmarx }}
-      
-      # Quality gate thresholds (optional overrides - centralized in shared repo)
-      min-code-coverage: '75'           # override shared repo default if needed
-      max-critical-vulnerabilities: '0' # override shared repo default if needed
-      max-high-vulnerabilities: '5'     # override shared repo default if needed
-      
-      # Deployment controls
-      skip-deployment: false
-      force-version: ${{ github.event.inputs.force_version }}
+      # All other configuration (build, security, quality gates) is centralized in the shared workflow
+      # Modify variables in the shared repository to change behavior across all frontend applications
     
     secrets:
       # Azure Static Web Apps API tokens (set these in your frontend repo)

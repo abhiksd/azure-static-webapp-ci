@@ -3,78 +3,11 @@ name: Shared Frontend CI/CD Pipeline
 on:
   workflow_call:
     inputs:
-      # Environment configuration
+      # Environment configuration (only essential runtime parameter)
       environment:
         description: 'Target environment'
         required: false
         default: 'development'
-        type: string
-      
-      # Build configuration
-      node-version:
-        description: 'Node.js version to use'
-        required: false
-        default: '18'
-        type: string
-      app-location:
-        description: 'App source code location'
-        required: false
-        default: '/'
-        type: string
-      output-location:
-        description: 'Built app content directory'
-        required: false
-        default: 'build'
-        type: string
-      build-command:
-        description: 'Custom build command'
-        required: false
-        default: 'npm run build'
-        type: string
-      install-command:
-        description: 'Custom install command'
-        required: false
-        default: 'npm ci'
-        type: string
-      
-      # Security scanning controls
-      enable-sonar:
-        description: 'Enable SonarCloud analysis'
-        required: false
-        default: true
-        type: boolean
-      enable-checkmarx:
-        description: 'Enable Checkmarx security scanning'
-        required: false
-        default: true
-        type: boolean
-      
-      # Quality gate thresholds
-      min-code-coverage:
-        description: 'Minimum code coverage percentage'
-        required: false
-        default: '80'
-        type: string
-      max-critical-vulnerabilities:
-        description: 'Maximum critical vulnerabilities allowed'
-        required: false
-        default: '0'
-        type: string
-      max-high-vulnerabilities:
-        description: 'Maximum high vulnerabilities allowed'
-        required: false
-        default: '2'
-        type: string
-      
-      # Deployment controls
-      skip-deployment:
-        description: 'Skip deployment steps'
-        required: false
-        default: false
-        type: boolean
-      force-version:
-        description: 'Override version (optional)'
-        required: false
         type: string
     
     secrets:
@@ -147,21 +80,25 @@ on:
         value: ${{ jobs.detect-deployment.outputs.version }}
 
 env:
-  # Build configuration
-  NODE_VERSION: ${{ inputs.node-version }}
+  # Build configuration (centralized in shared workflow)
+  NODE_VERSION: ${{ vars.NODE_VERSION || '18' }}
+  APP_LOCATION: ${{ vars.APP_LOCATION || '/' }}
+  OUTPUT_LOCATION: ${{ vars.OUTPUT_LOCATION || 'build' }}
+  BUILD_COMMAND: ${{ vars.BUILD_COMMAND || 'npm run build' }}
+  INSTALL_COMMAND: ${{ vars.INSTALL_COMMAND || 'npm ci' }}
   
   # Security scanning controls (centralized in shared workflow)
-  ENABLE_SONAR: ${{ inputs.enable-sonar || vars.ENABLE_SONAR_SCAN || 'true' }}
-  ENABLE_CHECKMARX: ${{ inputs.enable-checkmarx || vars.ENABLE_CHECKMARX_SCAN || 'true' }}
+  ENABLE_SONAR: ${{ vars.ENABLE_SONAR_SCAN || 'true' }}
+  ENABLE_CHECKMARX: ${{ vars.ENABLE_CHECKMARX_SCAN || 'true' }}
   
   # SonarQube/SonarCloud configuration (centralized)
   SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}
   SONAR_SKIP_SSL_VERIFICATION: ${{ vars.SONAR_SKIP_SSL_VERIFICATION || 'false' }}
   
-  # Quality gate thresholds (centralized with caller override capability)
-  MIN_CODE_COVERAGE: ${{ inputs.min-code-coverage || vars.MIN_CODE_COVERAGE || '80' }}
-  MAX_CRITICAL_VULNERABILITIES: ${{ inputs.max-critical-vulnerabilities || vars.MAX_CRITICAL_VULNERABILITIES || '0' }}
-  MAX_HIGH_VULNERABILITIES: ${{ inputs.max-high-vulnerabilities || vars.MAX_HIGH_VULNERABILITIES || '2' }}
+  # Quality gate thresholds (centralized in shared workflow)
+  MIN_CODE_COVERAGE: ${{ vars.MIN_CODE_COVERAGE || '75' }}
+  MAX_CRITICAL_VULNERABILITIES: ${{ vars.MAX_CRITICAL_VULNERABILITIES || '0' }}
+  MAX_HIGH_VULNERABILITIES: ${{ vars.MAX_HIGH_VULNERABILITIES || '5' }}
   MAX_BLOCKER_ISSUES: ${{ vars.MAX_BLOCKER_ISSUES || '0' }}
   MAX_CRITICAL_ISSUES: ${{ vars.MAX_CRITICAL_ISSUES || '0' }}
   
@@ -169,11 +106,15 @@ env:
   CHECKMARX_SCAN_TYPES: ${{ vars.CHECKMARX_SCAN_TYPES || 'sast,sca' }}
   CHECKMARX_PRESET: ${{ vars.CHECKMARX_PRESET || 'Checkmarx Default' }}
   
+  # Deployment controls (centralized)
+  SKIP_DEPLOYMENT: ${{ vars.SKIP_DEPLOYMENT || 'false' }}
+  FORCE_VERSION: ${{ vars.FORCE_VERSION || '' }}
+  
   # Common Azure Static Web Apps deployment parameters
   AZURE_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   AZURE_ACTION: "upload"
-  AZURE_APP_LOCATION: ${{ inputs.app-location }}
-  AZURE_OUTPUT_LOCATION: ${{ inputs.output-location }}
+  AZURE_APP_LOCATION: ${{ vars.APP_LOCATION || '/' }}
+  AZURE_OUTPUT_LOCATION: ${{ vars.OUTPUT_LOCATION || 'build' }}
 
 jobs:
   detect-deployment:
@@ -194,8 +135,8 @@ jobs:
       - name: Generate Version
         id: version
         run: |
-          if [ -n "${{ inputs.force-version }}" ]; then
-            VERSION="${{ inputs.force-version }}"
+                  if [ -n "${{ env.FORCE_VERSION }}" ]; then
+          VERSION="${{ env.FORCE_VERSION }}"
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             VERSION=${GITHUB_REF#refs/tags/}
           else
@@ -216,7 +157,7 @@ jobs:
           DEPLOY_PREPROD="false"
           DEPLOY_PROD="false"
           
-          if [ "${{ inputs.skip-deployment }}" = "true" ]; then
+          if [ "${{ env.SKIP_DEPLOYMENT }}" = "true" ]; then
             echo "Deployment skipped by input"
           elif [ -n "$ENVIRONMENT" ] && [ "$ENVIRONMENT" != "development" ]; then
             # Manual workflow dispatch with specific environment
@@ -256,21 +197,21 @@ jobs:
 
       - name: Install Dependencies and Build
         run: |
-          ${{ inputs.install-command }}
-          ${{ inputs.build-command }}
+          ${{ env.INSTALL_COMMAND }}
+          ${{ env.BUILD_COMMAND }}
           npm test 2>/dev/null || echo "No tests found or test command not available"
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: build-artifacts
-          path: ${{ inputs.output-location }}/
+          path: ${{ env.OUTPUT_LOCATION }}/
           retention-days: 7
 
   sonar-analysis:
     runs-on: ubuntu-latest
     needs: [build-and-test]
-    if: always() && (vars.ENABLE_SONAR_SCAN != 'false' && inputs.enable-sonar != false)
+    if: always() && (env.ENABLE_SONAR != 'false')
     outputs:
       status: ${{ steps.sonar-scan.outputs.status }}
       coverage: ${{ steps.sonar-scan.outputs.coverage }}
@@ -288,7 +229,7 @@ jobs:
           cache: 'npm'
 
       - name: Install Dependencies
-        run: ${{ inputs.install-command }}
+        run: ${{ env.INSTALL_COMMAND }}
 
       - name: SonarCloud Analysis
         id: sonar-scan
@@ -307,7 +248,7 @@ jobs:
   checkmarx-scan:
     runs-on: ubuntu-latest
     needs: [build-and-test]
-    if: always() && (vars.ENABLE_CHECKMARX_SCAN != 'false' && inputs.enable-checkmarx != false)
+    if: always() && (env.ENABLE_CHECKMARX != 'false')
     outputs:
       status: ${{ steps.checkmarx-security.outputs.status }}
       critical-count: ${{ steps.checkmarx-security.outputs.critical-count }}
@@ -326,7 +267,7 @@ jobs:
           cache: 'npm'
 
       - name: Install Dependencies
-        run: ${{ inputs.install-command }}
+        run: ${{ env.INSTALL_COMMAND }}
 
       - name: Checkmarx Security Scan
         id: checkmarx-security
@@ -343,7 +284,7 @@ jobs:
           preset: ${{ env.CHECKMARX_PRESET }}
 
   deploy-dev:
-    if: always() && needs.detect-deployment.outputs.should-deploy-dev == 'true' && !inputs.skip-deployment
+    if: always() && needs.detect-deployment.outputs.should-deploy-dev == 'true' && env.SKIP_DEPLOYMENT != 'true'
     runs-on: ubuntu-latest
     needs: [detect-deployment, build-and-test, sonar-analysis, checkmarx-scan]
     environment: development
@@ -358,7 +299,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: build-artifacts
-          path: ${{ inputs.output-location }}/
+          path: ${{ env.OUTPUT_LOCATION }}/
 
       - name: Deploy to Development
         id: deploy
@@ -367,12 +308,12 @@ jobs:
           azure-static-web-apps-api-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_DEV }}
           environment: 'development'
           version: ${{ needs.detect-deployment.outputs.version }}
-          app-location: ${{ inputs.app-location }}
-          output-location: ${{ inputs.output-location }}
+          app-location: ${{ env.APP_LOCATION }}
+          output-location: ${{ env.OUTPUT_LOCATION }}
           skip-build: 'true'
 
   deploy-staging:
-    if: always() && needs.detect-deployment.outputs.should-deploy-staging == 'true' && !inputs.skip-deployment
+    if: always() && needs.detect-deployment.outputs.should-deploy-staging == 'true' && env.SKIP_DEPLOYMENT != 'true'
     runs-on: ubuntu-latest
     needs: [detect-deployment, build-and-test, sonar-analysis, checkmarx-scan]
     environment: staging
@@ -387,7 +328,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: build-artifacts
-          path: ${{ inputs.output-location }}/
+          path: ${{ env.OUTPUT_LOCATION }}/
 
       - name: Deploy to Staging
         id: deploy
@@ -396,12 +337,12 @@ jobs:
           azure-static-web-apps-api-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING }}
           environment: 'staging'
           version: ${{ needs.detect-deployment.outputs.version }}
-          app-location: ${{ inputs.app-location }}
-          output-location: ${{ inputs.output-location }}
+          app-location: ${{ env.APP_LOCATION }}
+          output-location: ${{ env.OUTPUT_LOCATION }}
           skip-build: 'true'
 
   deploy-preprod:
-    if: always() && needs.detect-deployment.outputs.should-deploy-preprod == 'true' && !inputs.skip-deployment
+    if: always() && needs.detect-deployment.outputs.should-deploy-preprod == 'true' && env.SKIP_DEPLOYMENT != 'true'
     runs-on: ubuntu-latest
     needs: [detect-deployment, build-and-test, sonar-analysis, checkmarx-scan]
     environment: pre-production
@@ -416,7 +357,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: build-artifacts
-          path: ${{ inputs.output-location }}/
+          path: ${{ env.OUTPUT_LOCATION }}/
 
       - name: Deploy to Pre-Production
         id: deploy
@@ -425,12 +366,12 @@ jobs:
           azure-static-web-apps-api-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD }}
           environment: 'pre-production'
           version: ${{ needs.detect-deployment.outputs.version }}
-          app-location: ${{ inputs.app-location }}
-          output-location: ${{ inputs.output-location }}
+          app-location: ${{ env.APP_LOCATION }}
+          output-location: ${{ env.OUTPUT_LOCATION }}
           skip-build: 'true'
 
   deploy-prod:
-    if: always() && needs.detect-deployment.outputs.should-deploy-prod == 'true' && !inputs.skip-deployment
+    if: always() && needs.detect-deployment.outputs.should-deploy-prod == 'true' && env.SKIP_DEPLOYMENT != 'true'
     runs-on: ubuntu-latest
     needs: [detect-deployment, build-and-test, sonar-analysis, checkmarx-scan]
     environment: production
@@ -445,7 +386,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: build-artifacts
-          path: ${{ inputs.output-location }}/
+          path: ${{ env.OUTPUT_LOCATION }}/
 
       - name: Deploy to Production
         id: deploy
@@ -454,12 +395,12 @@ jobs:
           azure-static-web-apps-api-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PROD }}
           environment: 'production'
           version: ${{ needs.detect-deployment.outputs.version }}
-          app-location: ${{ inputs.app-location }}
-          output-location: ${{ inputs.output-location }}
+          app-location: ${{ env.APP_LOCATION }}
+          output-location: ${{ env.OUTPUT_LOCATION }}
           skip-build: 'true'
 
   deployment-summary:
-    if: always() && !inputs.skip-deployment
+    if: always() && env.SKIP_DEPLOYMENT != 'true'
     runs-on: ubuntu-latest
     needs: [detect-deployment, sonar-analysis, checkmarx-scan, deploy-dev, deploy-staging, deploy-preprod, deploy-prod]
     
