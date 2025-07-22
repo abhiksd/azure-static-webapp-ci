@@ -6,8 +6,8 @@ name: Shared Frontend CI/CD Pipeline
 # - No redundant builds during deployment, significantly reducing pipeline time
 #
 # Simple Production-Grade Versioning Strategy:
-# - Development/Staging/Pre-prod: Short SHA (e.g., a1b2c3d4)
-# - Production: Semantic version from git tags (e.g., v1.2.3) or SHA fallback
+# - Development/Staging: Short SHA (e.g., a1b2c3d4) 
+# - Pre-Production/Production: Semantic version from git tags (e.g., v1.2.3) or SHA fallback
 
 on:
   workflow_call:
@@ -151,14 +151,38 @@ jobs:
         id: version
         run: |
           SHORT_SHA="${GITHUB_SHA::8}"
+          BRANCH="${{ github.ref_name }}"
+          ENVIRONMENT="${{ inputs.environment }}"
           
-          # Simple version strategy
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            # For tagged releases (production)
-            VERSION=${GITHUB_REF#refs/tags/}
+          # Determine if this is a pre-prod/prod deployment
+          IS_PREPROD_OR_PROD="false"
+          
+          if [ -n "$ENVIRONMENT" ] && [ "$ENVIRONMENT" != "development" ]; then
+            # Manual workflow dispatch
+            case $ENVIRONMENT in
+              pre-production|production) IS_PREPROD_OR_PROD="true" ;;
+            esac
           else
-            # For all other deployments (dev/staging/preprod)
+            # Auto deployment based on branch
+            case $BRANCH in
+              main|master|preprod|pre-production) IS_PREPROD_OR_PROD="true" ;;
+            esac
+          fi
+          
+          # Version strategy
+          if [ "$IS_PREPROD_OR_PROD" = "true" ]; then
+            # Pre-production and Production: Use semantic version from tags
+            if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+              VERSION=${GITHUB_REF#refs/tags/}
+              echo "Using semantic version from tag: $VERSION"
+            else
+              VERSION="$SHORT_SHA"
+              echo "No tag found, using SHA for pre-prod/prod: $VERSION"
+            fi
+          else
+            # Development and Staging: Always use SHA
             VERSION="$SHORT_SHA"
+            echo "Using SHA for dev/staging: $VERSION"
           fi
           
           echo "version=$VERSION" >> $GITHUB_OUTPUT
