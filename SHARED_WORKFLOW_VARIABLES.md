@@ -22,51 +22,43 @@ The following are **hardcoded in workflows** with enterprise-standard defaults:
 - **Checkmarx Scan Types**: `sast,sca` (recommended security coverage)
 - **Checkmarx Preset**: `Checkmarx Default` (standard preset)
 
-## Optional Organizational Variables
-
-Configure these variables **only if** your organization requires different standards:
-
-### Quality Thresholds (Customizable)
-
-| Variable | Default Value | Description |
-|----------|---------------|-------------|
-| `MIN_CODE_COVERAGE` | `75` (CI/CD) / `80` (PR) | Minimum code coverage percentage |
-| `MAX_CRITICAL_VULNERABILITIES` | `0` | Maximum critical vulnerabilities allowed |
-| `MAX_HIGH_VULNERABILITIES` | `5` (CI/CD) / `2` (PR) | Maximum high vulnerabilities allowed |
-
-### SonarCloud Configuration (Customizable)
-
-| Variable | Default Value | Description |
-|----------|---------------|-------------|
-| `SONAR_HOST_URL` | `https://sonarcloud.io` | SonarCloud/SonarQube server URL (for on-premise) |
-| `SONAR_ORGANIZATION` | *Required* | Your SonarCloud organization ID |
-
-## Example: Custom Organizational Standards
-
-**Only configure variables that differ from defaults:**
-
-```bash
-# Quality thresholds (only if stricter than defaults)
-MIN_CODE_COVERAGE=85
-MAX_HIGH_VULNERABILITIES=3
-
-# SonarCloud (only if using on-premise)
-SONAR_HOST_URL=https://sonar.company.com
-```
-
 ## Required Repository Variables
 
-Set these in the shared CI/CD repository under **Settings > Secrets and variables > Actions > Variables**:
+Only 2 variables need to be configured:
 
 ### Essential Configuration
 
+| Variable | Default Value | Description |
+|----------|---------------|-------------|
+| `SONAR_ORGANIZATION` | *Required* | Your SonarCloud organization ID |
+| `SONAR_HOST_URL` | `https://sonarcloud.io` | SonarCloud/SonarQube server URL (optional: only for on-premise) |
+
+### Quality Thresholds (Enterprise Standards - Not Configurable)
+
+These are now **hardcoded** as enterprise security standards:
+- **Code Coverage**: `75%` (CI/CD) / `80%` (PR) - Industry benchmarks
+- **Critical Vulnerabilities**: `0` - Zero tolerance security policy  
+- **High Vulnerabilities**: `5` (CI/CD) / `2` (PR) - Risk-based limits
+
+## Setup Instructions
+
+Set these in the shared CI/CD repository under **Settings > Secrets and variables > Actions > Variables**:
+
+### Standard Setup (SonarCloud.io)
+
 ```bash
-# SonarCloud integration (required)
+# Required: Your SonarCloud organization
+SONAR_ORGANIZATION=your-sonarcloud-org
+```
+
+### On-Premise Setup (SonarQube)
+
+```bash
+# Required: Your SonarCloud organization  
 SONAR_ORGANIZATION=your-sonarcloud-org
 
-# Optional: Custom quality standards (only if different from defaults)
-MIN_CODE_COVERAGE=80
-MAX_HIGH_VULNERABILITIES=3
+# Required: Your on-premise SonarQube server
+SONAR_HOST_URL=https://sonar.company.com
 ```
 
 ## Benefits of Simplified Configuration
@@ -93,27 +85,30 @@ If you previously configured many variables, you can safely remove these **stand
 
 ```bash
 # These can be REMOVED from repository variables:
-NODE_VERSION=18                    # Now hardcoded
-APP_LOCATION=/                     # Now hardcoded
-OUTPUT_LOCATION=build              # Now hardcoded
-BUILD_COMMAND=npm run build        # Now hardcoded
-INSTALL_COMMAND=npm ci             # Now hardcoded
-ENABLE_SONAR_SCAN=true            # Now hardcoded
-ENABLE_CHECKMARX_SCAN=true        # Now hardcoded
-SONAR_SKIP_SSL_VERIFICATION=false # Now hardcoded
-MAX_BLOCKER_ISSUES=0              # Now hardcoded
-MAX_CRITICAL_ISSUES=0             # Now hardcoded
-CHECKMARX_SCAN_TYPES=sast,sca     # Now hardcoded
+NODE_VERSION=18                     # Now hardcoded
+APP_LOCATION=/                      # Now hardcoded
+OUTPUT_LOCATION=build               # Now hardcoded
+BUILD_COMMAND=npm run build         # Now hardcoded
+INSTALL_COMMAND=npm ci              # Now hardcoded
+ENABLE_SONAR_SCAN=true             # Now hardcoded
+ENABLE_CHECKMARX_SCAN=true         # Now hardcoded
+SONAR_SKIP_SSL_VERIFICATION=false  # Now hardcoded
+MIN_CODE_COVERAGE=75               # Now hardcoded (75 CI/CD, 80 PR)
+MAX_CRITICAL_VULNERABILITIES=0     # Now hardcoded
+MAX_HIGH_VULNERABILITIES=5         # Now hardcoded (5 CI/CD, 2 PR)
+MAX_BLOCKER_ISSUES=0               # Now hardcoded
+MAX_CRITICAL_ISSUES=0              # Now hardcoded
+CHECKMARX_SCAN_TYPES=sast,sca      # Now hardcoded
 CHECKMARX_PRESET=Checkmarx Default # Now hardcoded
-SKIP_DEPLOYMENT=false             # Now hardcoded
-FORCE_VERSION=                    # Now hardcoded
+SKIP_DEPLOYMENT=false              # Now hardcoded
+FORCE_VERSION=                     # Now hardcoded
 ```
 
-**Keep only organizational customizations:**
+**Keep only these essential variables:**
 ```bash
-# Keep only these if different from defaults:
-SONAR_ORGANIZATION=your-org        # Required
-MIN_CODE_COVERAGE=85              # Optional: if stricter than 75/80
-MAX_HIGH_VULNERABILITIES=3        # Optional: if stricter than 5/2
-SONAR_HOST_URL=https://sonar.com  # Optional: if on-premise
+# Required for all organizations:
+SONAR_ORGANIZATION=your-org        # Your SonarCloud organization
+
+# Optional for on-premise only:
+SONAR_HOST_URL=https://sonar.com   # Only if using on-premise SonarQube
 ```

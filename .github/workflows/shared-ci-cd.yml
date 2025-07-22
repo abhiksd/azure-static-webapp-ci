@@ -95,10 +95,10 @@ env:
   SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}
   SONAR_SKIP_SSL_VERIFICATION: 'false'
   
-  # Quality gate thresholds (organizational standards)
-  MIN_CODE_COVERAGE: ${{ vars.MIN_CODE_COVERAGE || '75' }}
-  MAX_CRITICAL_VULNERABILITIES: ${{ vars.MAX_CRITICAL_VULNERABILITIES || '0' }}
-  MAX_HIGH_VULNERABILITIES: ${{ vars.MAX_HIGH_VULNERABILITIES || '5' }}
+  # Quality gate thresholds (enterprise standards)
+  MIN_CODE_COVERAGE: '75'
+  MAX_CRITICAL_VULNERABILITIES: '0'
+  MAX_HIGH_VULNERABILITIES: '5'
   MAX_BLOCKER_ISSUES: '0'
   MAX_CRITICAL_ISSUES: '0'
   
