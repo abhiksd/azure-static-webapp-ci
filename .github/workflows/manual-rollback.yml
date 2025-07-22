@@ -37,12 +37,12 @@ on:
         required: false
 
 env:
-  # Build configuration (centralized in shared workflow) - reuse same variables
-  NODE_VERSION: ${{ vars.NODE_VERSION || '18' }}
-  APP_LOCATION: ${{ vars.APP_LOCATION || '/' }}
-  OUTPUT_LOCATION: ${{ vars.OUTPUT_LOCATION || 'build' }}
-  BUILD_COMMAND: ${{ vars.BUILD_COMMAND || 'npm run build' }}
-  INSTALL_COMMAND: ${{ vars.INSTALL_COMMAND || 'npm ci' }}
+  # Build configuration (standardized)
+  NODE_VERSION: '18'
+  APP_LOCATION: '/'
+  OUTPUT_LOCATION: 'build'
+  BUILD_COMMAND: 'npm run build'
+  INSTALL_COMMAND: 'npm ci'
 
 jobs:
   validate-rollback:
