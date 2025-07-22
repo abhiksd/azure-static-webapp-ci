@@ -1,5 +1,5 @@
 name: 'Deploy to Azure Static Web Apps'
-description: 'Deploy Node.js application to Azure Static Web Apps with multi-environment support'
+description: 'Deploy Node.js application to Azure Static Web Apps with multi-environment support. Optimized to use pre-built artifacts when skip-build is enabled.'
 
 inputs:
   azure-static-web-apps-api-token:
@@ -107,32 +107,47 @@ runs:
         
         echo "Environment variables set for $ENVIRONMENT"
 
-    - name: Build Application
-      if: inputs.skip-build != 'true'
+    - name: Verify Build Artifacts
       shell: bash
       run: |
-        echo " Building application..."
-        
-        # Install dependencies
-        INSTALL_CMD="${{ inputs.install-command }}"
-        echo "Installing dependencies: $INSTALL_CMD"
-        eval $INSTALL_CMD
-        
-        # Build application
-        BUILD_CMD="${{ inputs.build-command }}"
-        echo "Building application: $BUILD_CMD"
-        eval $BUILD_CMD
-        
-        # Verify build output
         OUTPUT_DIR="${{ inputs.output-location }}"
-        if [ -d "$OUTPUT_DIR" ]; then
-          echo "Build completed successfully"
-          echo "Build output location: $OUTPUT_DIR"
-          echo "Build contents:"
-          ls -la $OUTPUT_DIR
+        
+        if [ "${{ inputs.skip-build }}" = "true" ]; then
+          echo "Build step skipped - using pre-built artifacts"
+          echo "Verifying build artifacts in: $OUTPUT_DIR"
+          
+          if [ -d "$OUTPUT_DIR" ]; then
+            echo "Build artifacts found successfully"
+            echo "Build contents:"
+            ls -la $OUTPUT_DIR
+          else
+            echo "ERROR: Build artifacts not found in: $OUTPUT_DIR"
+            echo "This usually means the build artifacts were not properly uploaded/downloaded"
+            exit 1
+          fi
         else
-          echo "Build output directory not found: $OUTPUT_DIR"
-          exit 1
+          echo "Building application..."
+          
+          # Install dependencies
+          INSTALL_CMD="${{ inputs.install-command }}"
+          echo "Installing dependencies: $INSTALL_CMD"
+          eval $INSTALL_CMD
+          
+          # Build application
+          BUILD_CMD="${{ inputs.build-command }}"
+          echo "Building application: $BUILD_CMD"
+          eval $BUILD_CMD
+          
+          # Verify build output
+          if [ -d "$OUTPUT_DIR" ]; then
+            echo "Build completed successfully"
+            echo "Build output location: $OUTPUT_DIR"
+            echo "Build contents:"
+            ls -la $OUTPUT_DIR
+          else
+            echo "Build output directory not found: $OUTPUT_DIR"
+            exit 1
+          fi
         fi
 
     - name: Create Deployment Configuration

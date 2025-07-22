@@ -1,5 +1,10 @@
 name: Shared Frontend CI/CD Pipeline
 
+# This pipeline is optimized for deployment efficiency:
+# - Build happens ONLY ONCE in the 'build-and-test' job
+# - Build artifacts are uploaded and reused across all deployment jobs
+# - No redundant builds during deployment, significantly reducing pipeline time
+
 on:
   workflow_call:
     inputs:
@@ -203,9 +208,24 @@ jobs:
 
       - name: Install Dependencies and Build
         run: |
+          echo "Installing dependencies..."
           ${{ env.INSTALL_COMMAND }}
+          echo "Building application (single build for all deployments)..."
           ${{ env.BUILD_COMMAND }}
+          echo "Running tests..."
           npm test 2>/dev/null || echo "No tests found or test command not available"
+
+      - name: Verify Build Output
+        run: |
+          if [ -d "${{ env.OUTPUT_LOCATION }}" ]; then
+            echo "Build completed successfully"
+            echo "Build output size: $(du -sh ${{ env.OUTPUT_LOCATION }} | cut -f1)"
+            echo "Build contents:"
+            ls -la ${{ env.OUTPUT_LOCATION }}
+          else
+            echo "ERROR: Build output directory not found: ${{ env.OUTPUT_LOCATION }}"
+            exit 1
+          fi
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
@@ -213,6 +233,7 @@ jobs:
           name: build-artifacts
           path: ${{ env.OUTPUT_LOCATION }}/
           retention-days: 7
+          compression-level: 6
 
 
 
@@ -309,6 +330,18 @@ jobs:
           name: build-artifacts
           path: ${{ env.OUTPUT_LOCATION }}/
 
+      - name: Verify Downloaded Artifacts
+        run: |
+          echo "Verifying downloaded build artifacts..."
+          if [ -d "${{ env.OUTPUT_LOCATION }}" ]; then
+            echo "Downloaded artifacts size: $(du -sh ${{ env.OUTPUT_LOCATION }} | cut -f1)"
+            echo "Artifact contents:"
+            ls -la ${{ env.OUTPUT_LOCATION }}
+          else
+            echo "ERROR: Downloaded artifacts not found"
+            exit 1
+          fi
+
       - name: Deploy to Development
         id: deploy
         uses: ./.github/actions/deploy-static-app
@@ -318,7 +351,7 @@ jobs:
           version: ${{ needs.detect-deployment.outputs.version }}
           app-location: ${{ env.APP_LOCATION }}
           output-location: ${{ env.OUTPUT_LOCATION }}
-          skip-build: 'true'
+          skip-build: 'true'  # Using pre-built artifacts from build-and-test job
 
   deploy-staging:
     if: always() && needs.detect-deployment.outputs.should-deploy-staging == 'true' && env.SKIP_DEPLOYMENT != 'true'
@@ -338,6 +371,18 @@ jobs:
           name: build-artifacts
           path: ${{ env.OUTPUT_LOCATION }}/
 
+      - name: Verify Downloaded Artifacts
+        run: |
+          echo "Verifying downloaded build artifacts..."
+          if [ -d "${{ env.OUTPUT_LOCATION }}" ]; then
+            echo "Downloaded artifacts size: $(du -sh ${{ env.OUTPUT_LOCATION }} | cut -f1)"
+            echo "Artifact contents:"
+            ls -la ${{ env.OUTPUT_LOCATION }}
+          else
+            echo "ERROR: Downloaded artifacts not found"
+            exit 1
+          fi
+
       - name: Deploy to Staging
         id: deploy
         uses: ./.github/actions/deploy-static-app
@@ -347,7 +392,7 @@ jobs:
           version: ${{ needs.detect-deployment.outputs.version }}
           app-location: ${{ env.APP_LOCATION }}
           output-location: ${{ env.OUTPUT_LOCATION }}
-          skip-build: 'true'
+          skip-build: 'true'  # Using pre-built artifacts from build-and-test job
 
   deploy-preprod:
     if: always() && needs.detect-deployment.outputs.should-deploy-preprod == 'true' && env.SKIP_DEPLOYMENT != 'true'
@@ -367,6 +412,18 @@ jobs:
           name: build-artifacts
           path: ${{ env.OUTPUT_LOCATION }}/
 
+      - name: Verify Downloaded Artifacts
+        run: |
+          echo "Verifying downloaded build artifacts..."
+          if [ -d "${{ env.OUTPUT_LOCATION }}" ]; then
+            echo "Downloaded artifacts size: $(du -sh ${{ env.OUTPUT_LOCATION }} | cut -f1)"
+            echo "Artifact contents:"
+            ls -la ${{ env.OUTPUT_LOCATION }}
+          else
+            echo "ERROR: Downloaded artifacts not found"
+            exit 1
+          fi
+
       - name: Deploy to Pre-Production
         id: deploy
         uses: ./.github/actions/deploy-static-app
@@ -376,7 +433,7 @@ jobs:
           version: ${{ needs.detect-deployment.outputs.version }}
           app-location: ${{ env.APP_LOCATION }}
           output-location: ${{ env.OUTPUT_LOCATION }}
-          skip-build: 'true'
+          skip-build: 'true'  # Using pre-built artifacts from build-and-test job
 
   deploy-prod:
     if: always() && needs.detect-deployment.outputs.should-deploy-prod == 'true' && env.SKIP_DEPLOYMENT != 'true'
@@ -396,6 +453,18 @@ jobs:
           name: build-artifacts
           path: ${{ env.OUTPUT_LOCATION }}/
 
+      - name: Verify Downloaded Artifacts
+        run: |
+          echo "Verifying downloaded build artifacts..."
+          if [ -d "${{ env.OUTPUT_LOCATION }}" ]; then
+            echo "Downloaded artifacts size: $(du -sh ${{ env.OUTPUT_LOCATION }} | cut -f1)"
+            echo "Artifact contents:"
+            ls -la ${{ env.OUTPUT_LOCATION }}
+          else
+            echo "ERROR: Downloaded artifacts not found"
+            exit 1
+          fi
+
       - name: Deploy to Production
         id: deploy
         uses: ./.github/actions/deploy-static-app
@@ -405,7 +474,7 @@ jobs:
           version: ${{ needs.detect-deployment.outputs.version }}
           app-location: ${{ env.APP_LOCATION }}
           output-location: ${{ env.OUTPUT_LOCATION }}
-          skip-build: 'true'
+          skip-build: 'true'  # Using pre-built artifacts from build-and-test job
 
 
   deployment-summary:
