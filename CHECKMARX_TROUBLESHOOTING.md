@@ -48,7 +48,7 @@ You can also set these **Repository Variables** for customization:
 
 | Variable Name | Description | Default |
 |---------------|-------------|---------|
-| `CHECKMARX_SCAN_TYPES` | Scan types to run | `sca,sast,kics` |
+| `CHECKMARX_SCAN_TYPES` | Scan types to run | `sast,sca` |
 | `CHECKMARX_PRESET` | SAST scan preset | `Checkmarx Default` |
 | `MAX_CRITICAL_VULNERABILITIES` | Max critical vulns allowed | `0` |
 | `MAX_HIGH_VULNERABILITIES` | Max high vulns allowed | `2` |
@@ -68,7 +68,7 @@ Run your workflow again and look for:
 ```
 ✓ Successfully authenticated with Checkmarx AST
 ✓ Project created/updated: your-repo-name
-✓ Scan types validated: sca,sast,kics
+✓ Scan types validated: sast,sca
 ```
 
 Instead of:
@@ -143,7 +143,7 @@ Setting up Checkmarx AST scan...
 Authenticating with tenant: your-tenant-name
 ✓ Authentication successful
 ✓ Project setup: your-repo-name
-✓ Scan types: sca,sast,kics
+✓ Scan types: sast,sca
 Running security scan...
 ✓ Scan completed successfully
 Processing results...

@@ -316,7 +316,7 @@ jobs:
           echo "CHECKMARX_CLIENT_ID: ${CHECKMARX_CLIENT_ID:0:8}$([ ${#CHECKMARX_CLIENT_ID} -gt 8 ] && echo '...' || echo '')"
           echo "CHECKMARX_SECRET: ${CHECKMARX_SECRET:0:8}$([ ${#CHECKMARX_SECRET} -gt 8 ] && echo '...' || echo '')"
           echo "CHECKMARX_TENANT: $CHECKMARX_TENANT"
-          echo "SCAN_TYPES: ${{ vars.CHECKMARX_SCAN_TYPES || 'sca,sast,kics' }}"
+          echo "SCAN_TYPES: ${{ vars.CHECKMARX_SCAN_TYPES || 'sast,sca' }}"
           echo "=== End Debug ==="
         env:
           CHECKMARX_CLIENT_ID: ${{ secrets.CHECKMARX_CLIENT_ID }}
@@ -332,7 +332,7 @@ jobs:
           checkmarx-client-id: ${{ secrets.CHECKMARX_CLIENT_ID }}
           checkmarx-secret: ${{ secrets.CHECKMARX_SECRET }}
           tenant: ${{ secrets.CHECKMARX_TENANT }}
-          scan-types: ${{ vars.CHECKMARX_SCAN_TYPES || 'sca,sast,kics' }}
+          scan-types: ${{ vars.CHECKMARX_SCAN_TYPES || 'sast,sca' }}
           max-critical: ${{ env.MAX_CRITICAL_VULNERABILITIES }}
           max-high: ${{ env.MAX_HIGH_VULNERABILITIES }}
           preset: ${{ vars.CHECKMARX_PRESET || 'Checkmarx Default' }}

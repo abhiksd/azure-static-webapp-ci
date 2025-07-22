@@ -22,7 +22,7 @@ inputs:
   scan-types:
     description: 'Comma-separated scan types'
     required: false
-    default: 'sast,sca,kics'
+    default: 'sast,sca'
   preset:
     description: 'SAST scan preset'
     required: false
@@ -50,17 +50,6 @@ outputs:
 runs:
   using: 'composite'
   steps:
-    - name: Setup SCA Resolver (Java)
-      if: inputs.enabled == 'true' && contains(inputs.scan-types, 'sca')
-      shell: bash
-      run: |
-        if [[ -f "pom.xml" || -f "build.gradle" ]]; then
-          echo "Setup SCA for Java..."
-          wget -q https://sca-downloads.s3.amazonaws.com/cli/2.7.2/ScaResolver-linux64.tar.gz
-          tar -xzf ScaResolver-linux64.tar.gz && rm ScaResolver-linux64.tar.gz
-          ./ScaResolver offline -r ".cxsca-results.json" -s . -n "${{ github.repository }}"
-        fi
-
     - name: Run Checkmarx AST
       if: inputs.enabled == 'true'
       uses: checkmarx/ast-github-action@86e9ae570a811f9a1fb85903647a307aa3bf6253
