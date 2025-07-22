@@ -1,0 +1,7 @@
+# Ignore core dumps and temporary files
+core
+*.core
+*.tmp
+*.log
+.DS_Store
+Thumbs.db

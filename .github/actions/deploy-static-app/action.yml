@@ -208,6 +208,22 @@ runs:
         
         echo "Created deployment configuration"
 
+    - name: Pre-deployment Cleanup
+      shell: bash
+      run: |
+        echo "Cleaning up any existing deployment artifacts..."
+        
+        # Remove any existing deployment artifacts that might have permission issues
+        sudo rm -rf .azure 2>/dev/null || true
+        sudo rm -rf deployment-*.json 2>/dev/null || true
+        sudo rm -rf oryx-manifest.toml 2>/dev/null || true
+        
+        # Fix permissions for existing files before deployment
+        sudo chown -R $USER:$USER . 2>/dev/null || true
+        chmod -R u+rwX . 2>/dev/null || true
+        
+        echo "Pre-deployment cleanup completed"
+
     - name: Deploy to Azure Static Web Apps
       id: deploy
       uses: Azure/static-web-apps-deploy@v1
@@ -219,6 +235,33 @@ runs:
         api_location: ${{ inputs.api-location }}
         output_location: ${{ inputs.output-location }}
         skip_build: ${{ inputs.skip-build }}
+
+    - name: Fix File Permissions
+      if: always()
+      shell: bash
+      run: |
+        echo "Fixing file permissions after Azure deployment..."
+        
+        # Fix permissions for all files in workspace that might have been created by Docker
+        # The Azure action runs in Docker as root, so we need to reclaim ownership
+        
+        # Change ownership of all files back to the runner user
+        sudo chown -R $USER:$USER . 2>/dev/null || true
+        
+        # Ensure proper permissions for common directories
+        chmod -R u+rwX . 2>/dev/null || true
+        
+        # Specifically fix build output directory if it exists
+        if [ -d "${{ inputs.output-location }}" ]; then
+          sudo chown -R $USER:$USER ${{ inputs.output-location }} 2>/dev/null || true
+          chmod -R u+rwX ${{ inputs.output-location }} 2>/dev/null || true
+        fi
+        
+        # Fix any hidden directories that might have been created
+        find . -type d -name ".*" -exec sudo chown -R $USER:$USER {} \; 2>/dev/null || true
+        find . -type d -name ".*" -exec chmod -R u+rwX {} \; 2>/dev/null || true
+        
+        echo "File permissions fixed"
 
     - name: Get Deployment URL
       shell: bash
@@ -320,3 +363,25 @@ runs:
           staticwebapp.config.json
           build/
         retention-days: 30
+
+    - name: Final Cleanup
+      if: always()
+      shell: bash
+      run: |
+        echo "Performing final cleanup to prevent permission issues..."
+        
+        # Ensure all files are owned by runner user for next workflow runs
+        sudo chown -R $USER:$USER . 2>/dev/null || true
+        
+        # Set proper permissions
+        chmod -R u+rwX . 2>/dev/null || true
+        
+        # Clean up any Docker-created temporary files
+        sudo rm -rf /tmp/.oryx* 2>/dev/null || true
+        sudo rm -rf .dockerenv 2>/dev/null || true
+        
+        # Remove any Azure-specific temporary files that might cause issues
+        sudo rm -rf .azure 2>/dev/null || true
+        sudo rm -rf oryx-manifest.toml 2>/dev/null || true
+        
+        echo "Final cleanup completed - workspace ready for next run"
