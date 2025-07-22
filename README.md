@@ -13,7 +13,7 @@ A centralized repository containing reusable GitHub Actions workflows and compos
 │       ├── checkmarx-scan/               # Checkmarx security scanning
 │       └── deploy-static-app/            # Azure Static Web Apps deployment
 ├── pr-security-check.yml                # Standalone PR security validation
-├── frontend-app-workflow-example.yml    # Example frontend app workflow
+├── frontend-ci-cd.yml                   # Ready-to-use frontend app workflow
 ├── setup-shared-repository.sh           # Automated migration script
 └── docs/                                 # Documentation
 ```

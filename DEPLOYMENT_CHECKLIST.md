@@ -69,7 +69,7 @@ Use this checklist to ensure proper integration and deployment of your frontend 
 ### ✅ Project Configuration Files
 
 - [ ] **SonarCloud config** created: `sonar-project.properties`
-- [ ] **Azure Static Web Apps config** created: `staticwebapp.config.json`
+- [ ] **Azure Static Web Apps config** created: `staticwebapp.config.json` (optional)
 - [ ] **Package.json scripts** updated with required commands:
   - [ ] `build` command
   - [ ] `test` command

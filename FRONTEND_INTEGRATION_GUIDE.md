@@ -273,54 +273,28 @@ Ensure your `package.json` includes required scripts:
 }
 ```
 
-### Step 7: Configure Azure Static Web Apps
+### Step 7: Configure Azure Static Web Apps (Optional)
 
-Create `staticwebapp.config.json` in your project root:
+If you need custom routing or configuration, create `staticwebapp.config.json` in your project root:
 
 ```json
 {
   "routes": [
-    {
-      "route": "/api/*",
-      "allowedRoles": ["authenticated"]
-    },
     {
       "route": "/*",
       "serve": "/index.html",
       "statusCode": 200
     }
   ],
-  "responseOverrides": {
-    "400": {
-      "rewrite": "/error/400.html",
-      "statusCode": 400
-    },
-    "401": {
-      "rewrite": "/login",
-      "statusCode": 302
-    },
-    "403": {
-      "rewrite": "/error/403.html",
-      "statusCode": 403
-    },
-    "404": {
-      "rewrite": "/error/404.html",
-      "statusCode": 404
-    }
-  },
   "globalHeaders": {
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
-    "X-XSS-Protection": "1; mode=block",
-    "Strict-Transport-Security": "max-age=31536000; includeSubDomains"
-  },
-  "mimeTypes": {
-    ".json": "application/json",
-    ".js": "application/javascript",
-    ".css": "text/css"
+    "X-XSS-Protection": "1; mode=block"
   }
 }
 ```
+
+**Note**: This step is optional. Azure Static Web Apps will work with default configuration for most frontend applications.
 
 ## 🔧 Environment Configuration
 
