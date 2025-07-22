@@ -5,9 +5,10 @@ name: Shared Frontend CI/CD Pipeline
 # - Build artifacts are uploaded and reused across all deployment jobs
 # - No redundant builds during deployment, significantly reducing pipeline time
 #
-# Simple Production-Grade Versioning Strategy:
+# Production-Grade Release Strategy:
 # - Development/Staging: Short SHA (e.g., a1b2c3d4) 
-# - Release branches (release/**): Auto-tagged semantic version (e.g., v1.2.3) extracted from branch name
+# - Release branches (release/**): Auto-tagged semantic version (e.g., v1.2.3) → Auto-deploy to pre-prod
+# - Production: Manual approval required after pre-prod validation
 # - Pre-Production/Production: Semantic version from git tags (e.g., v1.2.3) or SHA fallback
 
 on:
@@ -240,10 +241,11 @@ jobs:
               staging) DEPLOY_STAGING="true" ;;
               preprod|pre-production) DEPLOY_PREPROD="true" ;;
               release/*) 
-                # Release branches deploy to both pre-prod and prod for release validation
+                # Release branches auto-deploy to pre-prod, manual approval for production
                 DEPLOY_PREPROD="true"
-                DEPLOY_PROD="true"
-                echo "Release branch detected: $BRANCH - deploying to pre-prod and production"
+                DEPLOY_PROD="false"
+                echo "Release branch detected: $BRANCH - auto-deploying to pre-production"
+                echo "Production deployment requires manual workflow dispatch with environment: 'production'"
                 ;;
               *) DEPLOY_DEV="true" ;;
             esac
@@ -589,6 +591,9 @@ jobs:
           
           if [ "${{ needs.deploy-prod.result }}" = "success" ]; then
             echo "**Production**: ${{ needs.deploy-prod.outputs.deployment-url }}" >> $GITHUB_STEP_SUMMARY
+          elif [[ "${{ github.ref_name }}" == release/* ]]; then
+            echo "**Production**: ⏳ Manual deployment required" >> $GITHUB_STEP_SUMMARY
+            echo "To deploy to production: Run workflow manually with environment: 'production'" >> $GITHUB_STEP_SUMMARY
           fi
           
           echo "" >> $GITHUB_STEP_SUMMARY
