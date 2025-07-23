@@ -16,6 +16,7 @@ on:
         options:
         - development
         - staging
+        - qa
         - pre-production
         - production
 
