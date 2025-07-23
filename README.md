@@ -1,151 +1,274 @@
-# Shared Frontend CI/CD Workflows
+# Frontend CI/CD with JFrog Artifactory
 
-Enterprise-grade, centralized CI/CD solution for frontend applications with complete DevOps control, mandatory security scanning, and intelligent rollback capabilities.
+Enterprise-grade CI/CD pipeline for frontend applications with JFrog Artifactory artifact management and Azure Static Web Apps deployment.
 
-> **NEW USERS: Start with [OVERVIEW.md](OVERVIEW.md) for complete system documentation**
+## Features
 
-## What This Provides
-
-- **Complete centralized control** - DevOps controls everything via repository variables
-- **Mandatory security scanning** - No way to bypass SonarCloud or Checkmarx
-- **Automatic deployment** to development, staging, pre-production, and production
-- **Manual rollback** - On-demand rollback capabilities via dedicated workflow
-- **Quality gates enforcement** - Consistent standards across all applications
-- **Zero configuration** for frontend teams - just copy workflow and set secrets
-
-## Repository Structure
-
-```
-├── .github/workflows/
-│   ├── shared-ci-cd.yml              # Main reusable workflow
-│   └── manual-rollback.yml           # Manual rollback workflow
-├── .github/actions/                  # Composite actions
-│   ├── sonar-analysis/               # SonarCloud scanning
-│   ├── checkmarx-scan/               # Checkmarx security scanning
-│   └── deploy-static-app/            # Azure Static Web Apps deployment
-├── pr-security-check-caller.yml     # PR security caller workflow (copy to frontend apps)
-├── frontend-ci-cd.yml               # Ready-to-use workflow (copy to frontend apps)
-├── manual-rollback-caller.yml       # Manual rollback caller (copy to frontend apps)
-└── setup-shared-repository.sh       # Automated migration script
-```
+- **Centralized Artifact Management** - JFrog Artifactory integration for reliable artifact storage and retrieval
+- **Multi-Environment Deployment** - Automated deployment to development, staging, pre-production, and production
+- **Security Scanning** - Integrated SonarCloud and Checkmarx security analysis
+- **Manual Deployment** - Flexible manual deployment with artifact selection
+- **Version Management** - Semantic versioning for releases with automated tagging
+- **Deployment Tracking** - Complete audit trail of deployments and artifacts
 
 ## Quick Start
 
-### 1. Copy Workflows to Frontend App
+### 1. Setup JFrog Artifactory
+
+Run the JFrog setup script to create required repositories:
+
 ```bash
-# Copy ready-to-use workflow
-cp frontend-ci-cd.yml .github/workflows/ci-cd.yml
-
-# Copy PR security check
-cp pr-security-check-caller.yml .github/workflows/pr-security-check.yml
-
-# Copy manual rollback caller
-cp manual-rollback-caller.yml .github/workflows/manual-rollback.yml
+./scripts/setup-jfrog-repositories.sh
 ```
 
-### 2. Update Repository Reference
-```yaml
-# In .github/workflows/ci-cd.yml
-uses: YOUR_ORG/shared-ci-cd-workflows/.github/workflows/shared-ci-cd.yml@main
+This creates three repositories:
+- `frontend-snapshots` - Development artifacts (30-day retention)
+- `frontend-releases` - Release candidates (90-day retention)  
+- `frontend-production` - Production artifacts (365-day retention)
+
+### 2. Migrate Frontend Project
+
+Use the migration script to update your frontend project:
+
+```bash
+# Run in your frontend project directory
+curl -sSL https://raw.githubusercontent.com/YOUR_ORG/shared-ci-cd-workflows/main/scripts/migrate-to-artifactory.sh | bash
 ```
 
-### 3. Set Repository Secrets
+Or download and run manually:
+
 ```bash
-AZURE_STATIC_WEB_APPS_API_TOKEN_DEV******# Development environment
-AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING**# Staging environment
-AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD**# Pre-production environment
-AZURE_STATIC_WEB_APPS_API_TOKEN_PROD**** # Production environment
-SONAR_TOKEN                  **# SonarCloud authentication
-CHECKMARX_CLIENT_ID**********************# Checkmarx authentication
-CHECKMARX_SECRET************************ # Checkmarx authentication
-CHECKMARX_TENANT************************ # Checkmarx tenant
+wget https://raw.githubusercontent.com/YOUR_ORG/shared-ci-cd-workflows/main/scripts/migrate-to-artifactory.sh
+chmod +x migrate-to-artifactory.sh
+./migrate-to-artifactory.sh
+```
+
+### 3. Configure Secrets
+
+Add required secrets to your GitHub repository (Settings > Secrets and variables > Actions):
+
+#### Required Secrets
+```
+AZURE_STATIC_WEB_APPS_API_TOKEN  # Azure deployment token
+JFROG_URL                        # https://yourorg.jfrog.io
+JFROG_USERNAME                   # JFrog username
+JFROG_ACCESS_TOKEN              # JFrog access token
+```
+
+#### Optional Security Scanning Secrets
+```
+SONAR_TOKEN                     # SonarCloud token
+CHECKMARX_CLIENT_ID            # Checkmarx client ID
+CHECKMARX_SECRET               # Checkmarx secret
+CHECKMARX_TENANT               # Checkmarx tenant
 ```
 
 ### 4. Deploy
-- Push to main → automatic development deployment
-- Create tag `v1.0.0` → automatic pre-production deployment
-- Manual approval → production deployment
-- All with organizational security and quality standards
 
-## Centralized Control** 
+Push code to trigger automatic deployment:
 
-### DevOps Controls Everything (Repository Variables)
 ```bash
-NODE_VERSION=18********************# Organizational standard
-OUTPUT_LOCATION=build**************# Framework-specific
-BUILD_COMMAND=npm run build********# Standardized build
-ENABLE_SONAR_SCAN=true************ # Mandatory scanning
-ENABLE_CHECKMARX_SCAN=true******** # Mandatory security
-MIN_CODE_COVERAGE=75************** # Quality gates
-MAX_CRITICAL_VULNERABILITIES=0**** # Security gates
+git push origin develop        # → Development environment
+git push origin release/1.2.3  # → Pre-production environment
+git push origin main           # → Production environment
 ```
 
-### Frontend Teams Control Only
-- Environment selection (development, staging, pre-production, production)
-- Repository secrets (Azure tokens, SonarCloud token, Checkmarx credentials)
-- Cannot override any organizational standards or security policies
+Or use manual deployment for specific artifact versions.
 
-## Rollback Capabilities
+## Architecture
 
-### Manual Rollback
-1. Go to frontend app → Actions → Manual Rollback
-2. Select environment (development/staging/pre-production/production)
-3. Specify version (optional - auto-detects if empty)
-4. Provide rollback reason (required for audit)
-5. Execute - calls shared workflow with centralized logic
+### Repository Structure
 
-## Documentation Index
+```
+JFrog Artifactory:
+├── frontend-snapshots/         # Development builds
+│   └── {app-name}/
+│       ├── {app}-{sha}-{timestamp}.tar.gz
+│       └── {app}-{sha}-{timestamp}.tar.gz.sha256
+├── frontend-releases/          # Release candidates
+│   └── {app-name}/
+│       ├── {app}-v1.2.3.tar.gz
+│       └── {app}-v1.2.3.tar.gz.sha256
+└── frontend-production/        # Production releases
+    └── {app-name}/
+        ├── {app}-v1.2.3.tar.gz
+        └── {app}-v1.2.3.tar.gz.sha256
+```
 
-###  Essential (Start Here)
-- **[ OVERVIEW.md](OVERVIEW.md)** - **Complete system overview and architecture
-- **[ QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - **Quick reference for common tasks
-- **[ SHARED_WORKFLOW_MIGRATION_GUIDE.md](SHARED_WORKFLOW_MIGRATION_GUIDE.md)** - How to adopt shared workflows
-- **[ FRONTEND_INTEGRATION_GUIDE.md](FRONTEND_INTEGRATION_GUIDE.md)** - Step-by-step integration
+### Workflow Process
 
-###  Configuration & Management
-- **[ SHARED_WORKFLOW_VARIABLES.md](SHARED_WORKFLOW_VARIABLES.md)** - Variable configuration guide
-- **[ COMPLETE_CENTRALIZATION_SUMMARY.md](COMPLETE_CENTRALIZATION_SUMMARY.md)** - Centralization benefits
+```
+1. Code Push/PR
+   ↓
+2. Build & Test (Node.js)
+   ↓
+3. Security Scans (SonarCloud + Checkmarx)
+   ↓
+4. Create Artifact (tar.gz with metadata)
+   ↓
+5. Push to JFrog Artifactory
+   ↓
+6. Fetch Artifact for Deployment
+   ↓
+7. Deploy to Azure Static Web Apps
+   ↓
+8. Update Deployment Metadata
+```
 
-###  Operations & Troubleshooting
-- **[ ROLLBACK_GUIDE.md](ROLLBACK_GUIDE.md)** - Rollback procedures and emergency response
-- **[ DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md)** - Pre-deployment validation
-- **[ AZURE_DEPLOYMENT_TROUBLESHOOTING.md](AZURE_DEPLOYMENT_TROUBLESHOOTING.md)** - Azure issues
-- **[ CHECKMARX_TROUBLESHOOTING.md](CHECKMARX_TROUBLESHOOTING.md)** - Checkmarx authentication
+## Deployment Strategy
 
-## Benefits
+### Automatic Deployment
 
-###  Ultimate Control
-- Single point of configuration for all CI/CD standards
-- Immediate updates across all frontend applications
-- Cannot be bypassed by individual teams
-- Complete compliance guarantee
+| Branch/Tag | Environment | Artifact Repository | Version Format |
+|------------|-------------|-------------------|----------------|
+| `develop` | Development | frontend-snapshots | `{sha}-{timestamp}` |
+| `sqe` | SQE | frontend-snapshots | `{sha}-{timestamp}` |
+| `qa` | QA | frontend-snapshots | `{sha}-{timestamp}` |
+| `release/*` | Pre-production | frontend-releases | `v{x.y.z}` |
+| `v*` tags | Production | frontend-production | `v{x.y.z}` |
 
-###  Security Excellence
-- Mandatory security scanning with zero exceptions
-- Consistent quality standards organization-wide
-- Audit trail for all deployments and rollbacks
-- Zero tolerance for critical vulnerabilities
+### Manual Deployment
 
-###  Operational Efficiency
-- Standardized deployments reduce support burden
-- Manual rollback provides controlled recovery
-- Simplified troubleshooting with consistent setup
-- Faster onboarding with zero configuration
+Use the manual deployment workflow to:
+- Deploy specific artifact versions to any environment
+- List available artifacts before deployment
+- Deploy with custom deployment reason for audit trail
 
-###  Cost Optimization
-- Reduced duplication of CI/CD logic across repositories
-- Centralized maintenance instead of per-project updates
-- Consistent infrastructure reduces operational overhead
-- Faster time-to-market for new applications
+## Migration Guide
 
-## Support
+### From Existing CI/CD
 
-1. **Self-Service: Check documentation and workflow logs
-2. **DevOps Support: Create issue in this repository with workflow details
-3. **Emergency: Use manual rollback workflow + contact on-call engineer
+1. **Backup Current Setup**
+   ```bash
+   cp -r .github/workflows .github/workflows.backup
+   ```
 
----
+2. **Run Migration Script**
+   ```bash
+   ./scripts/migrate-to-artifactory.sh
+   ```
 
-** Ready to revolutionize your CI/CD with enterprise-grade centralized control!
+3. **Configure Secrets**
+   - Add JFrog credentials to repository secrets
+   - Keep existing Azure and security scanning secrets
 
-For complete system documentation, **start with [OVERVIEW.md](OVERVIEW.md)**.
+4. **Test Deployment**
+   ```bash
+   git push origin develop  # Test development deployment
+   ```
+
+5. **Update Organization**
+   - Train teams on new manual deployment capabilities
+   - Update deployment procedures documentation
+
+### Key Changes
+
+- **Artifacts** - Build output now stored in JFrog Artifactory
+- **Deployment** - Fetch artifacts from JFrog instead of rebuilding
+- **Manual Process** - Enhanced manual deployment with artifact selection
+- **Versioning** - Improved version management with semantic versioning
+- **Tracking** - Complete deployment audit trail
+
+## Workflows
+
+### Main CI/CD Workflow
+
+Location: `.github/workflows/shared-ci-cd-artifactory.yml`
+
+**Jobs:**
+1. `generate-version` - Create version and determine artifact repository
+2. `determine-deployment` - Decide which environments to deploy to
+3. `build-and-test` - Build application and run tests
+4. `security-scans` - Run SonarCloud and Checkmarx scans
+5. `build-and-publish` - Package and upload artifact to JFrog
+6. `deploy-*` - Deploy to specific environments from artifacts
+
+### Manual Deployment Workflow
+
+Location: `.github/workflows/manual-deployment-artifactory.yml`
+
+**Features:**
+- List available artifacts when no version specified
+- Validate artifact existence before deployment
+- Deploy to any environment with audit trail
+- Support for all artifact repositories
+
+## Scripts
+
+### Migration Script
+
+`scripts/migrate-to-artifactory.sh` - Migrate frontend projects to use JFrog Artifactory CI/CD
+
+**Features:**
+- Interactive configuration
+- Backup existing workflows
+- Generate workflow files
+- Create secrets checklist
+- Validate package.json
+
+### JFrog Setup Script
+
+`scripts/setup-jfrog-repositories.sh` - Set up required JFrog Artifactory repositories
+
+**Features:**
+- Create all required repositories
+- Configure retention policies
+- Validate repository setup
+- Generate setup instructions
+
+## Security & Compliance
+
+### Artifact Security
+- SHA256 checksums for all artifacts
+- Artifact integrity validation before deployment
+- Access control via JFrog permissions
+- Audit trail for all artifact operations
+
+### Deployment Security
+- Environment-specific approval gates
+- Manual approval required for production
+- Deployment reason tracking
+- Complete deployment history
+
+### Scanning Integration
+- SonarCloud for code quality and coverage
+- Checkmarx for security vulnerability scanning
+- Quality gates enforcement
+- Security scan results in deployment metadata
+
+## Troubleshooting
+
+### Common Issues
+
+**Artifact not found**
+- Check artifact version format
+- Verify repository permissions
+- Ensure artifact was successfully uploaded
+
+**JFrog authentication failed**
+- Verify JFROG_URL format (include https://)
+- Check access token permissions
+- Validate username/token combination
+
+**Deployment failed**
+- Check Azure Static Web Apps token
+- Verify artifact integrity
+- Review deployment logs
+
+### Support
+
+1. Check workflow logs in GitHub Actions
+2. Verify JFrog repository contents
+3. Validate all required secrets are configured
+4. Review artifact metadata for deployment history
+
+## Contributing
+
+1. Fork the repository
+2. Create feature branch
+3. Test changes with example application
+4. Submit pull request with documentation updates
+
+## License
+
+MIT License - see LICENSE file for details.

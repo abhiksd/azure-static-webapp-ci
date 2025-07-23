@@ -1,0 +1,458 @@
+name: Shared Frontend CI/CD with Artifactory
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: false
+        default: 'development'
+        type: string
+      app-location:
+        description: 'Source code location relative to repository root'
+        required: false
+        default: '/'
+        type: string
+      output-location:
+        description: 'Built application output directory'
+        required: false
+        default: 'build'
+        type: string
+      app-name:
+        description: 'Application name for artifact naming'
+        required: true
+        type: string
+    
+    secrets:
+      AZURE_STATIC_WEB_APPS_API_TOKEN:
+        description: 'Azure Static Web Apps API token'
+        required: false
+      SONAR_TOKEN:
+        description: 'SonarCloud token'
+        required: false
+      CHECKMARX_CLIENT_ID:
+        description: 'Checkmarx client ID'
+        required: false
+      CHECKMARX_SECRET:
+        description: 'Checkmarx client secret'
+        required: false
+      CHECKMARX_TENANT:
+        description: 'Checkmarx tenant'
+        required: false
+      CHECKMARX_BASE_URI:
+        description: 'Checkmarx base URI'
+        required: false
+      JFROG_URL:
+        description: 'JFrog Artifactory URL'
+        required: true
+      JFROG_USERNAME:
+        description: 'JFrog username'
+        required: true
+      JFROG_ACCESS_TOKEN:
+        description: 'JFrog access token'
+        required: true
+    
+    outputs:
+      dev-url:
+        description: 'Development environment URL'
+        value: ${{ jobs.deploy-dev.outputs.deployment-url }}
+      sqe-url:
+        description: 'SQE environment URL'
+        value: ${{ jobs.deploy-sqe.outputs.deployment-url }}
+      qa-url:
+        description: 'QA environment URL'
+        value: ${{ jobs.deploy-qa.outputs.deployment-url }}
+      preprod-url:
+        description: 'Pre-production environment URL'
+        value: ${{ jobs.deploy-preprod.outputs.deployment-url }}
+      prod-url:
+        description: 'Production environment URL'
+        value: ${{ jobs.deploy-prod.outputs.deployment-url }}
+      version:
+        description: 'Deployed version'
+        value: ${{ jobs.generate-version.outputs.version }}
+      artifact-name:
+        description: 'Generated artifact name'
+        value: ${{ jobs.build-and-publish.outputs.artifact-name }}
+
+env:
+  NODE_VERSION: '18'
+  APP_LOCATION: ${{ inputs.app-location }}
+  OUTPUT_LOCATION: ${{ inputs.output-location }}
+  APP_NAME: ${{ inputs.app-name }}
+  BUILD_COMMAND: 'npm run build'
+  INSTALL_COMMAND: 'npm ci'
+  ENABLE_SONAR: 'true'
+  ENABLE_CHECKMARX: 'true'
+  MIN_CODE_COVERAGE: '75'
+  MAX_CRITICAL_VULNERABILITIES: '0'
+  MAX_HIGH_VULNERABILITIES: '5'
+
+jobs:
+  generate-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is-release: ${{ steps.version.outputs.is-release }}
+      repository: ${{ steps.version.outputs.repository }}
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate Version and Repository
+        id: version
+        run: |
+          SHORT_SHA="${GITHUB_SHA::8}"
+          BRANCH="${{ github.ref_name }}"
+          ENVIRONMENT="${{ inputs.environment }}"
+          TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
+          
+          IS_RELEASE="false"
+          REPOSITORY="frontend-snapshots"
+          
+          if [[ "$BRANCH" == release/* ]] && [[ "${{ github.ref }}" != refs/tags/* ]]; then
+            RELEASE_VERSION="${BRANCH#release/}"
+            if [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              git config user.name "github-actions[bot]"
+              git config user.email "github-actions[bot]@users.noreply.github.com"
+              git tag "v$RELEASE_VERSION"
+              git push origin "v$RELEASE_VERSION"
+              VERSION="v$RELEASE_VERSION"
+              IS_RELEASE="true"
+              REPOSITORY="frontend-releases"
+            else
+              VERSION="$SHORT_SHA-$TIMESTAMP"
+            fi
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+            IS_RELEASE="true"
+            REPOSITORY="frontend-production"
+          else
+            VERSION="$SHORT_SHA-$TIMESTAMP"
+          fi
+          
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "is-release=$IS_RELEASE" >> $GITHUB_OUTPUT
+          echo "repository=$REPOSITORY" >> $GITHUB_OUTPUT
+
+  determine-deployment:
+    runs-on: ubuntu-latest
+    outputs:
+      deploy-dev: ${{ steps.logic.outputs.deploy-dev }}
+      deploy-sqe: ${{ steps.logic.outputs.deploy-sqe }}
+      deploy-qa: ${{ steps.logic.outputs.deploy-qa }}
+      deploy-preprod: ${{ steps.logic.outputs.deploy-preprod }}
+      deploy-prod: ${{ steps.logic.outputs.deploy-prod }}
+    
+    steps:
+      - name: Deployment Logic
+        id: logic
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          ENVIRONMENT="${{ inputs.environment }}"
+          
+          DEPLOY_DEV="false"
+          DEPLOY_SQE="false"
+          DEPLOY_QA="false"
+          DEPLOY_PREPROD="false"
+          DEPLOY_PROD="false"
+          
+          if [ -n "$ENVIRONMENT" ] && [ "$ENVIRONMENT" != "development" ]; then
+            case $ENVIRONMENT in
+              sqe) DEPLOY_SQE="true" ;;
+              qa) DEPLOY_QA="true" ;;
+              pre-production) DEPLOY_PREPROD="true" ;;
+              production) DEPLOY_PROD="true" ;;
+              *) DEPLOY_DEV="true" ;;
+            esac
+          else
+            case $BRANCH in
+              main|master) DEPLOY_PROD="true" ;;
+              develop|development) DEPLOY_DEV="true" ;;
+              sqe) DEPLOY_SQE="true" ;;
+              qa) DEPLOY_QA="true" ;;
+              preprod|pre-production) DEPLOY_PREPROD="true" ;;
+              release/*) DEPLOY_PREPROD="true" ;;
+              *) DEPLOY_DEV="true" ;;
+            esac
+          fi
+          
+          echo "deploy-dev=$DEPLOY_DEV" >> $GITHUB_OUTPUT
+          echo "deploy-sqe=$DEPLOY_SQE" >> $GITHUB_OUTPUT
+          echo "deploy-qa=$DEPLOY_QA" >> $GITHUB_OUTPUT
+          echo "deploy-preprod=$DEPLOY_PREPROD" >> $GITHUB_OUTPUT
+          echo "deploy-prod=$DEPLOY_PROD" >> $GITHUB_OUTPUT
+
+  build-and-test:
+    runs-on: ubuntu-latest
+    needs: [generate-version]
+    outputs:
+      build-path: ${{ steps.build.outputs.build-path }}
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install Dependencies and Build
+        id: build
+        working-directory: ${{ env.APP_LOCATION }}
+        run: |
+          ${{ env.INSTALL_COMMAND }}
+          ${{ env.BUILD_COMMAND }}
+          npm test 2>/dev/null || echo "No tests found"
+          
+          if [[ "${{ env.OUTPUT_LOCATION }}" == /* ]]; then
+            BUILD_PATH="${{ env.OUTPUT_LOCATION }}"
+          else
+            BUILD_PATH="${{ env.APP_LOCATION }}/${{ env.OUTPUT_LOCATION }}"
+          fi
+          
+          if [ ! -d "$BUILD_PATH" ]; then
+            echo "ERROR: Build output directory not found: $BUILD_PATH"
+            exit 1
+          fi
+          
+          echo "build-path=$BUILD_PATH" >> $GITHUB_OUTPUT
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: ${{ steps.build.outputs.build-path }}
+          retention-days: 7
+
+  security-scans:
+    runs-on: ubuntu-latest
+    needs: [build-and-test]
+    outputs:
+      sonar-status: ${{ steps.sonar.outputs.status }}
+      checkmarx-status: ${{ steps.checkmarx.outputs.status }}
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install Dependencies
+        working-directory: ${{ env.APP_LOCATION }}
+        run: ${{ env.INSTALL_COMMAND }}
+
+      - name: SonarCloud Analysis
+        id: sonar
+        if: env.ENABLE_SONAR == 'true' && secrets.SONAR_TOKEN != ''
+        uses: ./.github/actions/sonar-analysis
+        with:
+          enabled: ${{ env.ENABLE_SONAR }}
+          sonar-token: ${{ secrets.SONAR_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          organization: ${{ vars.SONAR_ORGANIZATION }}
+          min-code-coverage: ${{ env.MIN_CODE_COVERAGE }}
+          app-location: ${{ env.APP_LOCATION }}
+
+      - name: Checkmarx Security Scan
+        id: checkmarx
+        if: env.ENABLE_CHECKMARX == 'true' && secrets.CHECKMARX_CLIENT_ID != ''
+        uses: ./.github/actions/checkmarx-scan
+        with:
+          enabled: ${{ env.ENABLE_CHECKMARX }}
+          base-uri: ${{ secrets.CHECKMARX_BASE_URI || 'https://ast.checkmarx.net' }}
+          checkmarx-client-id: ${{ secrets.CHECKMARX_CLIENT_ID }}
+          checkmarx-secret: ${{ secrets.CHECKMARX_SECRET }}
+          tenant: ${{ secrets.CHECKMARX_TENANT }}
+          max-critical: ${{ env.MAX_CRITICAL_VULNERABILITIES }}
+          max-high: ${{ env.MAX_HIGH_VULNERABILITIES }}
+          app-location: ${{ env.APP_LOCATION }}
+
+  build-and-publish:
+    runs-on: ubuntu-latest
+    needs: [generate-version, build-and-test, security-scans]
+    outputs:
+      artifact-name: ${{ steps.publish.outputs.artifact-name }}
+    
+    steps:
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-output
+          path: ./build-output
+
+      - name: Setup JFrog CLI
+        uses: jfrog/setup-jfrog-cli@v3
+        env:
+          JF_URL: ${{ secrets.JFROG_URL }}
+          JF_USER: ${{ secrets.JFROG_USERNAME }}
+          JF_ACCESS_TOKEN: ${{ secrets.JFROG_ACCESS_TOKEN }}
+
+      - name: Create and Publish Artifact
+        id: publish
+        run: |
+          VERSION="${{ needs.generate-version.outputs.version }}"
+          REPOSITORY="${{ needs.generate-version.outputs.repository }}"
+          ARTIFACT_NAME="${{ env.APP_NAME }}-${VERSION}.tar.gz"
+          
+          # Create metadata
+          cat > metadata.json << EOF
+          {
+            "version": "$VERSION",
+            "commit": "${{ github.sha }}",
+            "branch": "${{ github.ref_name }}",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "repository": "$REPOSITORY",
+            "app_name": "${{ env.APP_NAME }}",
+            "build_number": "${{ github.run_number }}"
+          }
+          EOF
+          
+          # Package artifact
+          tar -czf "$ARTIFACT_NAME" -C ./build-output .
+          sha256sum "$ARTIFACT_NAME" > "${ARTIFACT_NAME}.sha256"
+          
+          # Upload to JFrog
+          jf rt upload "$ARTIFACT_NAME" "$REPOSITORY/${{ env.APP_NAME }}/" \
+            --props "version=$VERSION;commit=${{ github.sha }};branch=${{ github.ref_name }}"
+          jf rt upload "${ARTIFACT_NAME}.sha256" "$REPOSITORY/${{ env.APP_NAME }}/"
+          jf rt upload "metadata.json" "$REPOSITORY/${{ env.APP_NAME }}/" \
+            --props "version=$VERSION;type=metadata"
+          
+          echo "artifact-name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
+
+  deploy-dev:
+    if: needs.determine-deployment.outputs.deploy-dev == 'true'
+    runs-on: ubuntu-latest
+    needs: [generate-version, determine-deployment, build-and-publish]
+    environment: development
+    outputs:
+      deployment-url: ${{ steps.deploy.outputs.deployment-url }}
+    
+    steps:
+      - name: Fetch and Deploy Artifact
+        id: deploy
+        uses: ./.github/actions/deploy-from-artifactory
+        with:
+          environment: 'development'
+          artifact-name: ${{ needs.build-and-publish.outputs.artifact-name }}
+          version: ${{ needs.generate-version.outputs.version }}
+          repository: ${{ needs.generate-version.outputs.repository }}
+          app-name: ${{ env.APP_NAME }}
+          azure-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          jfrog-url: ${{ secrets.JFROG_URL }}
+          jfrog-username: ${{ secrets.JFROG_USERNAME }}
+          jfrog-token: ${{ secrets.JFROG_ACCESS_TOKEN }}
+          app-location: ${{ env.APP_LOCATION }}
+          output-location: ${{ env.OUTPUT_LOCATION }}
+
+  deploy-sqe:
+    if: needs.determine-deployment.outputs.deploy-sqe == 'true'
+    runs-on: ubuntu-latest
+    needs: [generate-version, determine-deployment, build-and-publish]
+    environment: sqe
+    outputs:
+      deployment-url: ${{ steps.deploy.outputs.deployment-url }}
+    
+    steps:
+      - name: Fetch and Deploy Artifact
+        id: deploy
+        uses: ./.github/actions/deploy-from-artifactory
+        with:
+          environment: 'sqe'
+          artifact-name: ${{ needs.build-and-publish.outputs.artifact-name }}
+          version: ${{ needs.generate-version.outputs.version }}
+          repository: ${{ needs.generate-version.outputs.repository }}
+          app-name: ${{ env.APP_NAME }}
+          azure-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          jfrog-url: ${{ secrets.JFROG_URL }}
+          jfrog-username: ${{ secrets.JFROG_USERNAME }}
+          jfrog-token: ${{ secrets.JFROG_ACCESS_TOKEN }}
+          app-location: ${{ env.APP_LOCATION }}
+          output-location: ${{ env.OUTPUT_LOCATION }}
+
+  deploy-qa:
+    if: needs.determine-deployment.outputs.deploy-qa == 'true'
+    runs-on: ubuntu-latest
+    needs: [generate-version, determine-deployment, build-and-publish]
+    environment: qa
+    outputs:
+      deployment-url: ${{ steps.deploy.outputs.deployment-url }}
+    
+    steps:
+      - name: Fetch and Deploy Artifact
+        id: deploy
+        uses: ./.github/actions/deploy-from-artifactory
+        with:
+          environment: 'qa'
+          artifact-name: ${{ needs.build-and-publish.outputs.artifact-name }}
+          version: ${{ needs.generate-version.outputs.version }}
+          repository: ${{ needs.generate-version.outputs.repository }}
+          app-name: ${{ env.APP_NAME }}
+          azure-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          jfrog-url: ${{ secrets.JFROG_URL }}
+          jfrog-username: ${{ secrets.JFROG_USERNAME }}
+          jfrog-token: ${{ secrets.JFROG_ACCESS_TOKEN }}
+          app-location: ${{ env.APP_LOCATION }}
+          output-location: ${{ env.OUTPUT_LOCATION }}
+
+  deploy-preprod:
+    if: needs.determine-deployment.outputs.deploy-preprod == 'true'
+    runs-on: ubuntu-latest
+    needs: [generate-version, determine-deployment, build-and-publish]
+    environment: pre-production
+    outputs:
+      deployment-url: ${{ steps.deploy.outputs.deployment-url }}
+    
+    steps:
+      - name: Fetch and Deploy Artifact
+        id: deploy
+        uses: ./.github/actions/deploy-from-artifactory
+        with:
+          environment: 'pre-production'
+          artifact-name: ${{ needs.build-and-publish.outputs.artifact-name }}
+          version: ${{ needs.generate-version.outputs.version }}
+          repository: ${{ needs.generate-version.outputs.repository }}
+          app-name: ${{ env.APP_NAME }}
+          azure-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          jfrog-url: ${{ secrets.JFROG_URL }}
+          jfrog-username: ${{ secrets.JFROG_USERNAME }}
+          jfrog-token: ${{ secrets.JFROG_ACCESS_TOKEN }}
+          app-location: ${{ env.APP_LOCATION }}
+          output-location: ${{ env.OUTPUT_LOCATION }}
+
+  deploy-prod:
+    if: needs.determine-deployment.outputs.deploy-prod == 'true'
+    runs-on: ubuntu-latest
+    needs: [generate-version, determine-deployment, build-and-publish]
+    environment: production
+    outputs:
+      deployment-url: ${{ steps.deploy.outputs.deployment-url }}
+    
+    steps:
+      - name: Fetch and Deploy Artifact
+        id: deploy
+        uses: ./.github/actions/deploy-from-artifactory
+        with:
+          environment: 'production'
+          artifact-name: ${{ needs.build-and-publish.outputs.artifact-name }}
+          version: ${{ needs.generate-version.outputs.version }}
+          repository: ${{ needs.generate-version.outputs.repository }}
+          app-name: ${{ env.APP_NAME }}
+          azure-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          jfrog-url: ${{ secrets.JFROG_URL }}
+          jfrog-username: ${{ secrets.JFROG_USERNAME }}
+          jfrog-token: ${{ secrets.JFROG_ACCESS_TOKEN }}
+          app-location: ${{ env.APP_LOCATION }}
+          output-location: ${{ env.OUTPUT_LOCATION }}

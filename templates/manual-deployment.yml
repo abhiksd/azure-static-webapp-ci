@@ -1,0 +1,50 @@
+name: Manual Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+        - development
+        - sqe
+        - qa
+        - pre-production
+        - production
+      artifact-version:
+        description: 'Artifact version (leave empty to list available versions)'
+        required: false
+        type: string
+      repository:
+        description: 'Artifact repository'
+        required: false
+        default: 'frontend-releases'
+        type: choice
+        options:
+        - frontend-snapshots
+        - frontend-releases
+        - frontend-production
+      reason:
+        description: 'Deployment reason'
+        required: true
+        type: string
+
+jobs:
+  manual-deploy:
+    uses: YOUR_ORG/shared-ci-cd-workflows/.github/workflows/manual-deployment-artifactory.yml@main
+    with:
+      environment: ${{ github.event.inputs.environment }}
+      app-name: 'YOUR_APP_NAME'
+      artifact-version: ${{ github.event.inputs.artifact-version }}
+      repository: ${{ github.event.inputs.repository }}
+      reason: ${{ github.event.inputs.reason }}
+      app-location: '/'
+      output-location: 'build'
+    
+    secrets:
+      AZURE_STATIC_WEB_APPS_API_TOKEN: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+      JFROG_URL: ${{ secrets.JFROG_URL }}
+      JFROG_USERNAME: ${{ secrets.JFROG_USERNAME }}
+      JFROG_ACCESS_TOKEN: ${{ secrets.JFROG_ACCESS_TOKEN }}

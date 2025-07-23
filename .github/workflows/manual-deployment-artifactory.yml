@@ -1,0 +1,149 @@
+name: Manual Deployment from Artifactory
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: string
+      app-name:
+        description: 'Application name'
+        required: true
+        type: string
+      artifact-version:
+        description: 'Artifact version to deploy (leave empty to list available)'
+        required: false
+        type: string
+      repository:
+        description: 'JFrog repository'
+        required: false
+        default: 'frontend-releases'
+        type: string
+      reason:
+        description: 'Deployment reason'
+        required: true
+        type: string
+      app-location:
+        description: 'Application location'
+        required: false
+        default: '/'
+        type: string
+      output-location:
+        description: 'Build output location'
+        required: false
+        default: 'build'
+        type: string
+    
+    secrets:
+      AZURE_STATIC_WEB_APPS_API_TOKEN:
+        description: 'Azure Static Web Apps API token'
+        required: true
+      JFROG_URL:
+        description: 'JFrog Artifactory URL'
+        required: true
+      JFROG_USERNAME:
+        description: 'JFrog username'
+        required: true
+      JFROG_ACCESS_TOKEN:
+        description: 'JFrog access token'
+        required: true
+
+jobs:
+  list-artifacts:
+    if: inputs.artifact-version == ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup JFrog CLI
+        uses: jfrog/setup-jfrog-cli@v3
+        env:
+          JF_URL: ${{ secrets.JFROG_URL }}
+          JF_USER: ${{ secrets.JFROG_USERNAME }}
+          JF_ACCESS_TOKEN: ${{ secrets.JFROG_ACCESS_TOKEN }}
+
+      - name: List Available Artifacts
+        run: |
+          echo "Available artifacts in ${{ inputs.repository }}/${{ inputs.app-name }}:"
+          jf rt search "${{ inputs.repository }}/${{ inputs.app-name }}/*.tar.gz" --sort-by=created --sort-order=desc --limit=20
+
+          echo ""
+          echo "To deploy a specific version, re-run this workflow with the artifact-version parameter."
+          echo "Example versions from the list above can be used."
+
+  validate-deployment:
+    if: inputs.artifact-version != ''
+    runs-on: ubuntu-latest
+    outputs:
+      artifact-name: ${{ steps.validate.outputs.artifact-name }}
+      can-deploy: ${{ steps.validate.outputs.can-deploy }}
+    
+    steps:
+      - name: Setup JFrog CLI
+        uses: jfrog/setup-jfrog-cli@v3
+        env:
+          JF_URL: ${{ secrets.JFROG_URL }}
+          JF_USER: ${{ secrets.JFROG_USERNAME }}
+          JF_ACCESS_TOKEN: ${{ secrets.JFROG_ACCESS_TOKEN }}
+
+      - name: Validate Artifact and Environment
+        id: validate
+        run: |
+          ARTIFACT_NAME="${{ inputs.app-name }}-${{ inputs.artifact-version }}.tar.gz"
+          ARTIFACT_PATH="${{ inputs.repository }}/${{ inputs.app-name }}/$ARTIFACT_NAME"
+          
+          echo "Checking if artifact exists: $ARTIFACT_PATH"
+          if jf rt search "$ARTIFACT_PATH" | grep -q "$ARTIFACT_NAME"; then
+            echo "Artifact found: $ARTIFACT_NAME"
+            echo "artifact-name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
+            echo "can-deploy=true" >> $GITHUB_OUTPUT
+            
+            echo "Artifact metadata:"
+            jf rt search "$ARTIFACT_PATH" --props
+          else
+            echo "ERROR: Artifact not found: $ARTIFACT_NAME"
+            echo "Available artifacts:"
+            jf rt search "${{ inputs.repository }}/${{ inputs.app-name }}/*.tar.gz" --sort-by=created --sort-order=desc --limit=10
+            echo "can-deploy=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+  deploy:
+    if: inputs.artifact-version != '' && needs.validate-deployment.outputs.can-deploy == 'true'
+    runs-on: ubuntu-latest
+    needs: [validate-deployment]
+    environment: ${{ inputs.environment }}
+    
+    steps:
+      - name: Record Deployment Intent
+        run: |
+          echo "Manual deployment initiated:"
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Application: ${{ inputs.app-name }}"
+          echo "Artifact: ${{ needs.validate-deployment.outputs.artifact-name }}"
+          echo "Version: ${{ inputs.artifact-version }}"
+          echo "Repository: ${{ inputs.repository }}"
+          echo "Reason: ${{ inputs.reason }}"
+          echo "Initiated by: ${{ github.actor }}"
+
+      - name: Deploy from Artifactory
+        uses: ./.github/actions/deploy-from-artifactory
+        with:
+          environment: ${{ inputs.environment }}
+          artifact-name: ${{ needs.validate-deployment.outputs.artifact-name }}
+          version: ${{ inputs.artifact-version }}
+          repository: ${{ inputs.repository }}
+          app-name: ${{ inputs.app-name }}
+          azure-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          jfrog-url: ${{ secrets.JFROG_URL }}
+          jfrog-username: ${{ secrets.JFROG_USERNAME }}
+          jfrog-token: ${{ secrets.JFROG_ACCESS_TOKEN }}
+          app-location: ${{ inputs.app-location }}
+          output-location: ${{ inputs.output-location }}
+
+      - name: Record Deployment Success
+        if: success()
+        run: |
+          echo "Deployment completed successfully"
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Version: ${{ inputs.artifact-version }}"
+          echo "Reason: ${{ inputs.reason }}"

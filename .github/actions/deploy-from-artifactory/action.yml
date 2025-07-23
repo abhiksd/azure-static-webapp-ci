@@ -1,0 +1,104 @@
+name: 'Deploy from JFrog Artifactory'
+description: 'Fetch artifact from JFrog Artifactory and deploy to Azure Static Web Apps'
+
+inputs:
+  environment:
+    description: 'Target environment'
+    required: true
+  artifact-name:
+    description: 'Artifact name to fetch'
+    required: true
+  version:
+    description: 'Artifact version'
+    required: true
+  repository:
+    description: 'JFrog repository name'
+    required: true
+  app-name:
+    description: 'Application name'
+    required: true
+  azure-token:
+    description: 'Azure Static Web Apps API token'
+    required: true
+  jfrog-url:
+    description: 'JFrog Artifactory URL'
+    required: true
+  jfrog-username:
+    description: 'JFrog username'
+    required: true
+  jfrog-token:
+    description: 'JFrog access token'
+    required: true
+  app-location:
+    description: 'Application location'
+    required: false
+    default: '/'
+  output-location:
+    description: 'Build output location'
+    required: false
+    default: 'build'
+
+outputs:
+  deployment-url:
+    description: 'Deployment URL'
+    value: ${{ steps.deploy-azure.outputs.static_web_app_url }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup JFrog CLI
+      uses: jfrog/setup-jfrog-cli@v3
+      env:
+        JF_URL: ${{ inputs.jfrog-url }}
+        JF_USER: ${{ inputs.jfrog-username }}
+        JF_ACCESS_TOKEN: ${{ inputs.jfrog-token }}
+
+    - name: Fetch Artifact from JFrog
+      shell: bash
+      run: |
+        ARTIFACT_PATH="${{ inputs.repository }}/${{ inputs.app-name }}/${{ inputs.artifact-name }}"
+        CHECKSUM_PATH="${{ inputs.repository }}/${{ inputs.app-name }}/${{ inputs.artifact-name }}.sha256"
+        
+        echo "Downloading artifact: $ARTIFACT_PATH"
+        jf rt download "$ARTIFACT_PATH" ./ --flat
+        jf rt download "$CHECKSUM_PATH" ./ --flat
+        
+        if [ ! -f "${{ inputs.artifact-name }}" ]; then
+          echo "ERROR: Artifact not found: ${{ inputs.artifact-name }}"
+          exit 1
+        fi
+        
+        echo "Verifying artifact integrity..."
+        sha256sum -c "${{ inputs.artifact-name }}.sha256"
+        
+        echo "Extracting artifact..."
+        mkdir -p extracted-build
+        tar -xzf "${{ inputs.artifact-name }}" -C extracted-build/
+
+    - name: Deploy to Azure Static Web Apps
+      id: deploy-azure
+      uses: Azure/static-web-apps-deploy@v1
+      with:
+        azure_static_web_apps_api_token: ${{ inputs.azure-token }}
+        repo_token: ${{ github.token }}
+        action: 'upload'
+        app_location: 'extracted-build'
+        output_location: '.'
+        skip_build: true
+
+    - name: Update Deployment Metadata
+      shell: bash
+      run: |
+        cat > deployment-info.json << EOF
+        {
+          "environment": "${{ inputs.environment }}",
+          "version": "${{ inputs.version }}",
+          "artifact": "${{ inputs.artifact-name }}",
+          "deployed_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+          "commit": "${{ github.sha }}",
+          "run_id": "${{ github.run_id }}"
+        }
+        EOF
+        
+        jf rt upload "deployment-info.json" "${{ inputs.repository }}/${{ inputs.app-name }}/deployments/" \
+          --props "environment=${{ inputs.environment }};version=${{ inputs.version }};type=deployment"
