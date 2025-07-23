@@ -9,7 +9,7 @@ on:
         type: choice
         options:
         - development
-        - staging
+        - sqe
         - qa
         - pre-production
         - production

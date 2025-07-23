@@ -2,7 +2,7 @@ name: Frontend Application CI/CD
 
 on:
   push:
-    branches: [main, develop, staging, preprod, qa]
+    branches: [main, develop, sqe, preprod, qa]
     tags: ['v*']
   pull_request:
     branches: [main, develop]
@@ -15,7 +15,7 @@ on:
         type: choice
         options:
         - development
-        - staging
+        - sqe
         - qa
         - pre-production
         - production

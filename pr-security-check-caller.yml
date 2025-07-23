@@ -2,7 +2,7 @@ name: PR Security Check
 
 on:
   pull_request:
-    branches: [main, develop, staging, preprod, qa]
+    branches: [main, develop, sqe, preprod, qa]
     types: [opened, synchronize, reopened]
   workflow_dispatch:
     inputs:

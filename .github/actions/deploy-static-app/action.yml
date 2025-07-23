@@ -61,9 +61,9 @@ runs:
         echo "Version: $VERSION"
         
         # Validate environment
-        if [[ ! "$ENVIRONMENT" =~ ^(development|staging|qa|pre-production|production)$ ]]; then
+        if [[ ! "$ENVIRONMENT" =~ ^(development|sqe|qa|pre-production|production)$ ]]; then
           echo "Invalid environment: $ENVIRONMENT"
-          echo "Valid environments: development, staging, qa, pre-production, production"
+          echo "Valid environments: development, sqe, qa, pre-production, production"
           exit 1
         fi
         
@@ -88,10 +88,10 @@ runs:
             echo "REACT_APP_ENV=development" >> $GITHUB_ENV
             echo "VITE_ENV=development" >> $GITHUB_ENV
             ;;
-          staging)
-            echo "NODE_ENV=staging" >> $GITHUB_ENV
-            echo "REACT_APP_ENV=staging" >> $GITHUB_ENV
-            echo "VITE_ENV=staging" >> $GITHUB_ENV
+          sqe)
+            echo "NODE_ENV=sqe" >> $GITHUB_ENV
+            echo "REACT_APP_ENV=sqe" >> $GITHUB_ENV
+            echo "VITE_ENV=sqe" >> $GITHUB_ENV
             ;;
           qa)
             echo "NODE_ENV=qa" >> $GITHUB_ENV
