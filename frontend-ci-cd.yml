@@ -19,6 +19,11 @@ on:
         - qa
         - pre-production
         - production
+      skip-deployment:
+        description: 'Skip deployment (build only)'
+        required: false
+        default: false
+        type: boolean
 
 
 jobs:
@@ -27,6 +32,9 @@ jobs:
     with:
       # Environment configuration
       environment: ${{ github.event.inputs.environment || 'development' }}
+      
+      # Deployment controls
+      skip-deployment: ${{ github.event.inputs.skip-deployment || false }}
       
       # App-specific configuration (customize for your frontend app)
       app-location: '/'                    # Change to your source code location (e.g., 'frontend', 'client', 'app')

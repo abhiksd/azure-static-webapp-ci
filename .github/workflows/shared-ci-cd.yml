@@ -32,6 +32,13 @@ on:
         required: false
         default: 'build'
         type: string
+      
+      # Deployment controls
+      skip-deployment:
+        description: 'Skip deployment (for build-only runs)'
+        required: false
+        default: false
+        type: boolean
     
     secrets:
       # Generic Azure Static Web Apps API token (environment-specific via environment-level secrets)
@@ -122,10 +129,6 @@ env:
   # Checkmarx configuration
   CHECKMARX_SCAN_TYPES: 'sast,sca'
   CHECKMARX_PRESET: 'Checkmarx Default'
-  
-  # Deployment controls
-  SKIP_DEPLOYMENT: 'false'
-  FORCE_VERSION: ''
 
 jobs:
   detect-deployment:
@@ -219,7 +222,7 @@ jobs:
           DEPLOY_PREPROD="false"
           DEPLOY_PROD="false"
           
-          if [ "${{ env.SKIP_DEPLOYMENT }}" = "true" ]; then
+          if [ "${{ inputs.skip-deployment }}" = "true" ]; then
             echo "Deployment skipped by input"
           elif [ -n "$ENVIRONMENT" ] && [ "$ENVIRONMENT" != "development" ]; then
             # Manual workflow dispatch with specific environment
@@ -398,7 +401,7 @@ jobs:
           app-location: ${{ env.APP_LOCATION }}
 
   deploy-dev:
-    if: always() && needs.detect-deployment.outputs.should-deploy-dev == 'true' && env.SKIP_DEPLOYMENT != 'true'
+    if: always() && needs.detect-deployment.outputs.should-deploy-dev == 'true' && inputs.skip-deployment != 'true'
     runs-on: ubuntu-latest
     needs: [detect-deployment, build-and-test, sonar-analysis, checkmarx-scan]
     environment: development
@@ -439,7 +442,7 @@ jobs:
           skip-build: 'true'  # Using pre-built artifacts from build-and-test job
 
   deploy-sqe:
-    if: always() && needs.detect-deployment.outputs.should-deploy-sqe == 'true' && env.SKIP_DEPLOYMENT != 'true'
+    if: always() && needs.detect-deployment.outputs.should-deploy-sqe == 'true' && inputs.skip-deployment != 'true'
     runs-on: ubuntu-latest
     needs: [detect-deployment, build-and-test, sonar-analysis, checkmarx-scan]
     environment: sqe
@@ -480,7 +483,7 @@ jobs:
           skip-build: 'true'  # Using pre-built artifacts from build-and-test job
 
   deploy-qa:
-    if: always() && needs.detect-deployment.outputs.should-deploy-qa == 'true' && env.SKIP_DEPLOYMENT != 'true'
+    if: always() && needs.detect-deployment.outputs.should-deploy-qa == 'true' && inputs.skip-deployment != 'true'
     runs-on: ubuntu-latest
     needs: [detect-deployment, build-and-test, sonar-analysis, checkmarx-scan]
     environment: qa
@@ -521,7 +524,7 @@ jobs:
           skip-build: 'true'  # Using pre-built artifacts from build-and-test job
 
   deploy-preprod:
-    if: always() && needs.detect-deployment.outputs.should-deploy-preprod == 'true' && env.SKIP_DEPLOYMENT != 'true'
+    if: always() && needs.detect-deployment.outputs.should-deploy-preprod == 'true' && inputs.skip-deployment != 'true'
     runs-on: ubuntu-latest
     needs: [detect-deployment, build-and-test, sonar-analysis, checkmarx-scan]
     environment: pre-production
@@ -562,7 +565,7 @@ jobs:
           skip-build: 'true'  # Using pre-built artifacts from build-and-test job
 
   deploy-prod:
-    if: always() && needs.detect-deployment.outputs.should-deploy-prod == 'true' && env.SKIP_DEPLOYMENT != 'true'
+    if: always() && needs.detect-deployment.outputs.should-deploy-prod == 'true' && inputs.skip-deployment != 'true'
     runs-on: ubuntu-latest
     needs: [detect-deployment, build-and-test, sonar-analysis, checkmarx-scan]
     environment: production
@@ -603,7 +606,7 @@ jobs:
           skip-build: 'true'  # Using pre-built artifacts from build-and-test job
 
   deployment-summary:
-    if: always() && env.SKIP_DEPLOYMENT != 'true'
+    if: always() && inputs.skip-deployment != 'true'
     runs-on: ubuntu-latest
     needs: [detect-deployment, sonar-analysis, checkmarx-scan, deploy-dev, deploy-sqe, deploy-qa, deploy-preprod, deploy-prod]
     
