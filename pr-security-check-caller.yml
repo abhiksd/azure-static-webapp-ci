@@ -2,32 +2,33 @@ name: PR Security Check
 
 on:
   pull_request:
+    branches: [main, develop, staging, preprod, qa]
     types: [opened, synchronize, reopened]
   workflow_dispatch:
     inputs:
       pr_number:
-        description: 'PR number to check'
-        required: true
+        description: 'PR number to check (for manual triggers)'
+        required: false
         type: string
 
 permissions:
   contents: read
   pull-requests: write
   security-events: write
-  actions: read
 
 jobs:
   call-shared-pr-security:
     uses: YOUR_ORG/shared-ci-cd-workflows/.github/workflows/shared-pr-security.yml@main
     with:
-      # Pass PR-specific information to shared workflow
-      pr_number: ${{ github.event.inputs.pr_number || github.event.pull_request.number }}
+      pr_number: ${{ github.event.inputs.pr_number || github.event.number }}
       pr_head_sha: ${{ github.event.pull_request.head.sha || github.sha }}
-      
+    secrets:
       # All security configuration is centralized in the shared repository
       # No ability to override security settings from frontend applications
-    
-    secrets:
+      
+      # Environment-level secrets will be used for any deployment-related operations
+      AZURE_STATIC_WEB_APPS_API_TOKEN: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+      
       # Security scanning secrets (set these in your frontend repo)
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       CHECKMARX_CLIENT_ID: ${{ secrets.CHECKMARX_CLIENT_ID }}
@@ -35,19 +36,19 @@ jobs:
       CHECKMARX_TENANT: ${{ secrets.CHECKMARX_TENANT }}
       CHECKMARX_BASE_URI: ${{ secrets.CHECKMARX_BASE_URI }}
 
-  pr-comment:
-    if: always() && github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+  # Update PR with security results
+  update-pr-comment:
     needs: [call-shared-pr-security]
+    runs-on: ubuntu-latest
+    if: always() && github.event_name == 'pull_request'
     permissions:
       pull-requests: write
     
     steps:
-      - name: Generate PR Comment
+      - name: Update PR Comment
         uses: actions/github-script@v7
         with:
           script: |
-            const prNumber = context.payload.pull_request.number;
             const overallStatus = '${{ needs.call-shared-pr-security.outputs.overall-status }}';
             const sonarStatus = '${{ needs.call-shared-pr-security.outputs.sonar-status }}';
             const sonarCoverage = '${{ needs.call-shared-pr-security.outputs.sonar-coverage }}';
@@ -55,13 +56,12 @@ jobs:
             const checkmarxCritical = '${{ needs.call-shared-pr-security.outputs.checkmarx-critical }}';
             const checkmarxHigh = '${{ needs.call-shared-pr-security.outputs.checkmarx-high }}';
             
-            let statusIcon = overallStatus === 'PASSED' ? '✅' : overallStatus === 'FAILED' ? '❌' : '⚠️';
+            const statusIcon = overallStatus === 'PASSED' ? '✅' : overallStatus === 'FAILED' ? '❌' : '⚠️';
             let commentBody = `## ${statusIcon} Security Check Results\n\n`;
-            
             commentBody += `**Overall Status**: ${overallStatus}\n\n`;
+            
             commentBody += `### Security Scan Details\n\n`;
             
-            // SonarCloud results
             if (sonarStatus && sonarStatus !== 'SKIPPED') {
               const sonarIcon = sonarStatus === 'PASSED' ? '✅' : '❌';
               commentBody += `${sonarIcon} **SonarCloud**: ${sonarStatus}`;
@@ -69,11 +69,8 @@ jobs:
                 commentBody += ` (Coverage: ${sonarCoverage}%)`;
               }
               commentBody += `\n`;
-            } else {
-              commentBody += `⚪ **SonarCloud**: DISABLED\n`;
             }
             
-            // Checkmarx results
             if (checkmarxStatus && checkmarxStatus !== 'SKIPPED') {
               const checkmarxIcon = checkmarxStatus === 'PASSED' ? '✅' : '❌';
               commentBody += `${checkmarxIcon} **Checkmarx**: ${checkmarxStatus}`;
@@ -81,40 +78,36 @@ jobs:
                 commentBody += ` (Critical: ${checkmarxCritical}, High: ${checkmarxHigh})`;
               }
               commentBody += `\n`;
-            } else {
-              commentBody += `⚪ **Checkmarx**: DISABLED\n`;
             }
             
             commentBody += `\n---\n`;
             commentBody += `*Security checks performed using shared workflow with centralized configuration*\n`;
-            commentBody += `*Configuration controlled by DevOps team - no frontend overrides allowed*`;
+            commentBody += `*Generated at: ${new Date().toISOString()}*`;
             
-            // Check if there are existing comments from this bot
+            // Find existing comment or create new one
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: prNumber,
+              issue_number: context.issue.number,
             });
             
-            const botComment = comments.find(comment => 
+            const existingComment = comments.find(comment => 
               comment.user.type === 'Bot' && 
               comment.body.includes('Security Check Results')
             );
             
-            if (botComment) {
-              // Update existing comment
+            if (existingComment) {
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                comment_id: botComment.id,
+                comment_id: existingComment.id,
                 body: commentBody
               });
             } else {
-              // Create new comment
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                issue_number: prNumber,
+                issue_number: context.issue.number,
                 body: commentBody
               });
             }
