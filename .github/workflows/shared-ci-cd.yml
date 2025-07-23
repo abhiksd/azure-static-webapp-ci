@@ -314,11 +314,40 @@ jobs:
             exit 1
           fi
 
+      - name: Prepare Deployment Package
+        run: |
+          # Create a deployment directory
+          mkdir -p deployment-package
+          
+          # Copy build output
+          if [[ "${{ env.OUTPUT_LOCATION }}" == /* ]]; then
+            BUILD_PATH="${{ env.OUTPUT_LOCATION }}"
+          else
+            BUILD_PATH="${{ env.APP_LOCATION }}/${{ env.OUTPUT_LOCATION }}"
+          fi
+          
+          cp -r $BUILD_PATH/* deployment-package/
+          
+          # Copy configuration files if they exist
+          if [ -f "${{ env.APP_LOCATION }}/staticwebapp.config.json" ]; then
+            cp "${{ env.APP_LOCATION }}/staticwebapp.config.json" deployment-package/
+            echo "Copied staticwebapp.config.json"
+          fi
+          
+          # Copy swa-db-connections if it exists
+          if [ -d "${{ env.APP_LOCATION }}/swa-db-connections" ]; then
+            cp -r "${{ env.APP_LOCATION }}/swa-db-connections" deployment-package/
+            echo "Copied swa-db-connections directory"
+          fi
+          
+          echo "Deployment package contents:"
+          ls -la deployment-package/
+
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: build-artifacts
-          path: ${{ env.APP_LOCATION }}/${{ env.OUTPUT_LOCATION }}/
+          path: deployment-package/
           retention-days: 7
           compression-level: 6
 
