@@ -2,32 +2,33 @@ name: PR Security Check
 
 on:
   pull_request:
+    branches: [main, develop, staging, preprod, qa]
     types: [opened, synchronize, reopened]
   workflow_dispatch:
     inputs:
       pr_number:
-        description: 'PR number to check'
-        required: true
+        description: 'PR number to check (for manual triggers)'
+        required: false
         type: string
 
 permissions:
   contents: read
   pull-requests: write
   security-events: write
-  actions: read
 
 jobs:
   call-shared-pr-security:
     uses: YOUR_ORG/shared-ci-cd-workflows/.github/workflows/shared-pr-security.yml@main
     with:
-      # Pass PR-specific information to shared workflow
-      pr_number: ${{ github.event.inputs.pr_number || github.event.pull_request.number }}
+      pr_number: ${{ github.event.inputs.pr_number || github.event.number }}
       pr_head_sha: ${{ github.event.pull_request.head.sha || github.sha }}
-      
+    secrets:
       # All security configuration is centralized in the shared repository
       # No ability to override security settings from frontend applications
-    
-    secrets:
+      
+      # Environment-level secrets will be used for any deployment-related operations
+      AZURE_STATIC_WEB_APPS_API_TOKEN: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+      
       # Security scanning secrets (set these in your frontend repo)
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       CHECKMARX_CLIENT_ID: ${{ secrets.CHECKMARX_CLIENT_ID }}

@@ -34,18 +34,9 @@ on:
         type: string
     
     secrets:
-      # Required secrets for deployment
-      AZURE_STATIC_WEB_APPS_API_TOKEN_DEV:
-        description: 'Azure Static Web Apps API token for development'
-        required: false
-      AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING:
-        description: 'Azure Static Web Apps API token for staging'
-        required: false
-      AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD:
-        description: 'Azure Static Web Apps API token for pre-production'
-        required: false
-      AZURE_STATIC_WEB_APPS_API_TOKEN_PROD:
-        description: 'Azure Static Web Apps API token for production'
+      # Generic Azure Static Web Apps API token (environment-specific via environment-level secrets)
+      AZURE_STATIC_WEB_APPS_API_TOKEN:
+        description: 'Azure Static Web Apps API token (resolved per environment)'
         required: false
       
       # Security scanning secrets
@@ -73,6 +64,9 @@ on:
       staging-url:
         description: 'Staging environment URL'
         value: ${{ jobs.deploy-staging.outputs.deployment-url }}
+      qa-url:
+        description: 'QA environment URL'
+        value: ${{ jobs.deploy-qa.outputs.deployment-url }}
       preprod-url:
         description: 'Pre-production environment URL'
         value: ${{ jobs.deploy-preprod.outputs.deployment-url }}
@@ -139,6 +133,7 @@ jobs:
     outputs:
       should-deploy-dev: ${{ steps.deployment-logic.outputs.deploy-dev }}
       should-deploy-staging: ${{ steps.deployment-logic.outputs.deploy-staging }}
+      should-deploy-qa: ${{ steps.deployment-logic.outputs.deploy-qa }}
       should-deploy-preprod: ${{ steps.deployment-logic.outputs.deploy-preprod }}
       should-deploy-prod: ${{ steps.deployment-logic.outputs.deploy-prod }}
       version: ${{ steps.version.outputs.version }}
@@ -203,9 +198,9 @@ jobs:
               echo "No tag found, using SHA for release/pre-prod/prod: $VERSION"
             fi
           else
-            # Development and Staging: Always use SHA
+            # Development, Staging, and QA: Always use SHA
             VERSION="$SHORT_SHA"
-            echo "Using SHA for dev/staging: $VERSION"
+            echo "Using SHA for dev/staging/qa: $VERSION"
           fi
           
           echo "version=$VERSION" >> $GITHUB_OUTPUT
@@ -220,6 +215,7 @@ jobs:
           # Default deployment logic
           DEPLOY_DEV="false"
           DEPLOY_STAGING="false"
+          DEPLOY_QA="false"
           DEPLOY_PREPROD="false"
           DEPLOY_PROD="false"
           
@@ -229,6 +225,7 @@ jobs:
             # Manual workflow dispatch with specific environment
             case $ENVIRONMENT in
               staging) DEPLOY_STAGING="true" ;;
+              qa) DEPLOY_QA="true" ;;
               pre-production) DEPLOY_PREPROD="true" ;;
               production) DEPLOY_PROD="true" ;;
               *) DEPLOY_DEV="true" ;;
@@ -239,6 +236,7 @@ jobs:
               main|master) DEPLOY_PROD="true" ;;
               develop|development) DEPLOY_DEV="true" ;;
               staging) DEPLOY_STAGING="true" ;;
+              qa) DEPLOY_QA="true" ;;
               preprod|pre-production) DEPLOY_PREPROD="true" ;;
               release/*) 
                 # Release branches auto-deploy to pre-prod, manual approval for production
@@ -253,10 +251,11 @@ jobs:
           
           echo "deploy-dev=$DEPLOY_DEV" >> $GITHUB_OUTPUT
           echo "deploy-staging=$DEPLOY_STAGING" >> $GITHUB_OUTPUT
+          echo "deploy-qa=$DEPLOY_QA" >> $GITHUB_OUTPUT
           echo "deploy-preprod=$DEPLOY_PREPROD" >> $GITHUB_OUTPUT
           echo "deploy-prod=$DEPLOY_PROD" >> $GITHUB_OUTPUT
           
-          echo "Deployment strategy: Dev=$DEPLOY_DEV, Staging=$DEPLOY_STAGING, Pre-prod=$DEPLOY_PREPROD, Prod=$DEPLOY_PROD"
+          echo "Deployment strategy: Dev=$DEPLOY_DEV, Staging=$DEPLOY_STAGING, QA=$DEPLOY_QA, Pre-prod=$DEPLOY_PREPROD, Prod=$DEPLOY_PROD"
 
   build-and-test:
     runs-on: ubuntu-latest
@@ -434,7 +433,7 @@ jobs:
         id: deploy
         uses: ./.github/actions/deploy-static-app
         with:
-          azure-static-web-apps-api-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_DEV }}
+          azure-static-web-apps-api-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           environment: 'development'
           version: ${{ needs.detect-deployment.outputs.version }}
           app-location: ${{ env.APP_LOCATION }}
@@ -475,8 +474,49 @@ jobs:
         id: deploy
         uses: ./.github/actions/deploy-static-app
         with:
-          azure-static-web-apps-api-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING }}
+          azure-static-web-apps-api-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           environment: 'staging'
+          version: ${{ needs.detect-deployment.outputs.version }}
+          app-location: ${{ env.APP_LOCATION }}
+          output-location: ${{ env.OUTPUT_LOCATION }}
+          skip-build: 'true'  # Using pre-built artifacts from build-and-test job
+
+  deploy-qa:
+    if: always() && needs.detect-deployment.outputs.should-deploy-qa == 'true' && env.SKIP_DEPLOYMENT != 'true'
+    runs-on: ubuntu-latest
+    needs: [detect-deployment, build-and-test, sonar-analysis, checkmarx-scan]
+    environment: qa
+    outputs:
+      deployment-url: ${{ steps.deploy.outputs.static-web-app-url }}
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+          path: ${{ env.OUTPUT_LOCATION }}/
+
+      - name: Verify Downloaded Artifacts
+        run: |
+          echo "Verifying downloaded build artifacts..."
+          if [ -d "${{ env.OUTPUT_LOCATION }}" ]; then
+            echo "Downloaded artifacts size: $(du -sh ${{ env.OUTPUT_LOCATION }} | cut -f1)"
+            echo "Artifact contents:"
+            ls -la ${{ env.OUTPUT_LOCATION }}
+          else
+            echo "ERROR: Downloaded artifacts not found"
+            exit 1
+          fi
+
+      - name: Deploy to QA
+        id: deploy
+        uses: ./.github/actions/deploy-static-app
+        with:
+          azure-static-web-apps-api-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          environment: 'qa'
           version: ${{ needs.detect-deployment.outputs.version }}
           app-location: ${{ env.APP_LOCATION }}
           output-location: ${{ env.OUTPUT_LOCATION }}
@@ -516,7 +556,7 @@ jobs:
         id: deploy
         uses: ./.github/actions/deploy-static-app
         with:
-          azure-static-web-apps-api-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD }}
+          azure-static-web-apps-api-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           environment: 'pre-production'
           version: ${{ needs.detect-deployment.outputs.version }}
           app-location: ${{ env.APP_LOCATION }}
@@ -557,7 +597,7 @@ jobs:
         id: deploy
         uses: ./.github/actions/deploy-static-app
         with:
-          azure-static-web-apps-api-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PROD }}
+          azure-static-web-apps-api-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           environment: 'production'
           version: ${{ needs.detect-deployment.outputs.version }}
           app-location: ${{ env.APP_LOCATION }}
@@ -568,7 +608,7 @@ jobs:
   deployment-summary:
     if: always() && env.SKIP_DEPLOYMENT != 'true'
     runs-on: ubuntu-latest
-    needs: [detect-deployment, sonar-analysis, checkmarx-scan, deploy-dev, deploy-staging, deploy-preprod, deploy-prod]
+    needs: [detect-deployment, sonar-analysis, checkmarx-scan, deploy-dev, deploy-staging, deploy-qa, deploy-preprod, deploy-prod]
     
     steps:
       - name: Deployment Summary
@@ -583,6 +623,10 @@ jobs:
           
           if [ "${{ needs.deploy-staging.result }}" = "success" ]; then
             echo "**Staging**: ${{ needs.deploy-staging.outputs.deployment-url }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.deploy-qa.result }}" = "success" ]; then
+            echo "**QA**: ${{ needs.deploy-qa.outputs.deployment-url }}" >> $GITHUB_STEP_SUMMARY
           fi
           
           if [ "${{ needs.deploy-preprod.result }}" = "success" ]; then

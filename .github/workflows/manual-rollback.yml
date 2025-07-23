@@ -8,45 +8,32 @@ on:
         required: true
         type: string
       target_version:
-        description: 'Version to rollback to (optional - uses last successful if empty)'
+        description: 'Version to rollback to (optional)'
         required: false
         type: string
       reason:
         description: 'Reason for rollback'
         required: true
         type: string
-      
-      # App-specific configuration (varies per frontend app)
       app-location:
-        description: 'Source code location relative to repository root'
+        description: 'App source code location'
         required: false
         default: '/'
         type: string
       output-location:
-        description: 'Built application output directory'
+        description: 'Built app content directory'
         required: false
         default: 'build'
         type: string
     
     secrets:
-      # Azure Static Web Apps API tokens
-      AZURE_STATIC_WEB_APPS_API_TOKEN_DEV:
-        description: 'Azure Static Web Apps API token for development'
-        required: false
-      AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING:
-        description: 'Azure Static Web Apps API token for staging'
-        required: false
-      AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD:
-        description: 'Azure Static Web Apps API token for pre-production'
-        required: false
-      AZURE_STATIC_WEB_APPS_API_TOKEN_PROD:
-        description: 'Azure Static Web Apps API token for production'
-        required: false
-      
-      # GitHub token for API access
+      # Generic Azure Static Web Apps API token (resolved per environment via environment-level secrets)
+      AZURE_STATIC_WEB_APPS_API_TOKEN:
+        description: 'Azure Static Web Apps API token (resolved per environment)'
+        required: true
       GITHUB_TOKEN:
         description: 'GitHub token for repository access'
-        required: false
+        required: true
 
 env:
   # Build configuration (standardized)
@@ -86,16 +73,19 @@ jobs:
           # Determine Azure token environment variable name
           case "$ENVIRONMENT" in
             "development")
-              AZURE_TOKEN_VAR="AZURE_STATIC_WEB_APPS_API_TOKEN_DEV"
+              AZURE_TOKEN_VAR="AZURE_STATIC_WEB_APPS_API_TOKEN"
               ;;
             "staging")
-              AZURE_TOKEN_VAR="AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING"
+              AZURE_TOKEN_VAR="AZURE_STATIC_WEB_APPS_API_TOKEN"
               ;;
             "pre-production")
-              AZURE_TOKEN_VAR="AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD"
+              AZURE_TOKEN_VAR="AZURE_STATIC_WEB_APPS_API_TOKEN"
               ;;
             "production")
-              AZURE_TOKEN_VAR="AZURE_STATIC_WEB_APPS_API_TOKEN_PROD"
+              AZURE_TOKEN_VAR="AZURE_STATIC_WEB_APPS_API_TOKEN"
+              ;;
+            "qa")
+              AZURE_TOKEN_VAR="AZURE_STATIC_WEB_APPS_API_TOKEN"
               ;;
             *)
               echo "Invalid environment: $ENVIRONMENT"
@@ -208,7 +198,7 @@ jobs:
         id: deploy
         uses: ./.github/actions/deploy-static-app
         with:
-          azure-static-web-apps-api-token: ${{ inputs.environment == 'development' && secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_DEV || inputs.environment == 'staging' && secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING || inputs.environment == 'pre-production' && secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD || inputs.environment == 'production' && secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PROD }}
+          azure-static-web-apps-api-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           environment: ${{ inputs.environment }}
           version: ${{ needs.validate-rollback.outputs.target-version }}
           app-location: ${{ env.APP_LOCATION }}

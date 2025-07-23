@@ -2,7 +2,7 @@ name: Frontend Application CI/CD
 
 on:
   push:
-    branches: [main, develop, staging, preprod]
+    branches: [main, develop, staging, preprod, qa]
     tags: ['v*']
   pull_request:
     branches: [main, develop]
@@ -35,11 +35,8 @@ jobs:
       # All other configuration (security, quality gates) is centralized in the shared workflow
     
     secrets:
-      # Azure Static Web Apps API tokens (set these in your frontend repo)
-      AZURE_STATIC_WEB_APPS_API_TOKEN_DEV: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_DEV }}
-      AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING }}
-      AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD }}
-      AZURE_STATIC_WEB_APPS_API_TOKEN_PROD: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PROD }}
+      # Generic Azure Static Web Apps API token (resolved per environment via environment-level secrets)
+      AZURE_STATIC_WEB_APPS_API_TOKEN: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
       
       # Security scanning secrets (set these in your frontend repo)
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
