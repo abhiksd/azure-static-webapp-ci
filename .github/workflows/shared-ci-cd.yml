@@ -461,6 +461,32 @@ jobs:
             echo "Downloaded artifacts size: $(du -sh ${{ env.OUTPUT_LOCATION }} | cut -f1)"
             echo "Artifact contents:"
             ls -la ${{ env.OUTPUT_LOCATION }}
+            
+            # Check for Azure Static Web Apps configuration files
+            if [ -f "${{ env.OUTPUT_LOCATION }}/staticwebapp.config.json" ]; then
+              echo "✓ staticwebapp.config.json found in artifacts"
+            else
+              echo "⚠ staticwebapp.config.json not found in artifacts"
+            fi
+            
+            if [ -d "${{ env.OUTPUT_LOCATION }}/swa-db-connections" ]; then
+              echo "✓ swa-db-connections directory found in artifacts"
+            else
+              echo "⚠ swa-db-connections directory not found in artifacts"
+            fi
+            
+            # Check for Azure Static Web Apps configuration files
+            if [ -f "${{ env.OUTPUT_LOCATION }}/staticwebapp.config.json" ]; then
+              echo "✓ staticwebapp.config.json found in artifacts"
+            else
+              echo "⚠ staticwebapp.config.json not found in artifacts"
+            fi
+            
+            if [ -d "${{ env.OUTPUT_LOCATION }}/swa-db-connections" ]; then
+              echo "✓ swa-db-connections directory found in artifacts"
+            else
+              echo "⚠ swa-db-connections directory not found in artifacts"
+            fi
           else
             echo "ERROR: Downloaded artifacts not found"
             exit 1
@@ -502,6 +528,19 @@ jobs:
             echo "Downloaded artifacts size: $(du -sh ${{ env.OUTPUT_LOCATION }} | cut -f1)"
             echo "Artifact contents:"
             ls -la ${{ env.OUTPUT_LOCATION }}
+            
+            # Check for Azure Static Web Apps configuration files
+            if [ -f "${{ env.OUTPUT_LOCATION }}/staticwebapp.config.json" ]; then
+              echo "✓ staticwebapp.config.json found in artifacts"
+            else
+              echo "⚠ staticwebapp.config.json not found in artifacts"
+            fi
+            
+            if [ -d "${{ env.OUTPUT_LOCATION }}/swa-db-connections" ]; then
+              echo "✓ swa-db-connections directory found in artifacts"
+            else
+              echo "⚠ swa-db-connections directory not found in artifacts"
+            fi
           else
             echo "ERROR: Downloaded artifacts not found"
             exit 1
@@ -543,6 +582,19 @@ jobs:
             echo "Downloaded artifacts size: $(du -sh ${{ env.OUTPUT_LOCATION }} | cut -f1)"
             echo "Artifact contents:"
             ls -la ${{ env.OUTPUT_LOCATION }}
+            
+            # Check for Azure Static Web Apps configuration files
+            if [ -f "${{ env.OUTPUT_LOCATION }}/staticwebapp.config.json" ]; then
+              echo "✓ staticwebapp.config.json found in artifacts"
+            else
+              echo "⚠ staticwebapp.config.json not found in artifacts"
+            fi
+            
+            if [ -d "${{ env.OUTPUT_LOCATION }}/swa-db-connections" ]; then
+              echo "✓ swa-db-connections directory found in artifacts"
+            else
+              echo "⚠ swa-db-connections directory not found in artifacts"
+            fi
           else
             echo "ERROR: Downloaded artifacts not found"
             exit 1
@@ -584,6 +636,19 @@ jobs:
             echo "Downloaded artifacts size: $(du -sh ${{ env.OUTPUT_LOCATION }} | cut -f1)"
             echo "Artifact contents:"
             ls -la ${{ env.OUTPUT_LOCATION }}
+            
+            # Check for Azure Static Web Apps configuration files
+            if [ -f "${{ env.OUTPUT_LOCATION }}/staticwebapp.config.json" ]; then
+              echo "✓ staticwebapp.config.json found in artifacts"
+            else
+              echo "⚠ staticwebapp.config.json not found in artifacts"
+            fi
+            
+            if [ -d "${{ env.OUTPUT_LOCATION }}/swa-db-connections" ]; then
+              echo "✓ swa-db-connections directory found in artifacts"
+            else
+              echo "⚠ swa-db-connections directory not found in artifacts"
+            fi
           else
             echo "ERROR: Downloaded artifacts not found"
             exit 1
@@ -625,6 +690,19 @@ jobs:
             echo "Downloaded artifacts size: $(du -sh ${{ env.OUTPUT_LOCATION }} | cut -f1)"
             echo "Artifact contents:"
             ls -la ${{ env.OUTPUT_LOCATION }}
+            
+            # Check for Azure Static Web Apps configuration files
+            if [ -f "${{ env.OUTPUT_LOCATION }}/staticwebapp.config.json" ]; then
+              echo "✓ staticwebapp.config.json found in artifacts"
+            else
+              echo "⚠ staticwebapp.config.json not found in artifacts"
+            fi
+            
+            if [ -d "${{ env.OUTPUT_LOCATION }}/swa-db-connections" ]; then
+              echo "✓ swa-db-connections directory found in artifacts"
+            else
+              echo "⚠ swa-db-connections directory not found in artifacts"
+            fi
           else
             echo "ERROR: Downloaded artifacts not found"
             exit 1
