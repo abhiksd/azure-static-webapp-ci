@@ -262,12 +262,35 @@ Location: `.github/workflows/manual-deployment-artifactory.yml`
 3. Validate all required secrets are configured
 4. Review artifact metadata for deployment history
 
+## Documentation
+
+- **[README.md](README.md)** - This comprehensive overview and quick start guide
+- **[MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)** - Step-by-step migration from existing CI/CD
+- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Complete issue resolution guide
+- **[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)** - Architecture and component overview
+
+## Files and Structure
+
+```
+shared-ci-cd-workflows/
+├── .github/
+│   ├── actions/                          # Reusable composite actions
+│   └── workflows/                        # Shared workflow definitions
+├── scripts/                              # Migration and setup scripts
+├── templates/                            # Frontend application templates
+├── README.md                             # Main documentation (this file)
+├── MIGRATION_GUIDE.md                    # Migration instructions
+├── TROUBLESHOOTING.md                    # Issue resolution guide
+└── PROJECT_STRUCTURE.md                 # Architecture overview
+```
+
 ## Contributing
 
 1. Fork the repository
 2. Create feature branch
 3. Test changes with example application
 4. Submit pull request with documentation updates
+5. Update documentation for any new features
 
 ## License
 
