@@ -83,27 +83,17 @@ jobs:
           echo "Reason: ${{ inputs.reason }}"
           echo "Requested by: ${{ github.actor }}"
           
-          # Determine Azure token environment variable name
+          # Validate environment
           case "$ENVIRONMENT" in
-            "development")
-              AZURE_TOKEN_VAR="AZURE_STATIC_WEB_APPS_API_TOKEN_DEV"
-              ;;
-            "staging")
-              AZURE_TOKEN_VAR="AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING"
-              ;;
-            "pre-production")
-              AZURE_TOKEN_VAR="AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD"
-              ;;
-            "production")
-              AZURE_TOKEN_VAR="AZURE_STATIC_WEB_APPS_API_TOKEN_PROD"
+            "development"|"staging"|"qa"|"pre-production"|"production")
+              echo "Valid environment: $ENVIRONMENT"
               ;;
             *)
               echo "Invalid environment: $ENVIRONMENT"
+              echo "Valid environments: development, staging, qa, pre-production, production"
               exit 1
               ;;
           esac
-          
-          echo "azure-token-env-var=$AZURE_TOKEN_VAR" >> $GITHUB_OUTPUT
           
           # Get current deployment version from GitHub API
           CURRENT_VERSION=$(curl -s "https://api.github.com/repos/${{ github.repository }}/deployments" \
@@ -208,7 +198,7 @@ jobs:
         id: deploy
         uses: ./.github/actions/deploy-static-app
         with:
-          azure-static-web-apps-api-token: ${{ inputs.environment == 'development' && secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_DEV || inputs.environment == 'staging' && secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING || inputs.environment == 'pre-production' && secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD || inputs.environment == 'production' && secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PROD }}
+          azure-static-web-apps-api-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           environment: ${{ inputs.environment }}
           version: ${{ needs.validate-rollback.outputs.target-version }}
           app-location: ${{ env.APP_LOCATION }}
