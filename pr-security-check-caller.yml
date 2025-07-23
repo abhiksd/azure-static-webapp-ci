@@ -20,7 +20,7 @@ jobs:
   call-shared-pr-security:
     uses: YOUR_ORG/shared-ci-cd-workflows/.github/workflows/shared-pr-security.yml@main
     with:
-      pr_number: ${{ github.event.inputs.pr_number || github.event.number }}
+      pr_number: ${{ github.event.inputs.pr_number || github.event.pull_request.number }}
       pr_head_sha: ${{ github.event.pull_request.head.sha || github.sha }}
     secrets:
       # All security configuration is centralized in the shared repository
