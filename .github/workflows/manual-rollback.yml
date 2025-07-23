@@ -29,24 +29,13 @@ on:
         type: string
     
     secrets:
-      # Azure Static Web Apps API tokens
-      AZURE_STATIC_WEB_APPS_API_TOKEN_DEV:
-        description: 'Azure Static Web Apps API token for development'
-        required: false
-      AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING:
-        description: 'Azure Static Web Apps API token for staging'
-        required: false
-      AZURE_STATIC_WEB_APPS_API_TOKEN_PREPROD:
-        description: 'Azure Static Web Apps API token for pre-production'
-        required: false
-      AZURE_STATIC_WEB_APPS_API_TOKEN_PROD:
-        description: 'Azure Static Web Apps API token for production'
-        required: false
-      
-      # GitHub token for API access
+      # Generic Azure Static Web Apps API token (resolved per environment via environment-level secrets)
+      AZURE_STATIC_WEB_APPS_API_TOKEN:
+        description: 'Azure Static Web Apps API token (resolved per environment)'
+        required: true
       GITHUB_TOKEN:
         description: 'GitHub token for repository access'
-        required: false
+        required: true
 
 env:
   # Build configuration (standardized)
@@ -63,7 +52,6 @@ jobs:
       can-rollback: ${{ steps.validation.outputs.can-rollback }}
       target-version: ${{ steps.validation.outputs.target-version }}
       current-version: ${{ steps.validation.outputs.current-version }}
-      azure-token-env-var: ${{ steps.validation.outputs.azure-token-env-var }}
     
     steps:
       - name: Checkout Frontend Repository
@@ -85,12 +73,12 @@ jobs:
           
           # Validate environment
           case "$ENVIRONMENT" in
-            "development"|"staging"|"qa"|"pre-production"|"production")
+            "development"|"sqe"|"qa"|"pre-production"|"production")
               echo "Valid environment: $ENVIRONMENT"
               ;;
             *)
               echo "Invalid environment: $ENVIRONMENT"
-              echo "Valid environments: development, staging, qa, pre-production, production"
+              echo "Valid environments: development, sqe, qa, pre-production, production"
               exit 1
               ;;
           esac
