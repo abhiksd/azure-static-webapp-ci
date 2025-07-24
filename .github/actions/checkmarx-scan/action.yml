@@ -103,9 +103,9 @@ runs:
         echo "status=$STATUS" >> $GITHUB_OUTPUT
         echo "critical-count=$CRITICAL" >> $GITHUB_OUTPUT
         echo "high-count=$HIGH" >> $GITHUB_OUTPUT
-                  echo "Checkmarx: $STATUS | Vulnerabilities: $CRITICAL critical, $HIGH high"
+        echo "Checkmarx: $STATUS | Vulnerabilities: $CRITICAL critical, $HIGH high"
 
-          - name: Skip (Disabled)
-        if: inputs.enabled != 'true'
-        shell: bash
-        run: echo "Checkmarx scan disabled"
+    - name: Skip (Disabled)
+      if: inputs.enabled != 'true'
+      shell: bash
+      run: echo "Checkmarx scan disabled"
