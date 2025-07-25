@@ -102,6 +102,17 @@ runs:
       run: |
         PROJECT_KEY="${{ inputs.project-key || github.repository }}"
         
+        # Normalize the SonarQube host URL (remove trailing slash)
+        SONAR_HOST="${{ inputs.sonar-host-url }}"
+        SONAR_HOST="${SONAR_HOST%/}"  # Remove trailing slash if present
+        
+        if [ "${{ inputs.debug }}" = "true" ]; then
+          echo "DEBUG: Original host URL: ${{ inputs.sonar-host-url }}"
+          echo "DEBUG: Normalized host URL: $SONAR_HOST"
+          echo "DEBUG: Project key: $PROJECT_KEY"
+          echo "DEBUG: URL-encoded project key: ${PROJECT_KEY//\//%2F}"
+        fi
+        
         # Set curl SSL options
         CURL_OPTS="-s"
         if [ "${{ inputs.skip-ssl-verification }}" = "true" ]; then
@@ -111,8 +122,12 @@ runs:
         
         # Get quality gate with error handling
         echo "Fetching quality gate status for project: ${PROJECT_KEY}"
+        GATE_URL="${SONAR_HOST}/api/qualitygates/project_status?projectKey=${PROJECT_KEY//\//%2F}"
+        if [ "${{ inputs.debug }}" = "true" ]; then
+          echo "DEBUG: Quality gate URL: $GATE_URL"
+        fi
         GATE_RESPONSE=$(curl $CURL_OPTS -w "HTTP_CODE:%{http_code}" -u "${{ inputs.sonar-token }}:" \
-          "${{ inputs.sonar-host-url }}/api/qualitygates/project_status?projectKey=${PROJECT_KEY//\//%2F}")
+          "$GATE_URL")
         
         HTTP_CODE=$(echo "$GATE_RESPONSE" | grep -o "HTTP_CODE:[0-9]*" | cut -d: -f2)
         GATE_JSON=$(echo "$GATE_RESPONSE" | sed 's/HTTP_CODE:[0-9]*$//')
@@ -139,8 +154,12 @@ runs:
         
         # Get metrics with error handling
         echo "Fetching metrics for project: ${PROJECT_KEY}"
+        METRICS_URL="${SONAR_HOST}/api/measures/component?component=${PROJECT_KEY//\//%2F}&metricKeys=coverage,blocker_violations,critical_violations"
+        if [ "${{ inputs.debug }}" = "true" ]; then
+          echo "DEBUG: Metrics URL: $METRICS_URL"
+        fi
         METRICS_RESPONSE=$(curl $CURL_OPTS -w "HTTP_CODE:%{http_code}" -u "${{ inputs.sonar-token }}:" \
-          "${{ inputs.sonar-host-url }}/api/measures/component?component=${PROJECT_KEY//\//%2F}&metricKeys=coverage,blocker_violations,critical_violations")
+          "$METRICS_URL")
         
         METRICS_HTTP_CODE=$(echo "$METRICS_RESPONSE" | grep -o "HTTP_CODE:[0-9]*" | cut -d: -f2)
         METRICS=$(echo "$METRICS_RESPONSE" | sed 's/HTTP_CODE:[0-9]*$//')
