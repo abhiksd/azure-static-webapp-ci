@@ -42,6 +42,10 @@ inputs:
     description: 'Application source code location relative to repository root'
     required: false
     default: '/'
+  debug:
+    description: 'Enable debug output for troubleshooting'
+    required: false
+    default: 'false'
 
 outputs:
   status:
@@ -98,6 +102,17 @@ runs:
       run: |
         PROJECT_KEY="${{ inputs.project-key || github.repository }}"
         
+        # Normalize the SonarQube host URL (remove trailing slash)
+        SONAR_HOST="${{ inputs.sonar-host-url }}"
+        SONAR_HOST="${SONAR_HOST%/}"  # Remove trailing slash if present
+        
+        if [ "${{ inputs.debug }}" = "true" ]; then
+          echo "DEBUG: Original host URL: ${{ inputs.sonar-host-url }}"
+          echo "DEBUG: Normalized host URL: $SONAR_HOST"
+          echo "DEBUG: Project key: $PROJECT_KEY"
+          echo "DEBUG: URL-encoded project key: ${PROJECT_KEY//\//%2F}"
+        fi
+        
         # Set curl SSL options
         CURL_OPTS="-s"
         if [ "${{ inputs.skip-ssl-verification }}" = "true" ]; then
@@ -105,18 +120,92 @@ runs:
           echo "Warning: Using insecure SSL for API calls"
         fi
         
-        # Get quality gate
-        GATE=$(curl $CURL_OPTS -u "${{ inputs.sonar-token }}:" \
-          "${{ inputs.sonar-host-url }}/api/qualitygates/project_status?projectKey=${PROJECT_KEY//\//%2F}" | \
-          jq -r '.projectStatus.status // "OK"')
+        # Get quality gate with error handling
+        echo "Fetching quality gate status for project: ${PROJECT_KEY}"
+        GATE_URL="${SONAR_HOST}/api/qualitygates/project_status"
+        if [ "${{ inputs.debug }}" = "true" ]; then
+          echo "DEBUG: Quality gate base URL: $GATE_URL"
+          echo "DEBUG: Full URL would be: ${GATE_URL}?projectKey=${PROJECT_KEY}"
+        fi
+        GATE_RESPONSE=$(curl $CURL_OPTS -w "HTTP_CODE:%{http_code}" -u "${{ inputs.sonar-token }}:" \
+          --get \
+          --data-urlencode "projectKey=${PROJECT_KEY}" \
+          "$GATE_URL")
         
-        # Get metrics
-        METRICS=$(curl $CURL_OPTS -u "${{ inputs.sonar-token }}:" \
-          "${{ inputs.sonar-host-url }}/api/measures/component?component=${PROJECT_KEY//\//%2F}&metricKeys=coverage,blocker_violations,critical_violations")
+        HTTP_CODE=$(echo "$GATE_RESPONSE" | grep -o "HTTP_CODE:[0-9]*" | cut -d: -f2)
+        GATE_JSON=$(echo "$GATE_RESPONSE" | sed 's/HTTP_CODE:[0-9]*$//')
         
-        COVERAGE=$(echo "$METRICS" | jq -r '.component.measures[] | select(.metric=="coverage") | .value // "0"')
-        BLOCKERS=$(echo "$METRICS" | jq -r '.component.measures[] | select(.metric=="blocker_violations") | .value // "0"')
-        CRITICALS=$(echo "$METRICS" | jq -r '.component.measures[] | select(.metric=="critical_violations") | .value // "0"')
+        if [ "${{ inputs.debug }}" = "true" ]; then
+          echo "DEBUG: Quality gate HTTP code: $HTTP_CODE"
+          echo "DEBUG: Quality gate response: $GATE_JSON"
+        fi
+        
+        if [ "$HTTP_CODE" != "200" ]; then
+          echo "Error: SonarQube API returned HTTP $HTTP_CODE"
+          echo "Response: $GATE_JSON"
+          GATE="ERROR"
+        else
+          # Validate JSON before parsing
+          if echo "$GATE_JSON" | jq empty 2>/dev/null; then
+            GATE=$(echo "$GATE_JSON" | jq -r '.projectStatus.status // "OK"')
+          else
+            echo "Error: Invalid JSON response from quality gate API"
+            echo "Response: $GATE_JSON"
+            GATE="ERROR"
+          fi
+        fi
+        
+        # Get metrics with error handling
+        echo "Fetching metrics for project: ${PROJECT_KEY}"
+        
+        # URL encode the project key properly
+        ENCODED_PROJECT_KEY=$(echo "${PROJECT_KEY}" | sed 's/\//%2F/g')
+        
+        # Construct the metrics URL with proper encoding
+        METRICS_URL="${SONAR_HOST}/api/measures/component"
+        
+        if [ "${{ inputs.debug }}" = "true" ]; then
+          echo "DEBUG: Metrics base URL: $METRICS_URL"
+          echo "DEBUG: Project key: $PROJECT_KEY"
+          echo "DEBUG: Encoded project key: $ENCODED_PROJECT_KEY"
+          echo "DEBUG: Full URL would be: ${METRICS_URL}?component=${ENCODED_PROJECT_KEY}&metricKeys=coverage,blocker_violations,critical_violations"
+        fi
+        
+        # Use curl with proper parameter passing to avoid URL issues
+        METRICS_RESPONSE=$(curl $CURL_OPTS -w "HTTP_CODE:%{http_code}" -u "${{ inputs.sonar-token }}:" \
+          --get \
+          --data-urlencode "component=${PROJECT_KEY}" \
+          --data-urlencode "metricKeys=coverage,blocker_violations,critical_violations" \
+          "$METRICS_URL")
+        
+        METRICS_HTTP_CODE=$(echo "$METRICS_RESPONSE" | grep -o "HTTP_CODE:[0-9]*" | cut -d: -f2)
+        METRICS=$(echo "$METRICS_RESPONSE" | sed 's/HTTP_CODE:[0-9]*$//')
+        
+        if [ "${{ inputs.debug }}" = "true" ]; then
+          echo "DEBUG: Metrics HTTP code: $METRICS_HTTP_CODE"
+          echo "DEBUG: Metrics response: $METRICS"
+        fi
+        
+        if [ "$METRICS_HTTP_CODE" != "200" ]; then
+          echo "Error: SonarQube metrics API returned HTTP $METRICS_HTTP_CODE"
+          echo "Response: $METRICS"
+          COVERAGE="0"
+          BLOCKERS="0"
+          CRITICALS="0"
+        else
+          # Validate JSON before parsing
+          if echo "$METRICS" | jq empty 2>/dev/null; then
+            COVERAGE=$(echo "$METRICS" | jq -r '.component.measures[] | select(.metric=="coverage") | .value // "0"')
+            BLOCKERS=$(echo "$METRICS" | jq -r '.component.measures[] | select(.metric=="blocker_violations") | .value // "0"')
+            CRITICALS=$(echo "$METRICS" | jq -r '.component.measures[] | select(.metric=="critical_violations") | .value // "0"')
+          else
+            echo "Error: Invalid JSON response from metrics API"
+            echo "Response: $METRICS"
+            COVERAGE="0"
+            BLOCKERS="0"
+            CRITICALS="0"
+          fi
+        fi
         
         # Check thresholds
         STATUS="PASSED"
@@ -129,7 +218,7 @@ runs:
         echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
         echo "SonarCloud: $STATUS | Coverage: ${COVERAGE}% | Issues: $CRITICALS critical, $BLOCKERS blocker"
 
-          - name: Skip (Disabled)
-        if: inputs.enabled != 'true'
-        shell: bash
-        run: echo "SonarCloud scan disabled"
+    - name: Skip (Disabled)
+      if: inputs.enabled != 'true'
+      shell: bash
+      run: echo "SonarCloud scan disabled"
