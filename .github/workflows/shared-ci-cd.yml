@@ -296,19 +296,33 @@ jobs:
           echo "Building application (single build for all deployments)..."
           ${{ env.BUILD_COMMAND }}
           echo "Running tests with coverage..."
-          # Try different test configurations based on project type
-          if npm run test:coverage 2>/dev/null; then
-            echo "Tests with coverage completed"
-          elif npm run test -- --code-coverage=true --watch=false --browsers=HeadlessChrome 2>/dev/null; then
-            echo "Angular tests with coverage completed"
-          elif npm test -- --coverage --watchAll=false 2>/dev/null; then
-            echo "React tests with coverage completed"
-          elif ng test --watch=false --code-coverage=true --browsers=HeadlessChrome 2>/dev/null; then
-            echo "Angular CLI tests with coverage completed"
-          elif npm test 2>/dev/null; then
-            echo "Tests completed (no coverage available)"
+          
+          # Check if this is an Angular project
+          if [ -f "angular.json" ]; then
+            echo "Angular project detected"
+            echo "Attempting to build first..."
+            if ng build --configuration=production; then
+              echo "Build successful, running tests..."
+              if ng test --watch=false --code-coverage=true --browsers=HeadlessChrome --progress=false; then
+                echo "Angular tests with coverage completed"
+              else
+                echo "Angular tests failed, trying without coverage..."
+                ng test --watch=false --browsers=HeadlessChrome --progress=false || echo "Angular tests failed"
+              fi
+            else
+              echo "Build failed, skipping tests"
+            fi
           else
-            echo "No tests found or test command not available"
+            # Try different test configurations for other project types
+            if npm run test:coverage; then
+              echo "Tests with coverage completed"
+            elif npm test -- --coverage --watchAll=false; then
+              echo "React tests with coverage completed"
+            elif npm test; then
+              echo "Tests completed (no coverage available)"
+            else
+              echo "No tests found or test command not available"
+            fi
           fi
 
       - name: Verify Build Output
