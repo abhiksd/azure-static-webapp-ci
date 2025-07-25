@@ -42,6 +42,10 @@ inputs:
     description: 'Application source code location relative to repository root'
     required: false
     default: '/'
+  debug:
+    description: 'Enable debug output for troubleshooting'
+    required: false
+    default: 'false'
 
 outputs:
   status:
@@ -105,18 +109,67 @@ runs:
           echo "Warning: Using insecure SSL for API calls"
         fi
         
-        # Get quality gate
-        GATE=$(curl $CURL_OPTS -u "${{ inputs.sonar-token }}:" \
-          "${{ inputs.sonar-host-url }}/api/qualitygates/project_status?projectKey=${PROJECT_KEY//\//%2F}" | \
-          jq -r '.projectStatus.status // "OK"')
+        # Get quality gate with error handling
+        echo "Fetching quality gate status for project: ${PROJECT_KEY}"
+        GATE_RESPONSE=$(curl $CURL_OPTS -w "HTTP_CODE:%{http_code}" -u "${{ inputs.sonar-token }}:" \
+          "${{ inputs.sonar-host-url }}/api/qualitygates/project_status?projectKey=${PROJECT_KEY//\//%2F}")
         
-        # Get metrics
-        METRICS=$(curl $CURL_OPTS -u "${{ inputs.sonar-token }}:" \
+        HTTP_CODE=$(echo "$GATE_RESPONSE" | grep -o "HTTP_CODE:[0-9]*" | cut -d: -f2)
+        GATE_JSON=$(echo "$GATE_RESPONSE" | sed 's/HTTP_CODE:[0-9]*$//')
+        
+        if [ "${{ inputs.debug }}" = "true" ]; then
+          echo "DEBUG: Quality gate HTTP code: $HTTP_CODE"
+          echo "DEBUG: Quality gate response: $GATE_JSON"
+        fi
+        
+        if [ "$HTTP_CODE" != "200" ]; then
+          echo "Error: SonarQube API returned HTTP $HTTP_CODE"
+          echo "Response: $GATE_JSON"
+          GATE="ERROR"
+        else
+          # Validate JSON before parsing
+          if echo "$GATE_JSON" | jq empty 2>/dev/null; then
+            GATE=$(echo "$GATE_JSON" | jq -r '.projectStatus.status // "OK"')
+          else
+            echo "Error: Invalid JSON response from quality gate API"
+            echo "Response: $GATE_JSON"
+            GATE="ERROR"
+          fi
+        fi
+        
+        # Get metrics with error handling
+        echo "Fetching metrics for project: ${PROJECT_KEY}"
+        METRICS_RESPONSE=$(curl $CURL_OPTS -w "HTTP_CODE:%{http_code}" -u "${{ inputs.sonar-token }}:" \
           "${{ inputs.sonar-host-url }}/api/measures/component?component=${PROJECT_KEY//\//%2F}&metricKeys=coverage,blocker_violations,critical_violations")
         
-        COVERAGE=$(echo "$METRICS" | jq -r '.component.measures[] | select(.metric=="coverage") | .value // "0"')
-        BLOCKERS=$(echo "$METRICS" | jq -r '.component.measures[] | select(.metric=="blocker_violations") | .value // "0"')
-        CRITICALS=$(echo "$METRICS" | jq -r '.component.measures[] | select(.metric=="critical_violations") | .value // "0"')
+        METRICS_HTTP_CODE=$(echo "$METRICS_RESPONSE" | grep -o "HTTP_CODE:[0-9]*" | cut -d: -f2)
+        METRICS=$(echo "$METRICS_RESPONSE" | sed 's/HTTP_CODE:[0-9]*$//')
+        
+        if [ "${{ inputs.debug }}" = "true" ]; then
+          echo "DEBUG: Metrics HTTP code: $METRICS_HTTP_CODE"
+          echo "DEBUG: Metrics response: $METRICS"
+        fi
+        
+        if [ "$METRICS_HTTP_CODE" != "200" ]; then
+          echo "Error: SonarQube metrics API returned HTTP $METRICS_HTTP_CODE"
+          echo "Response: $METRICS"
+          COVERAGE="0"
+          BLOCKERS="0"
+          CRITICALS="0"
+        else
+          # Validate JSON before parsing
+          if echo "$METRICS" | jq empty 2>/dev/null; then
+            COVERAGE=$(echo "$METRICS" | jq -r '.component.measures[] | select(.metric=="coverage") | .value // "0"')
+            BLOCKERS=$(echo "$METRICS" | jq -r '.component.measures[] | select(.metric=="blocker_violations") | .value // "0"')
+            CRITICALS=$(echo "$METRICS" | jq -r '.component.measures[] | select(.metric=="critical_violations") | .value // "0"')
+          else
+            echo "Error: Invalid JSON response from metrics API"
+            echo "Response: $METRICS"
+            COVERAGE="0"
+            BLOCKERS="0"
+            CRITICALS="0"
+          fi
+        fi
         
         # Check thresholds
         STATUS="PASSED"
