@@ -129,7 +129,7 @@ runs:
         echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
         echo "SonarCloud: $STATUS | Coverage: ${COVERAGE}% | Issues: $CRITICALS critical, $BLOCKERS blocker"
 
-          - name: Skip (Disabled)
-        if: inputs.enabled != 'true'
-        shell: bash
-        run: echo "SonarCloud scan disabled"
+    - name: Skip (Disabled)
+      if: inputs.enabled != 'true'
+      shell: bash
+      run: echo "SonarCloud scan disabled"
