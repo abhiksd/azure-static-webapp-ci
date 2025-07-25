@@ -83,11 +83,30 @@ runs:
         echo "Scanning files in:"
         ls -la
         
-        sonar-scanner \
-          -Dsonar.projectKey=${{ inputs.project-key || github.repository }} \
-          -Dsonar.organization=${{ inputs.organization }} \
-          -Dsonar.host.url=${{ inputs.sonar-host-url }} \
-          -Dsonar.token=${{ inputs.sonar-token }}
+        # Check if sonar-project.properties exists
+        if [ -f "sonar-project.properties" ]; then
+          echo "Found sonar-project.properties file, using it for configuration"
+          cat sonar-project.properties
+          # Only pass token and organization (if not in properties file)
+          SONAR_ARGS=""
+          if ! grep -q "sonar.token" sonar-project.properties; then
+            SONAR_ARGS="$SONAR_ARGS -Dsonar.token=${{ inputs.sonar-token }}"
+          fi
+          if ! grep -q "sonar.organization" sonar-project.properties; then
+            SONAR_ARGS="$SONAR_ARGS -Dsonar.organization=${{ inputs.organization }}"
+          fi
+          if ! grep -q "sonar.host.url" sonar-project.properties; then
+            SONAR_ARGS="$SONAR_ARGS -Dsonar.host.url=${{ inputs.sonar-host-url }}"
+          fi
+          sonar-scanner $SONAR_ARGS
+        else
+          echo "No sonar-project.properties found, using command-line parameters"
+          sonar-scanner \
+            -Dsonar.projectKey=${{ inputs.project-key || github.repository }} \
+            -Dsonar.organization=${{ inputs.organization }} \
+            -Dsonar.host.url=${{ inputs.sonar-host-url }} \
+            -Dsonar.token=${{ inputs.sonar-token }}
+        fi
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
 
@@ -111,12 +130,20 @@ runs:
           jq -r '.projectStatus.status // "OK"')
         
         # Get metrics
+        echo "Fetching metrics for project: ${PROJECT_KEY}"
         METRICS=$(curl $CURL_OPTS -u "${{ inputs.sonar-token }}:" \
           "${{ inputs.sonar-host-url }}/api/measures/component?component=${PROJECT_KEY//\//%2F}&metricKeys=coverage,blocker_violations,critical_violations")
         
-        COVERAGE=$(echo "$METRICS" | jq -r '.component.measures[] | select(.metric=="coverage") | .value // "0"')
-        BLOCKERS=$(echo "$METRICS" | jq -r '.component.measures[] | select(.metric=="blocker_violations") | .value // "0"')
-        CRITICALS=$(echo "$METRICS" | jq -r '.component.measures[] | select(.metric=="critical_violations") | .value // "0"')
+        # Debug: Check if METRICS is valid JSON
+        if ! echo "$METRICS" | jq empty 2>/dev/null; then
+          echo "Warning: Invalid JSON response from SonarCloud API"
+          echo "Response: $METRICS"
+          METRICS='{"component":{"measures":[]}}'
+        fi
+        
+        COVERAGE=$(echo "$METRICS" | jq -r '.component.measures[]? | select(.metric=="coverage") | .value // "0"' 2>/dev/null || echo "0")
+        BLOCKERS=$(echo "$METRICS" | jq -r '.component.measures[]? | select(.metric=="blocker_violations") | .value // "0"' 2>/dev/null || echo "0")
+        CRITICALS=$(echo "$METRICS" | jq -r '.component.measures[]? | select(.metric=="critical_violations") | .value // "0"' 2>/dev/null || echo "0")
         
         # Check thresholds
         STATUS="PASSED"
@@ -129,7 +156,7 @@ runs:
         echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
         echo "SonarCloud: $STATUS | Coverage: ${COVERAGE}% | Issues: $CRITICALS critical, $BLOCKERS blocker"
 
-          - name: Skip (Disabled)
-        if: inputs.enabled != 'true'
-        shell: bash
-        run: echo "SonarCloud scan disabled"
+    - name: Skip (Disabled)
+      if: inputs.enabled != 'true'
+      shell: bash
+      run: echo "SonarCloud scan disabled"

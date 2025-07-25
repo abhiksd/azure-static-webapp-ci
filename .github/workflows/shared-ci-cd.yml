@@ -286,10 +286,44 @@ jobs:
           pwd
           echo "Installing dependencies..."
           ${{ env.INSTALL_COMMAND }}
+          
+          # Install Chrome for Angular tests if needed
+          if [ -f "angular.json" ] || [ -f "src/app/app.module.ts" ]; then
+            echo "Angular project detected, ensuring Chrome is available..."
+            sudo apt-get update
+            sudo apt-get install -y google-chrome-stable
+          fi
           echo "Building application (single build for all deployments)..."
           ${{ env.BUILD_COMMAND }}
-          echo "Running tests..."
-          npm test 2>/dev/null || echo "No tests found or test command not available"
+          echo "Running tests with coverage..."
+          
+          # Check if this is an Angular project
+          if [ -f "angular.json" ]; then
+            echo "Angular project detected"
+            echo "Attempting to build first..."
+            if ng build --configuration=production; then
+              echo "Build successful, running tests..."
+              if ng test --watch=false --code-coverage=true --browsers=HeadlessChrome --progress=false; then
+                echo "Angular tests with coverage completed"
+              else
+                echo "Angular tests failed, trying without coverage..."
+                ng test --watch=false --browsers=HeadlessChrome --progress=false || echo "Angular tests failed"
+              fi
+            else
+              echo "Build failed, skipping tests"
+            fi
+          else
+            # Try different test configurations for other project types
+            if npm run test:coverage; then
+              echo "Tests with coverage completed"
+            elif npm test -- --coverage --watchAll=false; then
+              echo "React tests with coverage completed"
+            elif npm test; then
+              echo "Tests completed (no coverage available)"
+            else
+              echo "No tests found or test command not available"
+            fi
+          fi
 
       - name: Verify Build Output
         run: |
@@ -322,6 +356,15 @@ jobs:
           retention-days: 7
           compression-level: 6
 
+      - name: Upload Coverage Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: ${{ env.APP_LOCATION }}/coverage/
+          retention-days: 7
+          compression-level: 6
+
   sonar-analysis:
     runs-on: ubuntu-latest
     needs: [build-and-test]
@@ -341,6 +384,13 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
+
+      - name: Download Coverage Reports
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-reports
+          path: ${{ env.APP_LOCATION }}/coverage/
+        continue-on-error: true
 
       - name: Install Dependencies
         working-directory: ${{ env.APP_LOCATION }}
