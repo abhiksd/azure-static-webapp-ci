@@ -122,11 +122,14 @@ runs:
         
         # Get quality gate with error handling
         echo "Fetching quality gate status for project: ${PROJECT_KEY}"
-        GATE_URL="${SONAR_HOST}/api/qualitygates/project_status?projectKey=${PROJECT_KEY//\//%2F}"
+        GATE_URL="${SONAR_HOST}/api/qualitygates/project_status"
         if [ "${{ inputs.debug }}" = "true" ]; then
-          echo "DEBUG: Quality gate URL: $GATE_URL"
+          echo "DEBUG: Quality gate base URL: $GATE_URL"
+          echo "DEBUG: Full URL would be: ${GATE_URL}?projectKey=${PROJECT_KEY}"
         fi
         GATE_RESPONSE=$(curl $CURL_OPTS -w "HTTP_CODE:%{http_code}" -u "${{ inputs.sonar-token }}:" \
+          --get \
+          --data-urlencode "projectKey=${PROJECT_KEY}" \
           "$GATE_URL")
         
         HTTP_CODE=$(echo "$GATE_RESPONSE" | grep -o "HTTP_CODE:[0-9]*" | cut -d: -f2)
@@ -154,11 +157,25 @@ runs:
         
         # Get metrics with error handling
         echo "Fetching metrics for project: ${PROJECT_KEY}"
-        METRICS_URL="${SONAR_HOST}/api/measures/component?component=${PROJECT_KEY//\//%2F}&metricKeys=coverage,blocker_violations,critical_violations"
+        
+        # URL encode the project key properly
+        ENCODED_PROJECT_KEY=$(echo "${PROJECT_KEY}" | sed 's/\//%2F/g')
+        
+        # Construct the metrics URL with proper encoding
+        METRICS_URL="${SONAR_HOST}/api/measures/component"
+        
         if [ "${{ inputs.debug }}" = "true" ]; then
-          echo "DEBUG: Metrics URL: $METRICS_URL"
+          echo "DEBUG: Metrics base URL: $METRICS_URL"
+          echo "DEBUG: Project key: $PROJECT_KEY"
+          echo "DEBUG: Encoded project key: $ENCODED_PROJECT_KEY"
+          echo "DEBUG: Full URL would be: ${METRICS_URL}?component=${ENCODED_PROJECT_KEY}&metricKeys=coverage,blocker_violations,critical_violations"
         fi
+        
+        # Use curl with proper parameter passing to avoid URL issues
         METRICS_RESPONSE=$(curl $CURL_OPTS -w "HTTP_CODE:%{http_code}" -u "${{ inputs.sonar-token }}:" \
+          --get \
+          --data-urlencode "component=${PROJECT_KEY}" \
+          --data-urlencode "metricKeys=coverage,blocker_violations,critical_violations" \
           "$METRICS_URL")
         
         METRICS_HTTP_CODE=$(echo "$METRICS_RESPONSE" | grep -o "HTTP_CODE:[0-9]*" | cut -d: -f2)
