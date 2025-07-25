@@ -286,14 +286,25 @@ jobs:
           pwd
           echo "Installing dependencies..."
           ${{ env.INSTALL_COMMAND }}
+          
+          # Install Chrome for Angular tests if needed
+          if [ -f "angular.json" ] || [ -f "src/app/app.module.ts" ]; then
+            echo "Angular project detected, ensuring Chrome is available..."
+            sudo apt-get update
+            sudo apt-get install -y google-chrome-stable
+          fi
           echo "Building application (single build for all deployments)..."
           ${{ env.BUILD_COMMAND }}
           echo "Running tests with coverage..."
-          # Try coverage first, fallback to regular tests
+          # Try different test configurations based on project type
           if npm run test:coverage 2>/dev/null; then
             echo "Tests with coverage completed"
+          elif npm run test -- --code-coverage=true --watch=false --browsers=HeadlessChrome 2>/dev/null; then
+            echo "Angular tests with coverage completed"
           elif npm test -- --coverage --watchAll=false 2>/dev/null; then
-            echo "Tests with coverage completed"
+            echo "React tests with coverage completed"
+          elif ng test --watch=false --code-coverage=true --browsers=HeadlessChrome 2>/dev/null; then
+            echo "Angular CLI tests with coverage completed"
           elif npm test 2>/dev/null; then
             echo "Tests completed (no coverage available)"
           else
