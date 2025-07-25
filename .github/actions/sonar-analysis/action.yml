@@ -83,11 +83,30 @@ runs:
         echo "Scanning files in:"
         ls -la
         
-        sonar-scanner \
-          -Dsonar.projectKey=${{ inputs.project-key || github.repository }} \
-          -Dsonar.organization=${{ inputs.organization }} \
-          -Dsonar.host.url=${{ inputs.sonar-host-url }} \
-          -Dsonar.token=${{ inputs.sonar-token }}
+        # Check if sonar-project.properties exists
+        if [ -f "sonar-project.properties" ]; then
+          echo "Found sonar-project.properties file, using it for configuration"
+          cat sonar-project.properties
+          # Only pass token and organization (if not in properties file)
+          SONAR_ARGS=""
+          if ! grep -q "sonar.token" sonar-project.properties; then
+            SONAR_ARGS="$SONAR_ARGS -Dsonar.token=${{ inputs.sonar-token }}"
+          fi
+          if ! grep -q "sonar.organization" sonar-project.properties; then
+            SONAR_ARGS="$SONAR_ARGS -Dsonar.organization=${{ inputs.organization }}"
+          fi
+          if ! grep -q "sonar.host.url" sonar-project.properties; then
+            SONAR_ARGS="$SONAR_ARGS -Dsonar.host.url=${{ inputs.sonar-host-url }}"
+          fi
+          sonar-scanner $SONAR_ARGS
+        else
+          echo "No sonar-project.properties found, using command-line parameters"
+          sonar-scanner \
+            -Dsonar.projectKey=${{ inputs.project-key || github.repository }} \
+            -Dsonar.organization=${{ inputs.organization }} \
+            -Dsonar.host.url=${{ inputs.sonar-host-url }} \
+            -Dsonar.token=${{ inputs.sonar-token }}
+        fi
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
 
