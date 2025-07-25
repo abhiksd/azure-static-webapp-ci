@@ -111,12 +111,20 @@ runs:
           jq -r '.projectStatus.status // "OK"')
         
         # Get metrics
+        echo "Fetching metrics for project: ${PROJECT_KEY}"
         METRICS=$(curl $CURL_OPTS -u "${{ inputs.sonar-token }}:" \
           "${{ inputs.sonar-host-url }}/api/measures/component?component=${PROJECT_KEY//\//%2F}&metricKeys=coverage,blocker_violations,critical_violations")
         
-        COVERAGE=$(echo "$METRICS" | jq -r '.component.measures[] | select(.metric=="coverage") | .value // "0"')
-        BLOCKERS=$(echo "$METRICS" | jq -r '.component.measures[] | select(.metric=="blocker_violations") | .value // "0"')
-        CRITICALS=$(echo "$METRICS" | jq -r '.component.measures[] | select(.metric=="critical_violations") | .value // "0"')
+        # Debug: Check if METRICS is valid JSON
+        if ! echo "$METRICS" | jq empty 2>/dev/null; then
+          echo "Warning: Invalid JSON response from SonarCloud API"
+          echo "Response: $METRICS"
+          METRICS='{"component":{"measures":[]}}'
+        fi
+        
+        COVERAGE=$(echo "$METRICS" | jq -r '.component.measures[]? | select(.metric=="coverage") | .value // "0"' 2>/dev/null || echo "0")
+        BLOCKERS=$(echo "$METRICS" | jq -r '.component.measures[]? | select(.metric=="blocker_violations") | .value // "0"' 2>/dev/null || echo "0")
+        CRITICALS=$(echo "$METRICS" | jq -r '.component.measures[]? | select(.metric=="critical_violations") | .value // "0"' 2>/dev/null || echo "0")
         
         # Check thresholds
         STATUS="PASSED"
@@ -129,7 +137,7 @@ runs:
         echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
         echo "SonarCloud: $STATUS | Coverage: ${COVERAGE}% | Issues: $CRITICALS critical, $BLOCKERS blocker"
 
-          - name: Skip (Disabled)
-        if: inputs.enabled != 'true'
-        shell: bash
-        run: echo "SonarCloud scan disabled"
+    - name: Skip (Disabled)
+      if: inputs.enabled != 'true'
+      shell: bash
+      run: echo "SonarCloud scan disabled"
