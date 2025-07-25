@@ -288,8 +288,17 @@ jobs:
           ${{ env.INSTALL_COMMAND }}
           echo "Building application (single build for all deployments)..."
           ${{ env.BUILD_COMMAND }}
-          echo "Running tests..."
-          npm test 2>/dev/null || echo "No tests found or test command not available"
+          echo "Running tests with coverage..."
+          # Try coverage first, fallback to regular tests
+          if npm run test:coverage 2>/dev/null; then
+            echo "Tests with coverage completed"
+          elif npm test -- --coverage --watchAll=false 2>/dev/null; then
+            echo "Tests with coverage completed"
+          elif npm test 2>/dev/null; then
+            echo "Tests completed (no coverage available)"
+          else
+            echo "No tests found or test command not available"
+          fi
 
       - name: Verify Build Output
         run: |
@@ -322,6 +331,15 @@ jobs:
           retention-days: 7
           compression-level: 6
 
+      - name: Upload Coverage Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: ${{ env.APP_LOCATION }}/coverage/
+          retention-days: 7
+          compression-level: 6
+
   sonar-analysis:
     runs-on: ubuntu-latest
     needs: [build-and-test]
@@ -341,6 +359,13 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
+
+      - name: Download Coverage Reports
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-reports
+          path: ${{ env.APP_LOCATION }}/coverage/
+        continue-on-error: true
 
       - name: Install Dependencies
         working-directory: ${{ env.APP_LOCATION }}
